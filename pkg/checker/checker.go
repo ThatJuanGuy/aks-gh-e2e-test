@@ -18,7 +18,7 @@ type CheckerConfig struct {
 }
 
 type Config struct {
-	Checkers []CheckerConfig `yaml:"checker"`
+	Checkers []CheckerConfig `yaml:"checkers"`
 }
 
 type checkerBuilder func(name string, spec map[string]any) (Checker, error)

@@ -1,7 +1,6 @@
 package checker
 
 import (
-	"os"
 	"testing"
 
 	"github.com/Azure/cluster-health-monitor/pkg/checker/example"
@@ -14,17 +13,13 @@ func TestRegisterAndBuildExampleChecker(t *testing.T) {
 	})
 
 	yamlData := []byte(`
-checker:
+checkers:
 - name: example
   type: example
   spec:
     interval: 15
     timeout: 30
 `)
-	yamlData, err := os.ReadFile("./example.yaml")
-	if err != nil {
-		t.Fatalf("failed to read example.yaml: %v", err)
-	}
 
 	checkers, err := BuildCheckersFromConfig(yamlData)
 	if err != nil {
