@@ -1,0 +1,6 @@
+checker:
+- name: example
+  type: example
+  spec:
+    interval: 15
+    timeout: 30
