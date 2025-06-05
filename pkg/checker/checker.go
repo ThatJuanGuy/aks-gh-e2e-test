@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	yaml "gopkg.in/yaml.v3"
+
+	"github.com/Azure/cluster-health-monitor/pkg/checker/example"
 )
 
 type Checker interface {
@@ -25,12 +27,15 @@ type checkerBuilder func(name string, spec map[string]any) (Checker, error)
 
 var registry = make(map[string]checkerBuilder)
 
-func registerChecker(typ string, builder checkerBuilder) {
-	registry[typ] = builder
+func registerChecker(chkType string, builder checkerBuilder) {
+	registry[chkType] = builder
 }
 
 func init() {
-	registerChecker("example", nil)
+	// this is a example to show how to register a checker
+	registerChecker("example", func(name string, spec map[string]any) (Checker, error) {
+		return example.BuildExampleChecker(name, spec)
+	})
 }
 
 func BuildCheckersFromConfig(config []byte) ([]Checker, error) {
@@ -54,10 +59,10 @@ func BuildCheckersFromConfig(config []byte) ([]Checker, error) {
 }
 
 // buildChecker creates a checker by registry identity (name) and passes the spec.
-func buildChecker(name, typ string, spec map[string]any) (Checker, error) {
-	builder, exists := registry[typ]
+func buildChecker(name, chkType string, spec map[string]any) (Checker, error) {
+	builder, exists := registry[chkType]
 	if !exists {
-		return nil, fmt.Errorf("checker type %q not registered", typ)
+		return nil, fmt.Errorf("checker type %q not registered", chkType)
 	}
 	return builder(name, spec)
 }

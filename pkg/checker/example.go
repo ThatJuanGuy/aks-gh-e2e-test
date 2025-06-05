@@ -1,4 +1,4 @@
-package example
+package checker
 
 import (
 	"fmt"
@@ -14,7 +14,7 @@ type ExampleChecker struct {
 
 func BuildExampleChecker(name string, spec map[string]any) (*ExampleChecker, error) {
 	if name == "" {
-		return nil, fmt.Errorf("name is required to build ExampleChecker")
+		return &ExampleChecker{}, nil
 	}
 	checker := &ExampleChecker{}
 	if err := mapstructure.Decode(spec, checker); err != nil {
