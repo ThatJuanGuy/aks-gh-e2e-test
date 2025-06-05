@@ -44,11 +44,16 @@ func BuildCheckersFromConfig(config []byte) ([]Checker, error) {
 		return nil, fmt.Errorf("failed to unmarshal yaml: %w", err)
 	}
 
+	nameSet := make(map[string]struct{})
 	var checkers []Checker
 	for _, cfg := range root.Checkers {
 		if cfg.Name == "" || cfg.Spec == nil {
 			return nil, fmt.Errorf("checker entry missing 'name' or 'spec'")
 		}
+		if _, exists := nameSet[cfg.Name]; exists {
+			return nil, fmt.Errorf("duplicate checker name: %q", cfg.Name)
+		}
+		nameSet[cfg.Name] = struct{}{}
 		chk, err := buildChecker(cfg.Name, cfg.Type, cfg.Spec)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build checker %q: %w", cfg.Name, err)

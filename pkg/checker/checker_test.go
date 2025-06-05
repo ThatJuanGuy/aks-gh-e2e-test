@@ -43,3 +43,27 @@ checkers:
 		t.Errorf("expected timeout 30, got %d", ec.Timeout)
 	}
 }
+
+func TestDuplicateCheckerName(t *testing.T) {
+	yamlData := []byte(`
+checkers:
+- name: foo
+  type: example
+  spec:
+    interval: 1
+    timeout: 2
+- name: foo
+  type: example
+  spec:
+    interval: 3
+    timeout: 4
+`)
+
+	_, err := BuildCheckersFromConfig(yamlData)
+	if err == nil {
+		t.Fatal("expected error for duplicate checker name, got nil")
+	}
+	if got, want := err.Error(), "duplicate checker name: \"foo\""; got != want {
+		t.Fatalf("unexpected error: got %q, want %q", got, want)
+	}
+}
