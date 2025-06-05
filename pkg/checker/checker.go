@@ -25,12 +25,12 @@ type checkerBuilder func(name string, spec map[string]any) (Checker, error)
 
 var registry = make(map[string]checkerBuilder)
 
-func RegisterChecker(typ string, builder checkerBuilder) {
+func registerChecker(typ string, builder checkerBuilder) {
 	registry[typ] = builder
 }
 
 func init() {
-	RegisterChecker("example", nil)
+	registerChecker("example", nil)
 }
 
 func BuildCheckersFromConfig(config []byte) ([]Checker, error) {

@@ -9,7 +9,7 @@ import (
 
 func TestRegisterAndBuildExampleChecker(t *testing.T) {
 	// Register the ExampleChecker builder
-	RegisterChecker("example", func(name string, spec map[string]any) (Checker, error) {
+	registerChecker("example", func(name string, spec map[string]any) (Checker, error) {
 		return example.BuildExampleChecker(name, spec)
 	})
 
