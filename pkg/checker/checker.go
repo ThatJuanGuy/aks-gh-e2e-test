@@ -5,7 +5,8 @@ import (
 
 	yaml "gopkg.in/yaml.v3"
 
-	"github.com/Azure/cluster-health-monitor/pkg/checker/example"
+	"github.com/Azure/cluster-health-monitor/pkg/checker/dns"
+	"github.com/Azure/cluster-health-monitor/pkg/config"
 )
 
 type Checker interface {
@@ -13,48 +14,25 @@ type Checker interface {
 	Run() error
 }
 
-type CheckerConfig struct {
-	Name string         `yaml:"name"`
-	Type string         `yaml:"type"`
-	Spec map[string]any `yaml:"spec"`
-}
-
-type Config struct {
-	Checkers []CheckerConfig `yaml:"checkers"`
-}
-
 type checkerBuilder func(name string, spec map[string]any) (Checker, error)
 
-var registry = make(map[string]checkerBuilder)
-
-func registerChecker(chkType string, builder checkerBuilder) {
-	registry[chkType] = builder
-}
-
-func init() {
-	// this is a example to show how to register a checker
-	registerChecker("example", func(name string, spec map[string]any) (Checker, error) {
-		return example.BuildExampleChecker(name, spec)
-	})
-}
-
-func BuildCheckersFromConfig(config []byte) ([]Checker, error) {
-	var root Config
-	if err := yaml.Unmarshal(config, &root); err != nil {
+func BuildCheckersFromConfig(cfg []byte) ([]Checker, error) {
+	var root config.Config
+	if err := yaml.Unmarshal(cfg, &root); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal yaml: %w", err)
 	}
 
 	nameSet := make(map[string]struct{})
 	var checkers []Checker
 	for _, cfg := range root.Checkers {
-		if cfg.Name == "" || cfg.Spec == nil {
+		if cfg.Name == "" {
 			return nil, fmt.Errorf("checker entry missing 'name' or 'spec'")
 		}
 		if _, exists := nameSet[cfg.Name]; exists {
 			return nil, fmt.Errorf("duplicate checker name: %q", cfg.Name)
 		}
 		nameSet[cfg.Name] = struct{}{}
-		chk, err := buildChecker(cfg.Name, cfg.Type, cfg.Spec)
+		chk, err := buildChecker(cfg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build checker %q: %w", cfg.Name, err)
 		}
@@ -64,10 +42,20 @@ func BuildCheckersFromConfig(config []byte) ([]Checker, error) {
 }
 
 // buildChecker creates a checker by registry identity (name) and passes the spec.
-func buildChecker(name, chkType string, spec map[string]any) (Checker, error) {
-	builder, exists := registry[chkType]
-	if !exists {
-		return nil, fmt.Errorf("checker type %q not registered", chkType)
+func buildChecker(cfg config.CheckerConfig) (Checker, error) {
+	switch cfg.Type {
+	case config.CheckTypeDNS:
+		if cfg.DNSProfile == nil {
+			return nil, fmt.Errorf("DNSProfile is required for checker type %q", cfg.Type)
+		}
+		return dns.BuildDNSChecker(cfg.Name, cfg.DNSProfile)
+	case config.CheckTypePodStartup:
+		if cfg.PodStartupProfile == nil {
+			return nil, fmt.Errorf("PodStartupProfile is required for checker type %q", cfg.Type)
+		}
+		// TODO: Implement PodStartup checker construction here
+		return nil, fmt.Errorf("PodStartup checker not implemented")
+	default:
+		return nil, fmt.Errorf("unrecognized checker type: %q", cfg.Type)
 	}
-	return builder(name, spec)
 }
