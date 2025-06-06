@@ -1,0 +1,55 @@
+name: publish_images
+
+on:
+  workflow_dispatch:
+    inputs:
+      releaseTag:
+        description: 'Release tag to publish images, defaults to the latest one'
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  CLUSTER_HEALTH_MONITOR_IMAGE_NAME: cluster-health-monitor
+  CLUSTER_HEALTH_MONITOR_IMAGE_VERSION: main
+
+jobs:
+  export-registry:
+    runs-on: ubuntu-22.04
+    outputs:
+      registry: ${{ steps.export.outputs.registry }}
+    steps:
+    - id: export
+      run: |
+        # registry must be in lowercase
+        echo "registry=$(echo "${{ env.REGISTRY }}/${{ github.repository }}" | tr [:upper:] [:lower:])" >> $GITHUB_OUTPUT
+  publish-images:
+    needs: export-registry
+    env:
+      REGISTRY: ${{ needs.export-registry.outputs.registry }}
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+        fetch-depth: 0
+    - name: Set image version for a new release
+      if: startsWith(github.ref, 'refs/tags/')
+      run: |
+        echo "CLUSTER_HEALTH_MONITOR_IMAGE_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+    - name: Login to ${{ env.REGISTRY }}
+      uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Build ${{ env.CLUSTER_HEALTH_MONITOR_IMAGE_NAME}}
+      run: |
+        make docker-build-cluster-health-monitor
+      env:
+        REGISTRY: ${{ env.REGISTRY}}
+        IMAGE_NAME: ${{ env.CLUSTER_HEALTH_MONITOR_IMAGE_NAME}}
+        IMAGE_VERSION: ${{ env.CLUSTER_HEALTH_MONITOR_IMAGE_VERSION }}
