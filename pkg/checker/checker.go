@@ -6,6 +6,7 @@ import (
 	yaml "gopkg.in/yaml.v3"
 
 	"github.com/Azure/cluster-health-monitor/pkg/checker/dns"
+	"github.com/Azure/cluster-health-monitor/pkg/checker/podstartup"
 	"github.com/Azure/cluster-health-monitor/pkg/config"
 )
 
@@ -53,8 +54,7 @@ func buildChecker(cfg config.CheckerConfig) (Checker, error) {
 		if cfg.PodStartupProfile == nil {
 			return nil, fmt.Errorf("PodStartupProfile is required for checker type %q", cfg.Type)
 		}
-		// TODO: Implement PodStartup checker construction here
-		return nil, fmt.Errorf("PodStartup checker not implemented")
+		return podstartup.BuildPodStartupChecker(cfg.Name, cfg.PodStartupProfile)
 	default:
 		return nil, fmt.Errorf("unrecognized checker type: %q", cfg.Type)
 	}
