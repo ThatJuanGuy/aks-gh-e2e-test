@@ -13,14 +13,13 @@ RUN go mod download
 COPY cmd/clusterhealthmonitor/ cmd/clusterhealthmonitor/
 COPY pkg/ pkg/
 
-ARG TARGETARCH
-
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} GO111MODULE=on go build -o clusterhealthmonitor  cmd/clusterhealthmonitor/main.go
+RUN CGO_ENABLED=1 GOEXPERIMENT=systemcrypto go build -o clusterhealthmonitor cmd/clusterhealthmonitor/main.go
 
 # Use distroless as minimal base image to package the clusterhealthmonitor binary
-# Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM gcr.io/distroless/static:nonroot
+# Using distroless/base instead of distroless/minimal because it comes with SymCrypt and SymCrypt-OpenSSL which are required FIPS/Azure compliance
+# Refer to https://mcr.microsoft.com/en-us/artifact/mar/azurelinux/distroless/base/about for more details
+FROM mcr.microsoft.com/azurelinux/distroless/base:3.0
 WORKDIR /
 COPY --from=builder /workspace/clusterhealthmonitor .
 USER 65532:65532
