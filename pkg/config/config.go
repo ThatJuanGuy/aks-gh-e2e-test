@@ -1,5 +1,7 @@
 package config
 
+import "time"
+
 type CheckerType string
 
 const (
@@ -7,37 +9,35 @@ const (
 	CheckTypePodStartup CheckerType = "podStartup"
 )
 
+// Config represents the configuration for the health checkers.
 type Config struct {
 	Checkers []CheckerConfig `yaml:"checkers"`
 }
 
+// CheckerConfig represents the configuration for a specific health checker.
 type CheckerConfig struct {
-	// the unique name of the checker, used to identify the checker in the system
+	// The unique name of the checker configuration, used to identify the checker in the system.
 	Name string `yaml:"name"`
 
-	// the type of the checker, used to determine which checker implementation to use
-	// each checker type must have a corresponding builder registered in the system
-	// each checker type must has a Profile configuration
+	// The type of the checker, used to determine which checker implementation to use.
+	// Each checker type must be accompanied by its specific configuration if it requires additional parameters.
 	Type CheckerType `yaml:"type"`
 
-	// the interval in seconds at which the checker should run
-	Interval int `yaml:"interval"`
+	// The interval in seconds at which the checker should run.
+	Interval time.Duration `yaml:"interval"`
 
-	// the profile configuration for the DNS checker, this field is required if Type is CheckTypeDNS
-	DNSProfile *DNSProfile `yaml:"dnsProfile,omitempty"`
+	// The timeout for the checker, used to determine how long to wait for a response before considering the check failed.
+	Timeout time.Duration `yaml:"interval"`
 
-	// the profile configuration for the Pod startup checker, this field is required if Type is CheckTypePodStartup
-	PodStartupProfile *PodStartupProfile `yaml:"podStartupProfile,omitempty"`
+	// The configuration for the DNS checker, this field is required if Type is CheckTypeDNS.
+	DNSConfig *DNSConfig `yaml:"dnsConfig,omitempty"`
+
+	// The configuration for the Pod startup checker, this field is required if Type is CheckTypePodStartup.
+	PodStartupConfig *PodStartupConfig `yaml:"podStartupConfig,omitempty"`
 }
 
-type DNSProfile struct {
-	Domain string `yaml:"domain"` // example field for DNS profile
-
-	// TODO: add more fields for DNS profile configuration
+type DNSConfig struct {
 }
 
-type PodStartupProfile struct {
-	Namespace string `yaml:"namespace"` // example field for Pod startup profile
-	PodName   string `yaml:"podName"`   // example field for Pod startup profile
-	// TODO: add more fields for Pod startup profile configuration
+type PodStartupConfig struct {
 }

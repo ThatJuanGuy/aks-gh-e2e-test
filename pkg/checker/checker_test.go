@@ -13,8 +13,6 @@ checkers:
 - name: dns 
   type: dns 
   interval: 10
-  dnsProfile:
-    domain: "example.com"
 `)
 
 	checkers, err := BuildCheckersFromConfig(yamlData)
@@ -32,9 +30,6 @@ checkers:
 	if dc.Name() != "dns" {
 		t.Errorf("expected name 'example', got %q", dc.Name())
 	}
-	if dc.Domain != "example.com" {
-		t.Errorf("expected domain 'example.com', got %q", dc.Domain)
-	}
 }
 
 func TestDuplicateCheckerName(t *testing.T) {
@@ -43,13 +38,9 @@ checkers:
 - name: foo
   interval: 10
   type: dns 
-  dnsProfile:
-    domain: "example.com"
 - name: foo
   interval: 10
   type: dns
-  dnsProfile:
-    domain: "example.com"
 `)
 
 	_, err := BuildCheckersFromConfig(yamlData)

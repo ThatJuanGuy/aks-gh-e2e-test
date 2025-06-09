@@ -11,11 +11,10 @@ type DNSChecker struct {
 	Domain string
 }
 
-func BuildDNSChecker(name string, profile *config.DNSProfile) (*DNSChecker, error) {
-	// TODO: Validate the name and profile
+func BuildDNSChecker(name string, config *config.DNSConfig) (*DNSChecker, error) {
+	// TODO: Validate the name and config
 	return &DNSChecker{
-		name:   name,
-		Domain: profile.Domain,
+		name: name,
 	}, nil
 }
 

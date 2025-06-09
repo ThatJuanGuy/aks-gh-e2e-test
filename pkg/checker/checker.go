@@ -46,15 +46,9 @@ func BuildCheckersFromConfig(cfg []byte) ([]Checker, error) {
 func buildChecker(cfg config.CheckerConfig) (Checker, error) {
 	switch cfg.Type {
 	case config.CheckTypeDNS:
-		if cfg.DNSProfile == nil {
-			return nil, fmt.Errorf("DNSProfile is required for checker type %q", cfg.Type)
-		}
-		return dns.BuildDNSChecker(cfg.Name, cfg.DNSProfile)
+		return dns.BuildDNSChecker(cfg.Name, cfg.DNSConfig)
 	case config.CheckTypePodStartup:
-		if cfg.PodStartupProfile == nil {
-			return nil, fmt.Errorf("PodStartupProfile is required for checker type %q", cfg.Type)
-		}
-		return podstartup.BuildPodStartupChecker(cfg.Name, cfg.PodStartupProfile)
+		return podstartup.BuildPodStartupChecker(cfg.Name, cfg.PodStartupConfig)
 	default:
 		return nil, fmt.Errorf("unrecognized checker type: %q", cfg.Type)
 	}

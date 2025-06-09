@@ -12,11 +12,9 @@ type PodStartupChecker struct {
 	podName   string
 }
 
-func BuildPodStartupChecker(name string, profile *config.PodStartupProfile) (*PodStartupChecker, error) {
+func BuildPodStartupChecker(name string, config *config.PodStartupConfig) (*PodStartupChecker, error) {
 	return &PodStartupChecker{
-		name:      name,
-		namespace: profile.Namespace,
-		podName:   profile.PodName,
+		name: name,
 	}, nil
 }
 
