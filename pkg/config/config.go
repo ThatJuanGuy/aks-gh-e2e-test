@@ -27,7 +27,7 @@ type CheckerConfig struct {
 	Interval time.Duration `yaml:"interval"`
 
 	// The timeout for the checker, used to determine how long to wait for a response before considering the check failed.
-	Timeout time.Duration `yaml:"interval"`
+	Timeout time.Duration `yaml:"timeout"`
 
 	// The configuration for the DNS checker, this field is required if Type is CheckTypeDNS.
 	DNSConfig *DNSConfig `yaml:"dnsConfig,omitempty"`

@@ -12,7 +12,7 @@ func TestRegisterAndBuildExampleChecker(t *testing.T) {
 checkers:
 - name: dns 
   type: dns 
-  interval: 10
+  interval: 10s
 `)
 
 	checkers, err := BuildCheckersFromConfig(yamlData)
@@ -36,10 +36,10 @@ func TestDuplicateCheckerName(t *testing.T) {
 	yamlData := []byte(`
 checkers:
 - name: foo
-  interval: 10
+  interval: 10s
   type: dns 
 - name: foo
-  interval: 10
+  interval: 10s
   type: dns
 `)
 
