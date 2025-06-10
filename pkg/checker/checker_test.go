@@ -1,10 +1,10 @@
 package checker
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/Azure/cluster-health-monitor/pkg/checker/dnscheck"
+	. "github.com/onsi/gomega"
 )
 
 func TestRegisterAndBuildExampleChecker(t *testing.T) {
@@ -18,29 +18,21 @@ checkers:
     domain: example.com
 `)
 
+	g := NewGomegaWithT(t)
 	checkers, err := BuildCheckersFromConfig(yamlData)
-	if err != nil {
-		t.Fatalf("failed to build checkers: %v", err)
-	}
-	if len(checkers) != 1 {
-		t.Fatalf("expected 1 checker, got %d", len(checkers))
-	}
+	g.Expect(err).NotTo(HaveOccurred(), "failed to build checkers")
+	g.Expect(checkers).To(HaveLen(1), "expected 1 checker")
 
 	dc, ok := checkers[0].(*dnscheck.DNSChecker)
-	if !ok {
-		t.Fatalf("checker is not of type *dnscheck.DNSChecker")
-	}
-	if dc.Name() != "dns" {
-		t.Errorf("expected name 'dns', got %q", dc.Name())
-	}
+	g.Expect(ok).To(BeTrue(), "checker should be of type *dnscheck.DNSChecker")
+	g.Expect(dc.Name()).To(Equal("dns"), "checker should have the correct name")
 }
 
 func TestValidationInBuildCheckersFromConfig(t *testing.T) {
-	testCases := []struct {
-		name             string
-		yaml             string
-		expectedError    bool
-		expectedErrorMsg string
+	for _, tc := range []struct {
+		name        string
+		yaml        string
+		validateRes func(g *WithT, checkers []Checker, err error)
 	}{
 		{
 			name: "Valid DNS Checker",
@@ -52,7 +44,10 @@ checkers:
   dnsConfig:
     domain: example.com
 `,
-			expectedError: false,
+			validateRes: func(g *WithT, checkers []Checker, err error) {
+				g.Expect(checkers).To(HaveLen(1))
+				g.Expect(err).NotTo(HaveOccurred())
+			},
 		},
 		{
 			name: "Duplicate Name",
@@ -69,8 +64,11 @@ checkers:
   dnsConfig:
     domain: example.com
 `,
-			expectedError:    true,
-			expectedErrorMsg: "duplicate checker name: \"duplicate-name\"",
+			validateRes: func(g *WithT, checkers []Checker, err error) {
+				g.Expect(checkers).To(BeNil())
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("duplicate checker name:"))
+			},
 		},
 		{
 			name: "Empty Name",
@@ -80,8 +78,11 @@ checkers:
   type: dns
   interval: 10s
 `,
-			expectedError:    true,
-			expectedErrorMsg: "missing 'name'",
+			validateRes: func(g *WithT, checkers []Checker, err error) {
+				g.Expect(checkers).To(BeNil())
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("missing 'name'"))
+			},
 		},
 		{
 			name: "Missing Type",
@@ -90,8 +91,11 @@ checkers:
 - name: test-checker
   interval: 10s
 `,
-			expectedError:    true,
-			expectedErrorMsg: "missing 'type'",
+			validateRes: func(g *WithT, checkers []Checker, err error) {
+				g.Expect(checkers).To(BeNil())
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("missing 'type'"))
+			},
 		},
 		{
 			name: "Invalid Interval",
@@ -101,8 +105,11 @@ checkers:
   type: dns
   interval: -10s
 `,
-			expectedError:    true,
-			expectedErrorMsg: "invalid 'interval'",
+			validateRes: func(g *WithT, checkers []Checker, err error) {
+				g.Expect(checkers).To(BeNil())
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("invalid 'interval'"))
+			},
 		},
 		{
 			name: "Invalid Timeout",
@@ -113,8 +120,11 @@ checkers:
   interval: 10s
   timeout: -5s
 `,
-			expectedError:    true,
-			expectedErrorMsg: "invalid 'timeout'",
+			validateRes: func(g *WithT, checkers []Checker, err error) {
+				g.Expect(checkers).To(BeNil())
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("invalid 'timeout'"))
+			},
 		},
 		{
 			name: "Unknown Type",
@@ -123,28 +133,17 @@ checkers:
 - name: unknown-checker
   type: unknown
 `,
-			expectedError:    true,
-			expectedErrorMsg: "unrecognized checker type: \"unknown\"",
+			validateRes: func(g *WithT, checkers []Checker, err error) {
+				g.Expect(checkers).To(BeNil())
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("unrecognized checker type:"))
+			},
 		},
-	}
-
-	for _, tc := range testCases {
+	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := BuildCheckersFromConfig([]byte(tc.yaml))
-
-			if tc.expectedError && err == nil {
-				t.Fatalf("expected error containing %q, got nil", tc.expectedErrorMsg)
-				return
-			}
-
-			if tc.expectedError && !strings.Contains(err.Error(), tc.expectedErrorMsg) {
-				t.Errorf("expected error containing %q, got: %v", tc.expectedErrorMsg, err)
-			}
-
-			if !tc.expectedError && err != nil {
-				t.Fatalf("unexpected error: %v", err)
-				return
-			}
+			g := NewWithT(t)
+			checkers, err := BuildCheckersFromConfig([]byte(tc.yaml))
+			tc.validateRes(g, checkers, err)
 		})
 	}
 }

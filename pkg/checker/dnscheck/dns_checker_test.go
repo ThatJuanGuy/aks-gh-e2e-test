@@ -1,19 +1,19 @@
 package dnscheck
 
 import (
-	"reflect"
 	"testing"
+
+	. "github.com/onsi/gomega"
 
 	"github.com/Azure/cluster-health-monitor/pkg/config"
 )
 
 func TestBuildDNSChecker(t *testing.T) {
-	testCases := []struct {
-		name            string
-		checkerName     string
-		dnsConfig       *config.DNSConfig
-		expectedError   bool
-		expectedChecker *DNSChecker
+	for _, tc := range []struct {
+		name        string
+		checkerName string
+		dnsConfig   *config.DNSConfig
+		validateRes func(g *WithT, checker *DNSChecker, err error)
 	}{
 		{
 			name:        "Valid config",
@@ -21,19 +21,25 @@ func TestBuildDNSChecker(t *testing.T) {
 			dnsConfig: &config.DNSConfig{
 				Domain: "example.com",
 			},
-			expectedError: false,
-			expectedChecker: &DNSChecker{
-				name: "test-dns-checker",
-				config: &config.DNSConfig{
-					Domain: "example.com",
-				},
+			validateRes: func(g *WithT, checker *DNSChecker, err error) {
+				g.Expect(checker).To(Equal(
+					&DNSChecker{
+						name: "test-dns-checker",
+						config: &config.DNSConfig{
+							Domain: "example.com",
+						},
+					}))
+				g.Expect(err).NotTo(HaveOccurred())
 			},
 		},
 		{
-			name:          "Missing DNSConfig",
-			checkerName:   "test-dns-checker",
-			dnsConfig:     nil,
-			expectedError: true,
+			name:        "Missing DNSConfig",
+			checkerName: "test-dns-checker",
+			dnsConfig:   nil,
+			validateRes: func(g *WithT, checker *DNSChecker, err error) {
+				g.Expect(checker).To(BeNil())
+				g.Expect(err).To(HaveOccurred())
+			},
 		},
 		{
 			name:        "Empty Domain",
@@ -41,34 +47,16 @@ func TestBuildDNSChecker(t *testing.T) {
 			dnsConfig: &config.DNSConfig{
 				Domain: "",
 			},
-			expectedError: true,
+			validateRes: func(g *WithT, checker *DNSChecker, err error) {
+				g.Expect(checker).To(BeNil())
+				g.Expect(err).To(HaveOccurred())
+			},
 		},
-	}
-
-	for _, tc := range testCases {
+	} {
 		t.Run(tc.name, func(t *testing.T) {
+			g := NewWithT(t)
 			checker, err := BuildDNSChecker(tc.checkerName, tc.dnsConfig)
-
-			if tc.expectedError && err == nil {
-				t.Errorf("expected error but got nil")
-				return
-			}
-
-			if !tc.expectedError && err != nil {
-				t.Errorf("unexpected error: %v", err)
-				return
-			}
-
-			if !tc.expectedError {
-				if checker == nil {
-					t.Errorf("expected checker but got nil")
-					return
-				}
-
-				if !reflect.DeepEqual(checker, tc.expectedChecker) {
-					t.Errorf("checkers don't match:\nexpected: %+v\ngot: %+v", tc.expectedChecker, checker)
-				}
-			}
+			tc.validateRes(g, checker, err)
 		})
 	}
 }
