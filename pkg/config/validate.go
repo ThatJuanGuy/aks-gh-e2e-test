@@ -18,3 +18,14 @@ func (c *CheckerConfig) ValidateCommon() error {
 	}
 	return nil
 }
+
+// ValidateDNSConfig validates the DNSConfig.
+func (c *DNSConfig) ValidateDNSConfig() error {
+	if c == nil {
+		return fmt.Errorf("dnsConfig is required for DNSChecker")
+	}
+	if c.Domain == "" {
+		return fmt.Errorf("domain is required for DNSChecker")
+	}
+	return nil
+}
