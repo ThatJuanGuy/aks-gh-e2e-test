@@ -3,22 +3,16 @@ package checker
 import (
 	"testing"
 
-	"github.com/Azure/cluster-health-monitor/pkg/checker/example"
+	"github.com/Azure/cluster-health-monitor/pkg/checker/dns"
 )
 
 func TestRegisterAndBuildExampleChecker(t *testing.T) {
 	// Register the ExampleChecker builder
-	registerChecker("example", func(name string, spec map[string]any) (Checker, error) {
-		return example.BuildExampleChecker(name, spec)
-	})
-
 	yamlData := []byte(`
 checkers:
-- name: example
-  type: example
-  spec:
-    interval: 15
-    timeout: 30
+- name: dns 
+  type: dns 
+  interval: 10s
 `)
 
 	checkers, err := BuildCheckersFromConfig(yamlData)
@@ -29,18 +23,12 @@ checkers:
 		t.Fatalf("expected 1 checker, got %d", len(checkers))
 	}
 
-	ec, ok := checkers[0].(*example.ExampleChecker)
+	dc, ok := checkers[0].(*dns.DNSChecker)
 	if !ok {
 		t.Fatalf("checker is not of type *ExampleChecker")
 	}
-	if ec.Name() != "example" {
-		t.Errorf("expected name 'example', got %q", ec.Name())
-	}
-	if ec.Interval != 15 {
-		t.Errorf("expected interval 15, got %d", ec.Interval)
-	}
-	if ec.Timeout != 30 {
-		t.Errorf("expected timeout 30, got %d", ec.Timeout)
+	if dc.Name() != "dns" {
+		t.Errorf("expected name 'example', got %q", dc.Name())
 	}
 }
 
@@ -48,15 +36,11 @@ func TestDuplicateCheckerName(t *testing.T) {
 	yamlData := []byte(`
 checkers:
 - name: foo
-  type: example
-  spec:
-    interval: 1
-    timeout: 2
+  interval: 10s
+  type: dns 
 - name: foo
-  type: example
-  spec:
-    interval: 3
-    timeout: 4
+  interval: 10s
+  type: dns
 `)
 
 	_, err := BuildCheckersFromConfig(yamlData)
