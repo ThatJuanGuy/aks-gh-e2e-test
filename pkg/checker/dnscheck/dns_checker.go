@@ -5,34 +5,28 @@ import (
 	"context"
 	"fmt"
 
-	"time"
-
 	"github.com/Azure/cluster-health-monitor/pkg/config"
 )
 
 // DNSChecker implements the Checker interface for DNS checks.
 type DNSChecker struct {
-	name     string
-	interval time.Duration
-	timeout  time.Duration
-	domain   string
+	name   string
+	config *config.DNSConfig
 }
 
 // BuildDNSChecker creates a new DNSChecker instance.
-func BuildDNSChecker(config config.CheckerConfig) (*DNSChecker, error) {
-	if config.DNSConfig == nil {
+func BuildDNSChecker(name string, config *config.DNSConfig) (*DNSChecker, error) {
+	if config == nil {
 		return nil, fmt.Errorf("dnsConfig is required for DNSChecker")
 	}
 
-	if config.DNSConfig.Domain == "" {
+	if config.Domain == "" {
 		return nil, fmt.Errorf("domain is required for DNSChecker")
 	}
 
 	return &DNSChecker{
-		name:     config.Name,
-		interval: config.Interval,
-		timeout:  config.Timeout,
-		domain:   config.DNSConfig.Domain,
+		name:   name,
+		config: config,
 	}, nil
 }
 

@@ -45,7 +45,7 @@ func BuildCheckersFromConfig(cfg []byte) ([]Checker, error) {
 func buildChecker(cfg config.CheckerConfig) (Checker, error) {
 	switch cfg.Type {
 	case config.CheckTypeDNS:
-		return dnscheck.BuildDNSChecker(cfg)
+		return dnscheck.BuildDNSChecker(cfg.Name, cfg.DNSConfig)
 	case config.CheckTypePodStartup:
 		return podstartup.BuildPodStartupChecker(cfg.Name, cfg.PodStartupConfig)
 	default:
