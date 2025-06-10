@@ -139,6 +139,42 @@ checkers:
 				g.Expect(err.Error()).To(ContainSubstring("unrecognized checker type:"))
 			},
 		},
+		{
+			name: "Multiple Errors",
+			yaml: `
+checkers:
+- name: invalid-test-checker
+  type: dns
+  interval: -10s
+  timeout: -5s
+  dnsConfig:
+    domain:
+- name: unknown-checker
+  type: unknown
+- name: duplicate-test-checker
+  type: dns
+  interval: 10s
+  timeout: 5s
+  dnsConfig:
+    domain: example.com
+- name: duplicate-test-checker
+  type: dns
+  interval: 10s
+  timeout: 5s
+  dnsConfig:
+    domain: example.com
+`, validateRes: func(g *WithT, checkers []Checker, err error) {
+				g.Expect(checkers).To(BeNil())
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("\"invalid-test-checker\""))
+				g.Expect(err.Error()).To(ContainSubstring("invalid 'interval'"))
+				g.Expect(err.Error()).To(ContainSubstring("invalid 'timeout'"))
+				g.Expect(err.Error()).To(ContainSubstring("domain is required for DNSChecker"))
+				g.Expect(err.Error()).To(ContainSubstring("\"unknown-checker\""))
+				g.Expect(err.Error()).To(ContainSubstring("unrecognized checker type:"))
+				g.Expect(err.Error()).To(ContainSubstring("duplicate checker name: \"duplicate-test-checker\""))
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			g := NewWithT(t)
