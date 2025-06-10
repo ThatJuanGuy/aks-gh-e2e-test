@@ -3,7 +3,6 @@ package dnscheck
 import (
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/Azure/cluster-health-monitor/pkg/config"
 )
@@ -11,88 +10,36 @@ import (
 func TestBuildDNSChecker(t *testing.T) {
 	testCases := []struct {
 		name            string
-		config          config.CheckerConfig
+		checkerName     string
+		dnsConfig       *config.DNSConfig
 		expectedError   bool
 		expectedChecker *DNSChecker
 	}{
 		{
-			name: "Valid config",
-			config: config.CheckerConfig{
-				Name:     "test-dns-checker",
-				Type:     config.CheckTypeDNS,
-				Interval: 10 * time.Second,
-				Timeout:  5 * time.Second,
-				DNSConfig: &config.DNSConfig{
-					Domain: "example.com",
-				},
+			name:        "Valid config",
+			checkerName: "test-dns-checker",
+			dnsConfig: &config.DNSConfig{
+				Domain: "example.com",
 			},
 			expectedError: false,
 			expectedChecker: &DNSChecker{
-				name:     "test-dns-checker",
-				interval: 10 * time.Second,
-				timeout:  5 * time.Second,
-				domain:   "example.com",
-			},
-		},
-		{
-			name: "Missing DNSConfig",
-			config: config.CheckerConfig{
-				Name:     "test-dns-checker",
-				Type:     config.CheckTypeDNS,
-				Interval: 10 * time.Second,
-				Timeout:  5 * time.Second,
-			},
-			expectedError: true,
-		},
-		{
-			name: "Empty Domain",
-			config: config.CheckerConfig{
-				Name:     "test-dns-checker",
-				Type:     config.CheckTypeDNS,
-				Interval: 10 * time.Second,
-				Timeout:  5 * time.Second,
-				DNSConfig: &config.DNSConfig{
-					Domain: "",
-				},
-			},
-			expectedError: true,
-		},
-		{
-			name: "Empty Name",
-			config: config.CheckerConfig{
-				Name:     "",
-				Type:     config.CheckTypeDNS,
-				Interval: 10 * time.Second,
-				Timeout:  5 * time.Second,
-				DNSConfig: &config.DNSConfig{
+				name: "test-dns-checker",
+				config: &config.DNSConfig{
 					Domain: "example.com",
 				},
 			},
+		},
+		{
+			name:          "Missing DNSConfig",
+			checkerName:   "test-dns-checker",
+			dnsConfig:     nil,
 			expectedError: true,
 		},
 		{
-			name: "Invalid Interval",
-			config: config.CheckerConfig{
-				Name:     "test-dns-checker",
-				Type:     config.CheckTypeDNS,
-				Interval: -10 * time.Second,
-				Timeout:  5 * time.Second,
-				DNSConfig: &config.DNSConfig{
-					Domain: "example.com",
-				},
-			},
-			expectedError: true,
-		},
-		{
-			name: "Invalid Timeout",
-			config: config.CheckerConfig{
-				Name:     "test-dns-checker",
-				Type:     config.CheckTypeDNS,
-				Interval: 10 * time.Second,
-				Timeout:  -5 * time.Second,
-				DNSConfig: &config.DNSConfig{
-					Domain: "example.com",
-				},
+			name:        "Empty Domain",
+			checkerName: "test-dns-checker",
+			dnsConfig: &config.DNSConfig{
+				Domain: "",
 			},
 			expectedError: true,
 		},
@@ -100,7 +47,7 @@ func TestBuildDNSChecker(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			checker, err := BuildDNSChecker(tc.config)
+			checker, err := BuildDNSChecker(tc.checkerName, tc.dnsConfig)
 
 			if tc.expectedError && err == nil {
 				t.Errorf("expected error but got nil")
