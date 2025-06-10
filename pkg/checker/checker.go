@@ -2,6 +2,7 @@ package checker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	yaml "gopkg.in/yaml.v3"
@@ -24,19 +25,24 @@ func BuildCheckersFromConfig(cfg []byte) ([]Checker, error) {
 
 	nameSet := make(map[string]struct{})
 	var checkers []Checker
+	var errs []error
 	for _, cfg := range root.Checkers {
 		if err := cfg.ValidateCommon(); err != nil {
-			return nil, fmt.Errorf("failed to validate checker config %q: %w", cfg.Name, err)
+			errs = append(errs, fmt.Errorf("failed to validate checker config %q: %w", cfg.Name, err))
 		}
 		if _, exists := nameSet[cfg.Name]; exists {
-			return nil, fmt.Errorf("duplicate checker name: %q", cfg.Name)
+			errs = append(errs, fmt.Errorf("duplicate checker name: %q", cfg.Name))
 		}
 		nameSet[cfg.Name] = struct{}{}
 		chk, err := buildChecker(cfg)
 		if err != nil {
-			return nil, fmt.Errorf("failed to build checker %q: %w", cfg.Name, err)
+			errs = append(errs, fmt.Errorf("failed to build checker %q: %w", cfg.Name, err))
+			continue
 		}
 		checkers = append(checkers, chk)
+	}
+	if len(errs) > 0 {
+		return nil, errors.Join(errs...)
 	}
 	return checkers, nil
 }

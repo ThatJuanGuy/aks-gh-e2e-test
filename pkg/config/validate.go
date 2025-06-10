@@ -1,22 +1,26 @@
 package config
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 // ValidateCommon validates the common fields of a CheckerConfig.
 func (c *CheckerConfig) ValidateCommon() error {
+	var errs []error
 	if c.Name == "" {
-		return fmt.Errorf("checker config missing 'name'")
+		errs = append(errs, fmt.Errorf("checker config missing 'name'"))
 	}
 	if c.Type == "" {
-		return fmt.Errorf("checker config missing 'type'")
+		errs = append(errs, fmt.Errorf("checker config missing 'type'"))
 	}
 	if c.Interval < 0 {
-		return fmt.Errorf("checker config invalid 'interval'")
+		errs = append(errs, fmt.Errorf("checker config invalid 'interval'"))
 	}
 	if c.Timeout < 0 {
-		return fmt.Errorf("checker config invalid 'timeout'")
+		errs = append(errs, fmt.Errorf("checker config invalid 'timeout'"))
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 // ValidateDNSConfig validates the DNSConfig.
