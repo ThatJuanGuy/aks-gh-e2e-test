@@ -6,7 +6,7 @@ import (
 
 	yaml "gopkg.in/yaml.v3"
 
-	"github.com/Azure/cluster-health-monitor/pkg/checker/dns"
+	"github.com/Azure/cluster-health-monitor/pkg/checker/dnscheck"
 	"github.com/Azure/cluster-health-monitor/pkg/checker/podstartup"
 	"github.com/Azure/cluster-health-monitor/pkg/config"
 )
@@ -45,7 +45,7 @@ func BuildCheckersFromConfig(cfg []byte) ([]Checker, error) {
 func buildChecker(cfg config.CheckerConfig) (Checker, error) {
 	switch cfg.Type {
 	case config.CheckTypeDNS:
-		return dns.BuildDNSChecker(cfg.Name, cfg.DNSConfig)
+		return dnscheck.BuildDNSChecker(cfg.Name, cfg.DNSConfig)
 	case config.CheckTypePodStartup:
 		return podstartup.BuildPodStartupChecker(cfg.Name, cfg.PodStartupConfig)
 	default:

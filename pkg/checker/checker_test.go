@@ -3,7 +3,7 @@ package checker
 import (
 	"testing"
 
-	"github.com/Azure/cluster-health-monitor/pkg/checker/dns"
+	"github.com/Azure/cluster-health-monitor/pkg/checker/dnscheck"
 )
 
 func TestRegisterAndBuildExampleChecker(t *testing.T) {
@@ -23,9 +23,9 @@ checkers:
 		t.Fatalf("expected 1 checker, got %d", len(checkers))
 	}
 
-	dc, ok := checkers[0].(*dns.DNSChecker)
+	dc, ok := checkers[0].(*dnscheck.DNSChecker)
 	if !ok {
-		t.Fatalf("checker is not of type *ExampleChecker")
+		t.Fatalf("checker is not of type *dnscheck.DNSChecker")
 	}
 	if dc.Name() != "dns" {
 		t.Errorf("expected name 'example', got %q", dc.Name())

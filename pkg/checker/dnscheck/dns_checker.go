@@ -1,4 +1,5 @@
-package dns
+// Package dnscheck provides a checker for DNS.
+package dnscheck
 
 import (
 	"context"
