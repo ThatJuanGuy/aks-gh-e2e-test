@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/Azure/cluster-health-monitor/pkg/config"
@@ -22,7 +23,7 @@ func (c DNSChecker) Name() string {
 	return c.name
 }
 
-func (c DNSChecker) Run() error {
+func (c DNSChecker) Run(ctx context.Context) error {
 	// TODO: Implement the DNS checking logic here
 	return fmt.Errorf("DNSChecker not implemented yet")
 }

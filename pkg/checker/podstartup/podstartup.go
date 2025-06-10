@@ -1,6 +1,7 @@
 package podstartup
 
 import (
+	"context"
 	"errors"
 
 	"github.com/Azure/cluster-health-monitor/pkg/config"
@@ -22,6 +23,6 @@ func (c *PodStartupChecker) Name() string {
 	return c.name
 }
 
-func (c *PodStartupChecker) Run() error {
+func (c *PodStartupChecker) Run(ctx context.Context) error {
 	return errors.New("PodStartupChecker not implemented yet")
 }

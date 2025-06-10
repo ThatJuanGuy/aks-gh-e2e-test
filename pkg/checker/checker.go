@@ -1,6 +1,7 @@
 package checker
 
 import (
+	"context"
 	"fmt"
 
 	yaml "gopkg.in/yaml.v3"
@@ -12,10 +13,8 @@ import (
 
 type Checker interface {
 	Name() string
-	Run() error
+	Run(ctx context.Context) error
 }
-
-type checkerBuilder func(name string, spec map[string]any) (Checker, error)
 
 func BuildCheckersFromConfig(cfg []byte) ([]Checker, error) {
 	var root config.Config
