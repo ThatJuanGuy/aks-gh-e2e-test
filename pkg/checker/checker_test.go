@@ -13,6 +13,8 @@ checkers:
 - name: dns 
   type: dns 
   interval: 10s
+  dnsConfig:
+    domain: example.com
 `)
 
 	checkers, err := BuildCheckersFromConfig(yamlData)
@@ -28,7 +30,7 @@ checkers:
 		t.Fatalf("checker is not of type *dnscheck.DNSChecker")
 	}
 	if dc.Name() != "dns" {
-		t.Errorf("expected name 'example', got %q", dc.Name())
+		t.Errorf("expected name 'dns', got %q", dc.Name())
 	}
 }
 
