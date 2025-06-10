@@ -25,8 +25,8 @@ func BuildCheckersFromConfig(cfg []byte) ([]Checker, error) {
 	nameSet := make(map[string]struct{})
 	var checkers []Checker
 	for _, cfg := range root.Checkers {
-		if cfg.Name == "" {
-			return nil, fmt.Errorf("checker entry missing 'name'")
+		if err := cfg.ValidateCommon(); err != nil {
+			return nil, fmt.Errorf("failed to validate checker config %q: %w", cfg.Name, err)
 		}
 		if _, exists := nameSet[cfg.Name]; exists {
 			return nil, fmt.Errorf("duplicate checker name: %q", cfg.Name)
