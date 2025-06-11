@@ -33,6 +33,17 @@ func TestBuildDNSChecker(t *testing.T) {
 			},
 		},
 		{
+			name:        "Empty Checker Name",
+			checkerName: "",
+			dnsConfig: &config.DNSConfig{
+				Domain: "example.com",
+			},
+			validateRes: func(g *WithT, checker *DNSChecker, err error) {
+				g.Expect(checker).To(BeNil())
+				g.Expect(err).To(HaveOccurred())
+			},
+		},
+		{
 			name:        "Missing DNSConfig",
 			checkerName: "test-dns-checker",
 			dnsConfig:   nil,
