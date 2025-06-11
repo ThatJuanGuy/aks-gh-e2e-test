@@ -16,6 +16,9 @@ type DNSChecker struct {
 
 // BuildDNSChecker creates a new DNSChecker instance.
 func BuildDNSChecker(name string, config *config.DNSConfig) (*DNSChecker, error) {
+	if name == "" {
+		return nil, fmt.Errorf("checker name cannot be empty")
+	}
 	if err := config.ValidateDNSConfig(); err != nil {
 		return nil, err
 	}
