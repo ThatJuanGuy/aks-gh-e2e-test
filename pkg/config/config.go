@@ -49,6 +49,9 @@ type CheckerConfig struct {
 }
 
 type DNSConfig struct {
+	// Required.
+	// The domain to check, used to determine the DNS records to query.
+	Domain string `yaml:"domain"`
 }
 
 type PodStartupConfig struct {

@@ -2,11 +2,12 @@ package checker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	yaml "gopkg.in/yaml.v3"
 
-	"github.com/Azure/cluster-health-monitor/pkg/checker/dns"
+	"github.com/Azure/cluster-health-monitor/pkg/checker/dnscheck"
 	"github.com/Azure/cluster-health-monitor/pkg/checker/podstartup"
 	"github.com/Azure/cluster-health-monitor/pkg/config"
 )
@@ -24,19 +25,24 @@ func BuildCheckersFromConfig(cfg []byte) ([]Checker, error) {
 
 	nameSet := make(map[string]struct{})
 	var checkers []Checker
+	var errs []error
 	for _, cfg := range root.Checkers {
-		if cfg.Name == "" {
-			return nil, fmt.Errorf("checker entry missing 'name'")
+		if err := cfg.ValidateCommon(); err != nil {
+			errs = append(errs, fmt.Errorf("failed to validate checker config %q: %w", cfg.Name, err))
 		}
 		if _, exists := nameSet[cfg.Name]; exists {
-			return nil, fmt.Errorf("duplicate checker name: %q", cfg.Name)
+			errs = append(errs, fmt.Errorf("duplicate checker name: %q", cfg.Name))
 		}
 		nameSet[cfg.Name] = struct{}{}
 		chk, err := buildChecker(cfg)
 		if err != nil {
-			return nil, fmt.Errorf("failed to build checker %q: %w", cfg.Name, err)
+			errs = append(errs, fmt.Errorf("failed to build checker %q: %w", cfg.Name, err))
+			continue
 		}
 		checkers = append(checkers, chk)
+	}
+	if len(errs) > 0 {
+		return nil, errors.Join(errs...)
 	}
 	return checkers, nil
 }
@@ -45,7 +51,7 @@ func BuildCheckersFromConfig(cfg []byte) ([]Checker, error) {
 func buildChecker(cfg config.CheckerConfig) (Checker, error) {
 	switch cfg.Type {
 	case config.CheckTypeDNS:
-		return dns.BuildDNSChecker(cfg.Name, cfg.DNSConfig)
+		return dnscheck.BuildDNSChecker(cfg.Name, cfg.DNSConfig)
 	case config.CheckTypePodStartup:
 		return podstartup.BuildPodStartupChecker(cfg.Name, cfg.PodStartupConfig)
 	default:
