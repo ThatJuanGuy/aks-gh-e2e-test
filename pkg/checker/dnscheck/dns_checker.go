@@ -14,6 +14,25 @@ type DNSChecker struct {
 	config *config.DNSConfig
 }
 
+const (
+	CoreDNSNamespace   = "kube-system"
+	CoreDNSServiceName = "kube-dns"
+)
+
+// DNSTargetType defines the type of DNS target.
+type DNSTargetType string
+
+const (
+	CoreDNSService DNSTargetType = "service"
+	CoreDNSPod     DNSTargetType = "pod"
+)
+
+// DNSTarget represents a DNS target with its IP and type.
+type DNSTarget struct {
+	IP   string
+	Type DNSTargetType
+}
+
 // BuildDNSChecker creates a new DNSChecker instance.
 func BuildDNSChecker(name string, config *config.DNSConfig) (*DNSChecker, error) {
 	if name == "" {
