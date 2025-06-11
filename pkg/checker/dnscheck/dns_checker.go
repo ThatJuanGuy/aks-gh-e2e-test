@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 
+	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
@@ -83,4 +84,36 @@ func GetCoreDNSServiceIP(ctx context.Context, clientset kubernetes.Interface) (D
 		IP:   service.Spec.ClusterIP,
 		Type: CoreDNSService,
 	}, nil
+}
+
+// GetCoreDNSPodIPs returns the IPs of all CoreDNS pods in the cluster as DNSTargets.
+func GetCoreDNSPodIPs(ctx context.Context, clientset kubernetes.Interface) ([]DNSTarget, error) {
+	if clientset == nil {
+		return nil, fmt.Errorf("clientset cannot be nil")
+	}
+
+	endpointSliceList, err := clientset.DiscoveryV1().EndpointSlices(CoreDNSNamespace).List(ctx, metav1.ListOptions{
+		LabelSelector: discoveryv1.LabelServiceName + "=" + CoreDNSServiceName,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list CoreDNS endpoint slices: %w", err)
+	}
+
+	var dnsTargets []DNSTarget
+	for _, endpointSlice := range endpointSliceList.Items {
+		for _, endpoint := range endpointSlice.Endpoints {
+			for _, address := range endpoint.Addresses {
+				dnsTargets = append(dnsTargets, DNSTarget{
+					IP:   address,
+					Type: CoreDNSPod,
+				})
+			}
+		}
+	}
+
+	if len(dnsTargets) == 0 {
+		return nil, fmt.Errorf("no CoreDNS pod endpoints found")
+	}
+
+	return dnsTargets, nil
 }
