@@ -3,11 +3,13 @@ package dnscheck
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
 	"github.com/Azure/cluster-health-monitor/pkg/config"
 )
@@ -57,9 +59,39 @@ func (c DNSChecker) Name() string {
 }
 
 func (c DNSChecker) Run(ctx context.Context) error {
-	// TODO: Get the CoreDNS service IP and pod IPs.
+	k8sConfig, err := rest.InClusterConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get in-cluster config: %w", err)
+	}
+
+	clientset, err := kubernetes.NewForConfig(k8sConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create Kubernetes client: %w", err)
+	}
+
+	var errs []error
+
+	coreDNSServiceTarget, err := GetCoreDNSServiceIP(ctx, clientset)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("failed to get CoreDNS service IP: %w", err))
+	}
+
+	coreDNSPodTargets, err := GetCoreDNSPodIPs(ctx, clientset)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("failed to get CoreDNS pod IPs: %w", err))
+	}
 
 	// TODO: Get LocalDNS IP.
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+
+	dnsTargets := make(map[DNSTarget]struct{})
+	dnsTargets[coreDNSServiceTarget] = struct{}{}
+	for _, target := range coreDNSPodTargets {
+		dnsTargets[target] = struct{}{}
+	}
 
 	// TODO: Implement the DNS checking logic here
 	return fmt.Errorf("DNSChecker not implemented yet")
