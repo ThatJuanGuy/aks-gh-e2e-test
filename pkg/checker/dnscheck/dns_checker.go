@@ -71,12 +71,12 @@ func (c DNSChecker) Run(ctx context.Context) error {
 
 	var errs []error
 
-	coreDNSServiceTarget, err := GetCoreDNSServiceIP(ctx, clientset)
+	coreDNSServiceTarget, err := getCoreDNSServiceIP(ctx, clientset)
 	if err != nil {
 		errs = append(errs, fmt.Errorf("failed to get CoreDNS service IP: %w", err))
 	}
 
-	coreDNSPodTargets, err := GetCoreDNSPodIPs(ctx, clientset)
+	coreDNSPodTargets, err := getCoreDNSPodIPs(ctx, clientset)
 	if err != nil {
 		errs = append(errs, fmt.Errorf("failed to get CoreDNS pod IPs: %w", err))
 	}
@@ -97,8 +97,8 @@ func (c DNSChecker) Run(ctx context.Context) error {
 	return fmt.Errorf("DNSChecker not implemented yet")
 }
 
-// GetCoreDNSServiceIP returns the ClusterIP of the CoreDNS service in the cluster as a DNSTarget.
-func GetCoreDNSServiceIP(ctx context.Context, clientset kubernetes.Interface) (DNSTarget, error) {
+// getCoreDNSServiceIP returns the ClusterIP of the CoreDNS service in the cluster as a DNSTarget.
+func getCoreDNSServiceIP(ctx context.Context, clientset kubernetes.Interface) (DNSTarget, error) {
 	if clientset == nil {
 		return DNSTarget{}, fmt.Errorf("clientset cannot be nil")
 	}
@@ -118,8 +118,8 @@ func GetCoreDNSServiceIP(ctx context.Context, clientset kubernetes.Interface) (D
 	}, nil
 }
 
-// GetCoreDNSPodIPs returns the IPs of all CoreDNS pods in the cluster as DNSTargets.
-func GetCoreDNSPodIPs(ctx context.Context, clientset kubernetes.Interface) ([]DNSTarget, error) {
+// getCoreDNSPodIPs returns the IPs of all CoreDNS pods in the cluster as DNSTargets.
+func getCoreDNSPodIPs(ctx context.Context, clientset kubernetes.Interface) ([]DNSTarget, error) {
 	if clientset == nil {
 		return nil, fmt.Errorf("clientset cannot be nil")
 	}

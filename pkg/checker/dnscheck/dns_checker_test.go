@@ -114,7 +114,7 @@ func TestGetCoreDNSServiceIP(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			g := NewWithT(t)
-			target, err := GetCoreDNSServiceIP(context.Background(), tc.setupClientset())
+			target, err := getCoreDNSServiceIP(context.Background(), tc.setupClientset())
 			tc.validateTarget(g, target, err)
 		})
 	}
@@ -167,7 +167,7 @@ func TestGetCoreDNSPodIPs(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			g := NewWithT(t)
-			targets, err := GetCoreDNSPodIPs(context.Background(), tc.setupClientset())
+			targets, err := getCoreDNSPodIPs(context.Background(), tc.setupClientset())
 			tc.validateTargets(g, targets, err)
 		})
 	}
