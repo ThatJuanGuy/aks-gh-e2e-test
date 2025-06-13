@@ -15,7 +15,7 @@ func NewUnhealthy(code string) *UnhealthyError {
 	}
 }
 
-func NewUnhealthyMessage(code, message string) *UnhealthyError {
+func NewUnhealthyWithMessage(code, message string) *UnhealthyError {
 	return &UnhealthyError{
 		Code:    code,
 		Message: message,
