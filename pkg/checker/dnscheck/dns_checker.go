@@ -92,10 +92,6 @@ func (c DNSChecker) Run(ctx context.Context) error {
 
 // getCoreDNSServiceIP returns the ClusterIP of the CoreDNS service in the cluster as a DNSTarget.
 func getCoreDNSServiceIP(ctx context.Context, clientset kubernetes.Interface) (DNSTarget, error) {
-	if clientset == nil {
-		return DNSTarget{}, fmt.Errorf("clientset cannot be nil")
-	}
-
 	service, err := clientset.CoreV1().Services(CoreDNSNamespace).Get(ctx, CoreDNSServiceName, metav1.GetOptions{})
 	if err != nil {
 		return DNSTarget{}, fmt.Errorf("failed to get CoreDNS service: %w", err)
@@ -113,10 +109,6 @@ func getCoreDNSServiceIP(ctx context.Context, clientset kubernetes.Interface) (D
 
 // getCoreDNSPodIPs returns the IPs of all CoreDNS pods in the cluster as DNSTargets.
 func getCoreDNSPodIPs(ctx context.Context, clientset kubernetes.Interface) ([]DNSTarget, error) {
-	if clientset == nil {
-		return nil, fmt.Errorf("clientset cannot be nil")
-	}
-
 	endpointSliceList, err := clientset.DiscoveryV1().EndpointSlices(CoreDNSNamespace).List(ctx, metav1.ListOptions{
 		LabelSelector: discoveryv1.LabelServiceName + "=" + CoreDNSServiceName,
 	})
