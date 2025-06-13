@@ -3,7 +3,6 @@ package dnscheck
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	discoveryv1 "k8s.io/api/discovery/v1"
@@ -69,23 +68,17 @@ func (c DNSChecker) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to create Kubernetes client: %w", err)
 	}
 
-	var errs []error
-
 	coreDNSServiceTarget, err := getCoreDNSServiceIP(ctx, clientset)
 	if err != nil {
-		errs = append(errs, fmt.Errorf("failed to get CoreDNS service IP: %w", err))
+		return fmt.Errorf("failed to get CoreDNS service IP: %w", err)
 	}
 
 	coreDNSPodTargets, err := getCoreDNSPodIPs(ctx, clientset)
 	if err != nil {
-		errs = append(errs, fmt.Errorf("failed to get CoreDNS pod IPs: %w", err))
+		return fmt.Errorf("failed to get CoreDNS pod IPs: %w", err)
 	}
 
 	// TODO: Get LocalDNS IP.
-
-	if len(errs) > 0 {
-		return errors.Join(errs...)
-	}
 
 	dnsTargets := make(map[DNSTarget]struct{})
 	dnsTargets[coreDNSServiceTarget] = struct{}{}
