@@ -4,6 +4,7 @@ package dnscheck
 import (
 	"context"
 	"fmt"
+	"net"
 
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -138,4 +139,18 @@ func getCoreDNSPodIPs(ctx context.Context, clientset kubernetes.Interface) ([]DN
 	}
 
 	return dnsTargets, nil
+}
+
+// resolveDomain performs the DNS query against the specified DNSTarget.
+func (c *DNSChecker) resolveDomain(ctx context.Context, dnsTarget DNSTarget) error {
+	resolver := &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, _ string) (net.Conn, error) {
+			d := net.Dialer{}
+			return d.DialContext(ctx, network, net.JoinHostPort(dnsTarget.IP, "53"))
+		},
+	}
+
+	_, err := resolver.LookupHost(ctx, c.config.Domain)
+	return err
 }
