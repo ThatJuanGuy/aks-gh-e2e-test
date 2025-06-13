@@ -127,7 +127,37 @@ func TestGetCoreDNSPodIPs(t *testing.T) {
 		validateTargets func(*WithT, []DNSTarget, error)
 	}{
 		{
-			name: "Success",
+			name: "Success with ready endpoints",
+			setupClientset: func() *fake.Clientset {
+				ready := true
+				return fake.NewSimpleClientset(
+					&discoveryv1.EndpointSlice{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "kube-dns-12345",
+							Namespace: "kube-system",
+							Labels: map[string]string{
+								discoveryv1.LabelServiceName: "kube-dns",
+							},
+						},
+						Endpoints: []discoveryv1.Endpoint{
+							{
+								Addresses:  []string{"10.244.0.2", "10.244.0.3"},
+								Conditions: discoveryv1.EndpointConditions{Ready: &ready},
+							},
+						},
+					},
+				)
+			},
+			validateTargets: func(g *WithT, targets []DNSTarget, err error) {
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(targets).To(ConsistOf(
+					DNSTarget{IP: "10.244.0.2", Type: CoreDNSPod},
+					DNSTarget{IP: "10.244.0.3", Type: CoreDNSPod},
+				))
+			},
+		},
+		{
+			name: "Success with nil ready condition endpoints",
 			setupClientset: func() *fake.Clientset {
 				return fake.NewSimpleClientset(
 					&discoveryv1.EndpointSlice{
@@ -140,7 +170,8 @@ func TestGetCoreDNSPodIPs(t *testing.T) {
 						},
 						Endpoints: []discoveryv1.Endpoint{
 							{
-								Addresses: []string{"10.244.0.2", "10.244.0.3"},
+								Addresses:  []string{"10.244.0.2", "10.244.0.3"},
+								Conditions: discoveryv1.EndpointConditions{Ready: nil},
 							},
 						},
 					},
@@ -152,6 +183,33 @@ func TestGetCoreDNSPodIPs(t *testing.T) {
 					DNSTarget{IP: "10.244.0.2", Type: CoreDNSPod},
 					DNSTarget{IP: "10.244.0.3", Type: CoreDNSPod},
 				))
+			},
+		},
+		{
+			name: "Error when endpoints are not ready",
+			setupClientset: func() *fake.Clientset {
+				ready := false
+				return fake.NewSimpleClientset(
+					&discoveryv1.EndpointSlice{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "kube-dns-12345",
+							Namespace: "kube-system",
+							Labels: map[string]string{
+								discoveryv1.LabelServiceName: "kube-dns",
+							},
+						},
+						Endpoints: []discoveryv1.Endpoint{
+							{
+								Addresses:  []string{"10.244.0.2", "10.244.0.3"},
+								Conditions: discoveryv1.EndpointConditions{Ready: &ready},
+							},
+						},
+					},
+				)
+			},
+			validateTargets: func(g *WithT, targets []DNSTarget, err error) {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(targets).To(BeNil())
 			},
 		},
 		{
