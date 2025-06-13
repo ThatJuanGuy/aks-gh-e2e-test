@@ -3,8 +3,10 @@ package dnscheck
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
+	"sync"
 
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -87,8 +89,30 @@ func (c DNSChecker) Run(ctx context.Context) error {
 		dnsTargets[target] = struct{}{}
 	}
 
-	// TODO: Implement the DNS checking logic here
-	return fmt.Errorf("DNSChecker not implemented yet")
+	var wg sync.WaitGroup
+	for target := range dnsTargets {
+		wg.Add(1)
+		go func(t DNSTarget) {
+			defer wg.Done()
+			err := c.resolveDomain(ctx, t)
+
+			if err != nil {
+				if errors.Is(err, context.DeadlineExceeded) {
+					// TODO: Collect timeout.
+					return
+				}
+				// TODO: Collect error.
+				return
+			}
+
+			// TODO: Collect success.
+		}(target)
+	}
+	wg.Wait()
+
+	// TODO: Aggregate results.
+
+	return nil
 }
 
 // getCoreDNSServiceIP returns the ClusterIP of the CoreDNS service in the cluster as a DNSTarget.
