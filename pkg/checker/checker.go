@@ -14,6 +14,11 @@ import (
 
 type Checker interface {
 	Name() string
+
+	// Run executes the health check logic for the checker.
+	// - error is nil: the checker is healthy. corresponding metrics status will be "healthy"
+	// - error is UnhealthyError: the checker is unhealthy, metrics status will be "unhealthy", and the error contains the code and message.
+	// - error is other: the checker encountered an unexpected error. metrics status will be "unknown"
 	Run(ctx context.Context) error
 }
 
