@@ -119,6 +119,11 @@ func getCoreDNSPodIPs(ctx context.Context, clientset kubernetes.Interface) ([]DN
 	var dnsTargets []DNSTarget
 	for _, endpointSlice := range endpointSliceList.Items {
 		for _, endpoint := range endpointSlice.Endpoints {
+			// According to Kubernetes docs: "A nil value should be interpreted as 'true'".
+			if endpoint.Conditions.Ready != nil && !*endpoint.Conditions.Ready {
+				continue
+			}
+
 			for _, address := range endpoint.Addresses {
 				dnsTargets = append(dnsTargets, DNSTarget{
 					IP:   address,
@@ -129,7 +134,7 @@ func getCoreDNSPodIPs(ctx context.Context, clientset kubernetes.Interface) ([]DN
 	}
 
 	if len(dnsTargets) == 0 {
-		return nil, fmt.Errorf("no CoreDNS pod endpoints found")
+		return nil, fmt.Errorf("no ready CoreDNS pod endpoints found")
 	}
 
 	return dnsTargets, nil
