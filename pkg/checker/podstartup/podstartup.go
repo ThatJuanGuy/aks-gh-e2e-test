@@ -9,7 +9,7 @@ import (
 )
 
 func Register() {
-	checker.RegisterChecker(config.CheckTypeDNS, BuildPodStartupChecker)
+	checker.RegisterChecker(config.CheckTypePodStartup, BuildPodStartupChecker)
 }
 
 type PodStartupChecker struct {
