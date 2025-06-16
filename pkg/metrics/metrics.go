@@ -33,7 +33,7 @@ func NewMetrics(addr string) (*Metrics, error) {
 			Name: "cluster_health_monitor_checker_result_total",
 			Help: "Total number of checker runs, labeled by status and code",
 		},
-		[]string{"status", "code"},
+		[]string{"checker_name", "checker_type", "status", "error_code"},
 	)
 	if err := reg.Register(counter); err != nil {
 		log.Printf("Failed to register checker counter: %v", err)
@@ -58,22 +58,22 @@ func (m *Metrics) Run() error {
 	return m.server.ListenAndServe()
 }
 
-func (m *Metrics) IncHealth() {
-	m.resultCounter.WithLabelValues(healthyStatus, healthyCode).Inc()
-}
-
-func (m *Metrics) IncUnhealth(code string) {
-	m.resultCounter.WithLabelValues(unhealthyStatus, code).Inc()
-}
-
-func (m *Metrics) IncUnknown() {
-	m.resultCounter.WithLabelValues(unknownStatus, unknownCode).Inc()
-}
-
 // Shutdown gracefully stops the metrics HTTP server.
 func (m *Metrics) Shutdown() error {
 	if m.server != nil {
 		return m.server.Close()
 	}
 	return nil
+}
+
+func (m *Metrics) IncHealth(chkType, chkName string) {
+	m.resultCounter.WithLabelValues(chkType, chkName, healthyStatus, healthyCode).Inc()
+}
+
+func (m *Metrics) IncUnhealth(chkType, chkName, code string) {
+	m.resultCounter.WithLabelValues(chkType, chkName, unhealthyStatus, code).Inc()
+}
+
+func (m *Metrics) IncUnknown(chkType, chkName string) {
+	m.resultCounter.WithLabelValues(chkType, chkName, unknownStatus, unknownCode).Inc()
 }
