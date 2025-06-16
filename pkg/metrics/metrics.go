@@ -13,6 +13,8 @@ const (
 	unhealthyStatus = "unhealthy"
 	unknownStatus   = "unknown"
 
+	// error_codes is required although healthy and unknown checkers do not use it.
+	// We set a default value for healthy and unknown result.
 	healthyCode = "healthy"
 	unknownCode = "unknown"
 )
@@ -33,7 +35,7 @@ func NewMetrics(addr string) (*Metrics, error) {
 			Name: "cluster_health_monitor_checker_result_total",
 			Help: "Total number of checker runs, labeled by status and code",
 		},
-		[]string{"checker_name", "checker_type", "status", "error_code"},
+		[]string{"checker_type", "checker_name", "status", "error_code"},
 	)
 	if err := reg.Register(counter); err != nil {
 		log.Printf("Failed to register checker counter: %v", err)
