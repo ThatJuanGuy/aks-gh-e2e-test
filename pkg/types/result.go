@@ -1,3 +1,4 @@
+// TODO: Move this package into pkg/checker once the circular dependency issue is resolved.
 package types
 
 type Status string
