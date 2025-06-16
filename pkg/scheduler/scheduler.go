@@ -40,17 +40,14 @@ func (r *Scheduler) Start(ctx context.Context) error {
 }
 
 func (r *Scheduler) scheduleChecker(ctx context.Context, cfg config.CheckerConfig) error {
-	interval := cfg.Interval
-	timeout := cfg.Timeout
-
-	ticker := time.NewTicker(interval)
+	ticker := time.NewTicker(cfg.Interval)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
 			func() {
-				runCtx, cancel := context.WithTimeout(ctx, timeout)
+				runCtx, cancel := context.WithTimeout(ctx, cfg.Timeout)
 				defer cancel()
 				chk, err := r.chkBuilder(cfg)
 				if err != nil {
@@ -65,7 +62,7 @@ func (r *Scheduler) scheduleChecker(ctx context.Context, cfg config.CheckerConfi
 			}()
 
 		case <-ctx.Done():
-			log.Println("stopping")
+			log.Println("scheduler stopping")
 			return ctx.Err()
 		}
 	}
