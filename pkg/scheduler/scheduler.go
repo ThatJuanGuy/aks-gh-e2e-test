@@ -31,9 +31,8 @@ func NewScheduler(cfg *config.Config) (*Scheduler, error) {
 func (r *Scheduler) Start(ctx context.Context) error {
 	var g errgroup.Group
 	for _, chkCfg := range r.config.Checkers {
-		cfg := chkCfg // capture range variable
 		g.Go(func() error {
-			return r.scheduleChecker(ctx, cfg)
+			return r.scheduleChecker(ctx, chkCfg)
 		})
 	}
 	return g.Wait()
