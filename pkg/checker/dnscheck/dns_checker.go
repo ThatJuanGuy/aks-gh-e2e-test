@@ -11,6 +11,7 @@ import (
 	"k8s.io/client-go/rest"
 
 	"github.com/Azure/cluster-health-monitor/pkg/config"
+	"github.com/Azure/cluster-health-monitor/pkg/types"
 )
 
 // DNSChecker implements the Checker interface for DNS checks.
@@ -57,25 +58,25 @@ func (c DNSChecker) Name() string {
 	return c.name
 }
 
-func (c DNSChecker) Run(ctx context.Context) error {
+func (c DNSChecker) Run(ctx context.Context) (types.Result, error) {
 	k8sConfig, err := rest.InClusterConfig()
 	if err != nil {
-		return fmt.Errorf("failed to get in-cluster config: %w", err)
+		return types.Result{}, fmt.Errorf("failed to get in-cluster config: %w", err)
 	}
 
 	clientset, err := kubernetes.NewForConfig(k8sConfig)
 	if err != nil {
-		return fmt.Errorf("failed to create Kubernetes client: %w", err)
+		return types.Result{}, fmt.Errorf("failed to create Kubernetes client: %w", err)
 	}
 
 	coreDNSServiceTarget, err := getCoreDNSServiceIP(ctx, clientset)
 	if err != nil {
-		return fmt.Errorf("failed to get CoreDNS service IP: %w", err)
+		return types.Result{}, fmt.Errorf("failed to get CoreDNS service IP: %w", err)
 	}
 
 	coreDNSPodTargets, err := getCoreDNSPodIPs(ctx, clientset)
 	if err != nil {
-		return fmt.Errorf("failed to get CoreDNS pod IPs: %w", err)
+		return types.Result{}, fmt.Errorf("failed to get CoreDNS pod IPs: %w", err)
 	}
 
 	// TODO: Get LocalDNS IP.
@@ -87,7 +88,7 @@ func (c DNSChecker) Run(ctx context.Context) error {
 	}
 
 	// TODO: Implement the DNS checking logic here
-	return fmt.Errorf("DNSChecker not implemented yet")
+	return types.Result{}, fmt.Errorf("DNSChecker not implemented yet")
 }
 
 // getCoreDNSServiceIP returns the ClusterIP of the CoreDNS service in the cluster as a DNSTarget.
