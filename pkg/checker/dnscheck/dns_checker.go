@@ -18,8 +18,36 @@ import (
 
 // DNSChecker implements the Checker interface for DNS checks.
 type DNSChecker struct {
-	name   string
-	config *config.DNSConfig
+	name         string
+	config       *config.DNSConfig
+	k8sClientset kubernetes.Interface
+	dnsResolver  func(dnsTarget DNSTarget) resolver
+}
+
+// resolver is an interface for DNS resolution.
+type resolver interface {
+	lookupHost(ctx context.Context, host string) ([]string, error)
+}
+
+// defaultResolver implements the resolver interface using net.Resolver.
+type defaultResolver struct {
+	target DNSTarget
+}
+
+func (r *defaultResolver) lookupHost(ctx context.Context, host string) ([]string, error) {
+	resolver := &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, _ string) (net.Conn, error) {
+			d := net.Dialer{}
+			return d.DialContext(ctx, network, net.JoinHostPort(r.target.IP, "53"))
+		},
+	}
+	return resolver.LookupHost(ctx, host)
+}
+
+// newDefaultResolver creates a new defaultResolver.
+func newDefaultResolver(target DNSTarget) resolver {
+	return &defaultResolver{target: target}
 }
 
 const (
@@ -51,9 +79,22 @@ func BuildDNSChecker(name string, config *config.DNSConfig) (*DNSChecker, error)
 	}
 
 	return &DNSChecker{
-		name:   name,
-		config: config,
+		name:        name,
+		config:      config,
+		dnsResolver: newDefaultResolver,
 	}, nil
+}
+
+// withClientset sets the Kubernetes clientset for testing.
+func (c *DNSChecker) withClientset(clientset kubernetes.Interface) *DNSChecker {
+	c.k8sClientset = clientset
+	return c
+}
+
+// withResolver sets a custom resolver factory for testing.
+func (c *DNSChecker) withResolver(dnsResolver func(dnsTarget DNSTarget) resolver) *DNSChecker {
+	c.dnsResolver = dnsResolver
+	return c
 }
 
 func (c DNSChecker) Name() string {
@@ -61,14 +102,21 @@ func (c DNSChecker) Name() string {
 }
 
 func (c DNSChecker) Run(ctx context.Context) error {
-	k8sConfig, err := rest.InClusterConfig()
-	if err != nil {
-		return fmt.Errorf("failed to get in-cluster config: %w", err)
-	}
+	var clientset kubernetes.Interface
+	if c.k8sClientset != nil {
+		// Use the provided client for testing
+		clientset = c.k8sClientset
+	} else {
+		// Create a new client for production
+		k8sConfig, err := rest.InClusterConfig()
+		if err != nil {
+			return fmt.Errorf("failed to get in-cluster config: %w", err)
+		}
 
-	clientset, err := kubernetes.NewForConfig(k8sConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create Kubernetes client: %w", err)
+		clientset, err = kubernetes.NewForConfig(k8sConfig)
+		if err != nil {
+			return fmt.Errorf("failed to create Kubernetes client: %w", err)
+		}
 	}
 
 	coreDNSServiceTarget, err := getCoreDNSServiceIP(ctx, clientset)
@@ -129,7 +177,7 @@ func (c DNSChecker) Run(ctx context.Context) error {
 			serviceError = fmt.Errorf("%s: %w", errMsg, result.err)
 		} else {
 			podErrors = append(podErrors, fmt.Errorf("%s: %w", errMsg, result.err))
-	}
+		}
 	}
 
 	var allErrors []error
@@ -197,14 +245,7 @@ func getCoreDNSPodIPs(ctx context.Context, clientset kubernetes.Interface) ([]DN
 
 // resolveDomain performs the DNS query against the specified DNSTarget.
 func (c *DNSChecker) resolveDomain(ctx context.Context, dnsTarget DNSTarget) error {
-	resolver := &net.Resolver{
-		PreferGo: true,
-		Dial: func(ctx context.Context, network, _ string) (net.Conn, error) {
-			d := net.Dialer{}
-			return d.DialContext(ctx, network, net.JoinHostPort(dnsTarget.IP, "53"))
-		},
-	}
-
-	_, err := resolver.LookupHost(ctx, c.config.Domain)
+	resolver := c.dnsResolver(dnsTarget)
+	_, err := resolver.lookupHost(ctx, c.config.Domain)
 	return err
 }
