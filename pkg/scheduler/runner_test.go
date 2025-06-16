@@ -1,4 +1,4 @@
-package runner
+package scheduler
 
 import (
 	"context"
@@ -33,7 +33,7 @@ func fakeBuilderFactory(runCount *int32, runErr error, delay time.Duration) Chec
 	}
 }
 
-func TestRunner_Run_Periodic(t *testing.T) {
+func TestScheduler_Run_Periodic(t *testing.T) {
 	t.Parallel()
 	g := NewWithT(t)
 	var runCount int32
@@ -47,12 +47,12 @@ func TestRunner_Run_Periodic(t *testing.T) {
 			},
 		},
 	}
-	runner := &Runner{
+	scheduler := &Scheduler{
 		config:     cfg,
 		chkBuilder: fakeBuilderFactory(&runCount, nil, 0),
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 160*time.Millisecond)
 	defer cancel()
-	_ = runner.Run(ctx)
+	_ = scheduler.Start(ctx)
 	g.Expect(runCount).To(BeNumerically(">=", 2))
 }

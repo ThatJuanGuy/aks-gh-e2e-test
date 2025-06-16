@@ -1,4 +1,4 @@
-package runner
+package scheduler
 
 import (
 	"context"
@@ -10,8 +10,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// Runner manages and runs a set of checkers periodically.
-type Runner struct {
+// Scheduler manages and runs a set of checkers periodically.
+type Scheduler struct {
 	config     *config.Config
 	chkBuilder CheckerBuilder
 }
@@ -19,16 +19,16 @@ type Runner struct {
 // CheckerBuilder is a factory function type that builds a Checker from a configuration.
 type CheckerBuilder func(cfg config.CheckerConfig) (checker.Checker, error)
 
-func NewRunner(cfg *config.Config) (*Runner, error) {
-	return &Runner{
+func NewScheduler(cfg *config.Config) (*Scheduler, error) {
+	return &Scheduler{
 		chkBuilder: nil, // TODO: set a default checker builder after refactoring checker's package
 		config:     cfg,
 	}, nil
 }
 
-// Run starts all checkers according to their configured intervals and timeouts.
-// Run create a new checker for each interval instead of reusing the same instance.
-func (r *Runner) Run(ctx context.Context) error {
+// Start starts all checkers according to their configured intervals and timeouts.
+// Start create a new checker for each interval instead of reusing the same instance.
+func (r *Scheduler) Start(ctx context.Context) error {
 	var g errgroup.Group
 	for _, chkCfg := range r.config.Checkers {
 		cfg := chkCfg // capture range variable
@@ -39,7 +39,7 @@ func (r *Runner) Run(ctx context.Context) error {
 	return g.Wait()
 }
 
-func (r *Runner) scheduleChecker(ctx context.Context, cfg config.CheckerConfig) error {
+func (r *Scheduler) scheduleChecker(ctx context.Context, cfg config.CheckerConfig) error {
 	interval := cfg.Interval
 	timeout := cfg.Timeout
 
