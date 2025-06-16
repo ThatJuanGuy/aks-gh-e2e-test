@@ -27,13 +27,12 @@ func TestBuildDNSChecker(t *testing.T) {
 				Domain: "example.com",
 			},
 			validateRes: func(g *WithT, checker *DNSChecker, err error) {
-				g.Expect(checker).To(Equal(
-					&DNSChecker{
-						name: "test-dns-checker",
-						config: &config.DNSConfig{
+				g.Expect(checker.name).To(Equal("test-dns-checker"))
+				g.Expect(checker.config).To(Equal(&config.DNSConfig{
 							Domain: "example.com",
-						},
 					}))
+				g.Expect(checker.k8sClientset).To(BeNil())
+				g.Expect(checker.dnsResolver).NotTo(BeNil())
 				g.Expect(err).NotTo(HaveOccurred())
 			},
 		},
