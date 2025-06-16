@@ -20,7 +20,7 @@ import (
 type DNSChecker struct {
 	name         string
 	config       *config.DNSConfig
-	k8sClientset kubernetes.Interface
+	k8sClientset kubernetes.Interface // for testing purposes
 	dnsResolver  func(dnsTarget DNSTarget) resolver
 }
 
