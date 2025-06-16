@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"sync"
 
+	"golang.org/x/sync/errgroup"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -89,28 +89,58 @@ func (c DNSChecker) Run(ctx context.Context) error {
 		dnsTargets[target] = struct{}{}
 	}
 
-	var wg sync.WaitGroup
-	for target := range dnsTargets {
-		wg.Add(1)
-		go func(t DNSTarget) {
-			defer wg.Done()
-			err := c.resolveDomain(ctx, t)
-
-			if err != nil {
-				if errors.Is(err, context.DeadlineExceeded) {
-					// TODO: Collect timeout.
-					return
-				}
-				// TODO: Collect error.
-				return
-			}
-
-			// TODO: Collect success.
-		}(target)
+	type dnsResult struct {
+		target DNSTarget
+		err    error
 	}
-	wg.Wait()
 
-	// TODO: Aggregate results.
+	dnsResultChan := make(chan dnsResult, len(dnsTargets))
+	g, gctx := errgroup.WithContext(ctx)
+	for target := range dnsTargets {
+		target := target
+		g.Go(func() error {
+			err := c.resolveDomain(gctx, target)
+			dnsResultChan <- dnsResult{target: target, err: err}
+			return nil
+		})
+	}
+	g.Wait()
+	close(dnsResultChan)
+
+	var serviceError error
+	var podErrors []error
+	var hasHealthyPod bool
+	for result := range dnsResultChan {
+		if result.err == nil {
+			if result.target.Type == CoreDNSPod {
+				hasHealthyPod = true
+			}
+			continue
+		}
+
+		var errMsg string
+		if errors.Is(result.err, context.DeadlineExceeded) {
+			errMsg = fmt.Sprintf("CoreDNS %s %s timed out", result.target.Type, result.target.IP)
+		} else {
+			errMsg = fmt.Sprintf("CoreDNS %s %s unhealthy", result.target.Type, result.target.IP)
+		}
+
+		if result.target.Type == CoreDNSService {
+			serviceError = fmt.Errorf("%s: %w", errMsg, result.err)
+		} else {
+			podErrors = append(podErrors, fmt.Errorf("%s: %w", errMsg, result.err))
+	}
+	}
+
+	var allErrors []error
+	allErrors = append(allErrors, serviceError)
+	if !hasHealthyPod {
+		allErrors = append(allErrors, podErrors...)
+	}
+
+	if len(allErrors) > 0 {
+		return errors.Join(allErrors...)
+	}
 
 	return nil
 }
