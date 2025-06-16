@@ -24,6 +24,6 @@ func (c *PodStartupChecker) Name() string {
 	return c.name
 }
 
-func (c *PodStartupChecker) Run(ctx context.Context) (types.Result, error) {
-	return types.Result{}, errors.New("PodStartupChecker not implemented yet")
+func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
+	return nil, errors.New("PodStartupChecker not implemented yet")
 }

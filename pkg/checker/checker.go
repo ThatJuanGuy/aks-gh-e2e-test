@@ -17,7 +17,7 @@ type Checker interface {
 	Name() string
 
 	// Run executes the health check logic for the checker.
-	Run(ctx context.Context) (types.Result, error)
+	Run(ctx context.Context) (*types.Result, error)
 }
 
 func BuildCheckersFromConfig(cfg []byte) ([]Checker, error) {
