@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
 
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -131,7 +132,8 @@ func (c DNSChecker) Run(ctx context.Context) (*types.Result, error) {
 	dnsTargets := append([]DNSTarget{coreDNSServiceTarget}, coreDNSPodTargets...)
 	for _, target := range dnsTargets {
 		if err := c.resolveDomain(ctx, target); err != nil {
-			return fmt.Errorf("DNS %s %s unhealthy: %w", target.Type, target.IP, err)
+			errorCode := fmt.Sprintf("DNS_%s_UNHEALTHY", strings.ToUpper(string(target.Type)))
+			return types.Unhealthy(errorCode, fmt.Sprintf("DNS %s %s unhealthy: %v", target.Type, target.IP, err)), nil
 		}
 	}
 
