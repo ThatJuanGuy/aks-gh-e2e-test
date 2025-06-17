@@ -46,13 +46,13 @@ func (r *Scheduler) scheduleChecker(ctx context.Context, cfg config.CheckerConfi
 		select {
 		case <-ticker.C:
 			func() {
-				runCtx, cancel := context.WithTimeout(ctx, cfg.Timeout)
-				defer cancel()
 				chk, err := r.chkBuilder(cfg)
 				if err != nil {
 					log.Printf("Failed to build checker %q: %v", cfg.Name, err)
 					return
 				}
+				runCtx, cancel := context.WithTimeout(ctx, cfg.Timeout)
+				defer cancel()
 				if err := chk.Run(runCtx); err != nil {
 					// TODO: handle the error of the checker and emit corresponding metrics
 					log.Printf("Checker %q failed: %s", chk.Name(), err)
