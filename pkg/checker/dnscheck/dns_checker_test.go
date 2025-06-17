@@ -13,6 +13,7 @@ import (
 
 	"github.com/Azure/cluster-health-monitor/pkg/checker"
 	"github.com/Azure/cluster-health-monitor/pkg/config"
+	"github.com/Azure/cluster-health-monitor/pkg/types"
 )
 
 type mockResolver struct {
@@ -261,7 +262,7 @@ func TestRun(t *testing.T) {
 		name           string
 		setupClientset func() *fake.Clientset
 		setupResolver  func() func(dnsTarget DNSTarget) resolver
-		validateResult func(*WithT, error)
+		validateResult func(*WithT, *types.Result, error)
 	}{
 		{
 			name: "All DNS servers are healthy",
@@ -302,8 +303,10 @@ func TestRun(t *testing.T) {
 					}
 				}
 			},
-			validateResult: func(g *WithT, err error) {
+			validateResult: func(g *WithT, result *types.Result, err error) {
 				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(result).NotTo(BeNil())
+				g.Expect(result.Status).To(Equal(types.StatusHealthy))
 			},
 		},
 		{
@@ -348,9 +351,12 @@ func TestRun(t *testing.T) {
 					}
 				}
 			},
-			validateResult: func(g *WithT, err error) {
-				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("DNS service 10.96.0.10 unhealthy"))
+			validateResult: func(g *WithT, result *types.Result, err error) {
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(result).NotTo(BeNil())
+				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
+				g.Expect(result.Detail.Code).To(Equal("DNS_SERVICE_UNHEALTHY"))
+				g.Expect(result.Detail.Message).To(ContainSubstring("DNS service 10.96.0.10 unhealthy"))
 			},
 		},
 		{
@@ -395,9 +401,12 @@ func TestRun(t *testing.T) {
 					}
 				}
 			},
-			validateResult: func(g *WithT, err error) {
-				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("DNS pod 10.244.0.3 unhealthy"))
+			validateResult: func(g *WithT, result *types.Result, err error) {
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(result).NotTo(BeNil())
+				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
+				g.Expect(result.Detail.Code).To(Equal("DNS_POD_UNHEALTHY"))
+				g.Expect(result.Detail.Message).To(ContainSubstring("DNS pod 10.244.0.3 unhealthy"))
 			},
 		},
 		{
@@ -431,8 +440,9 @@ func TestRun(t *testing.T) {
 					}
 				}
 			},
-			validateResult: func(g *WithT, err error) {
+			validateResult: func(g *WithT, result *types.Result, err error) {
 				g.Expect(err).To(HaveOccurred())
+				g.Expect(result).To(BeNil())
 				g.Expect(err.Error()).To(ContainSubstring("failed to get CoreDNS service"))
 			},
 		},
@@ -475,8 +485,9 @@ func TestRun(t *testing.T) {
 					}
 				}
 			},
-			validateResult: func(g *WithT, err error) {
+			validateResult: func(g *WithT, result *types.Result, err error) {
 				g.Expect(err).To(HaveOccurred())
+				g.Expect(result).To(BeNil())
 				g.Expect(err.Error()).To(ContainSubstring("CoreDNS service has no ClusterIP"))
 			},
 		},
@@ -504,8 +515,9 @@ func TestRun(t *testing.T) {
 					}
 				}
 			},
-			validateResult: func(g *WithT, err error) {
+			validateResult: func(g *WithT, result *types.Result, err error) {
 				g.Expect(err).To(HaveOccurred())
+				g.Expect(result).To(BeNil())
 				g.Expect(err.Error()).To(ContainSubstring("failed to get CoreDNS pod IPs"))
 			},
 		},
@@ -549,8 +561,9 @@ func TestRun(t *testing.T) {
 					}
 				}
 			},
-			validateResult: func(g *WithT, err error) {
+			validateResult: func(g *WithT, result *types.Result, err error) {
 				g.Expect(err).To(HaveOccurred())
+				g.Expect(result).To(BeNil())
 				g.Expect(err.Error()).To(ContainSubstring("failed to get CoreDNS pod IPs"))
 				g.Expect(err.Error()).To(ContainSubstring("no ready CoreDNS pod endpoints found"))
 			},
@@ -572,8 +585,8 @@ func TestRun(t *testing.T) {
 			dnsChecker.k8sClientset = tc.setupClientset()
 			dnsChecker.dnsResolver = tc.setupResolver()
 
-			err = dnsChecker.Run(context.Background())
-			tc.validateResult(g, err)
+			result, err := dnsChecker.Run(context.Background())
+			tc.validateResult(g, result, err)
 		})
 	}
 }
