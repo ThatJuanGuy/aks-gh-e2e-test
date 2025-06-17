@@ -641,8 +641,8 @@ func TestRun(t *testing.T) {
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(checker).NotTo(BeNil())
 
-			checker.withClientset(tc.setupClientset())
-			checker.withResolver(tc.setupResolver())
+			checker.k8sClientset = tc.setupClientset()
+			checker.dnsResolver = tc.setupResolver()
 
 			err = checker.Run(context.Background())
 			tc.validateResult(g, err)

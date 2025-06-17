@@ -83,18 +83,6 @@ func BuildDNSChecker(name string, config *config.DNSConfig) (*DNSChecker, error)
 	}, nil
 }
 
-// withClientset sets the Kubernetes clientset for testing.
-func (c *DNSChecker) withClientset(clientset kubernetes.Interface) *DNSChecker {
-	c.k8sClientset = clientset
-	return c
-}
-
-// withResolver sets a custom resolver factory for testing.
-func (c *DNSChecker) withResolver(dnsResolver func(dnsTarget DNSTarget) resolver) *DNSChecker {
-	c.dnsResolver = dnsResolver
-	return c
-}
-
 func (c DNSChecker) Name() string {
 	return c.name
 }
