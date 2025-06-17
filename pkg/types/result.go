@@ -29,15 +29,15 @@ type Detail struct {
 }
 
 // Healthy is a helper function to create a healthy Result.
-func Healthy() Result {
-	return Result{
+func Healthy() *Result {
+	return &Result{
 		Status: StatusHealthy,
 	}
 }
 
 // Unhealthy is a helper function to create an unhealthy Result with a specific code and message.
-func Unhealthy(code, message string) Result {
-	return Result{
+func Unhealthy(code, message string) *Result {
+	return &Result{
 		Status: StatusUnhealthy,
 		Detail: Detail{
 			Code:    code,

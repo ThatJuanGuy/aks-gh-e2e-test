@@ -4,9 +4,14 @@ import (
 	"context"
 	"errors"
 
+	"github.com/Azure/cluster-health-monitor/pkg/checker"
 	"github.com/Azure/cluster-health-monitor/pkg/config"
 	"github.com/Azure/cluster-health-monitor/pkg/types"
 )
+
+func Register() {
+	checker.RegisterChecker(config.CheckTypePodStartup, BuildPodStartupChecker)
+}
 
 type PodStartupChecker struct {
 	name      string
@@ -14,9 +19,9 @@ type PodStartupChecker struct {
 	podName   string
 }
 
-func BuildPodStartupChecker(name string, config *config.PodStartupConfig) (*PodStartupChecker, error) {
+func BuildPodStartupChecker(config *config.CheckerConfig) (checker.Checker, error) {
 	return &PodStartupChecker{
-		name: name,
+		name: config.Name,
 	}, nil
 }
 
