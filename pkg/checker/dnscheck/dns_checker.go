@@ -3,11 +3,9 @@ package dnscheck
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 
-	"golang.org/x/sync/errgroup"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -101,6 +99,10 @@ func (c DNSChecker) Name() string {
 	return c.name
 }
 
+// Run executes the DNS check.
+// It queries the CoreDNS service and pods for the configured domain.
+// If LocalDNS is configured, it should also query that.
+// If all queries succeed, the check is considered healthy.
 func (c DNSChecker) Run(ctx context.Context) error {
 	var clientset kubernetes.Interface
 	if c.k8sClientset != nil {
@@ -131,63 +133,12 @@ func (c DNSChecker) Run(ctx context.Context) error {
 
 	// TODO: Get LocalDNS IP.
 
-	dnsTargets := make(map[DNSTarget]struct{})
-	dnsTargets[coreDNSServiceTarget] = struct{}{}
-	for _, target := range coreDNSPodTargets {
-		dnsTargets[target] = struct{}{}
-	}
-
-	type dnsResult struct {
-		target DNSTarget
-		err    error
-	}
-
-	dnsResultChan := make(chan dnsResult, len(dnsTargets))
-	g, gctx := errgroup.WithContext(ctx)
-	for target := range dnsTargets {
-		target := target
-		g.Go(func() error {
-			err := c.resolveDomain(gctx, target)
-			dnsResultChan <- dnsResult{target: target, err: err}
-			return nil
-		})
-	}
-	g.Wait()
-	close(dnsResultChan)
-
-	var serviceError error
-	var podErrors []error
-	var hasHealthyPod bool
-	for result := range dnsResultChan {
-		if result.err == nil {
-			if result.target.Type == CoreDNSPod {
-				hasHealthyPod = true
-			}
-			continue
+	// Resolve the domain against DNS targets.
+	dnsTargets := append([]DNSTarget{coreDNSServiceTarget}, coreDNSPodTargets...)
+	for _, target := range dnsTargets {
+		if err := c.resolveDomain(ctx, target); err != nil {
+			return fmt.Errorf("DNS %s %s unhealthy: %w", target.Type, target.IP, err)
 		}
-
-		var errMsg string
-		if errors.Is(result.err, context.DeadlineExceeded) {
-			errMsg = fmt.Sprintf("CoreDNS %s %s timed out", result.target.Type, result.target.IP)
-		} else {
-			errMsg = fmt.Sprintf("CoreDNS %s %s unhealthy", result.target.Type, result.target.IP)
-		}
-
-		if result.target.Type == CoreDNSService {
-			serviceError = fmt.Errorf("%s: %w", errMsg, result.err)
-		} else {
-			podErrors = append(podErrors, fmt.Errorf("%s: %w", errMsg, result.err))
-		}
-	}
-
-	var allErrors []error
-	allErrors = append(allErrors, serviceError)
-	if !hasHealthyPod {
-		allErrors = append(allErrors, podErrors...)
-	}
-
-	if len(allErrors) > 0 {
-		return errors.Join(allErrors...)
 	}
 
 	return nil
