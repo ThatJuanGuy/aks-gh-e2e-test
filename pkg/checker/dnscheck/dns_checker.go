@@ -11,8 +11,13 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
+	"github.com/Azure/cluster-health-monitor/pkg/checker"
 	"github.com/Azure/cluster-health-monitor/pkg/config"
 )
+
+func Register() {
+	checker.RegisterChecker(config.CheckTypeDNS, BuildDNSChecker)
+}
 
 const (
 	CoreDNSNamespace   = "kube-system"
@@ -68,17 +73,17 @@ func newDefaultResolver(target DNSTarget) resolver {
 }
 
 // BuildDNSChecker creates a new DNSChecker instance.
-func BuildDNSChecker(name string, config *config.DNSConfig) (*DNSChecker, error) {
-	if name == "" {
+func BuildDNSChecker(config *config.CheckerConfig) (checker.Checker, error) {
+	if config.Name == "" {
 		return nil, fmt.Errorf("checker name cannot be empty")
 	}
-	if err := config.ValidateDNSConfig(); err != nil {
+	if err := config.DNSConfig.ValidateDNSConfig(); err != nil {
 		return nil, err
 	}
 
 	return &DNSChecker{
-		name:        name,
-		config:      config,
+		name:        config.Name,
+		config:      config.DNSConfig,
 		dnsResolver: newDefaultResolver,
 	}, nil
 }
