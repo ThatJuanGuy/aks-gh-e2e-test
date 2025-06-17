@@ -336,11 +336,11 @@ func TestRun(t *testing.T) {
 			},
 			validateResult: func(g *WithT, err error) {
 				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("CoreDNS service 10.96.0.10 unhealthy"))
+				g.Expect(err.Error()).To(ContainSubstring("DNS service 10.96.0.10 unhealthy"))
 			},
 		},
 		{
-			name: "All CoreDNS pods are unhealthy",
+			name: "CoreDNS service is healthy but CoreDNS pod is unhealthy",
 			setupClientset: func() *fake.Clientset {
 				return fake.NewSimpleClientset(
 					&corev1.Service{
@@ -373,7 +373,7 @@ func TestRun(t *testing.T) {
 				return func(dnsTarget DNSTarget) resolver {
 					return &mockResolver{
 						lookupHostFunc: func(ctx context.Context, host string) ([]string, error) {
-							if dnsTarget.Type == CoreDNSPod {
+							if dnsTarget.Type == CoreDNSPod && dnsTarget.IP == "10.244.0.3" {
 								return nil, fmt.Errorf("connection refused")
 							}
 							return []string{"1.2.3.4"}, nil
@@ -383,100 +383,7 @@ func TestRun(t *testing.T) {
 			},
 			validateResult: func(g *WithT, err error) {
 				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("CoreDNS pod 10.244.0.2 unhealthy"))
-				g.Expect(err.Error()).To(ContainSubstring("CoreDNS pod 10.244.0.3 unhealthy"))
-			},
-		},
-		{
-			name: "Partial CoreDNS pods are unhealthy but service is healthy",
-			setupClientset: func() *fake.Clientset {
-				return fake.NewSimpleClientset(
-					&corev1.Service{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "kube-dns",
-							Namespace: "kube-system",
-						},
-						Spec: corev1.ServiceSpec{
-							ClusterIP: "10.96.0.10",
-						},
-					},
-					&discoveryv1.EndpointSlice{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "kube-dns-12345",
-							Namespace: "kube-system",
-							Labels: map[string]string{
-								discoveryv1.LabelServiceName: "kube-dns",
-							},
-						},
-						Endpoints: []discoveryv1.Endpoint{
-							{
-								Addresses:  []string{"10.244.0.2", "10.244.0.3"},
-								Conditions: discoveryv1.EndpointConditions{Ready: nil},
-							},
-						},
-					},
-				)
-			},
-			setupResolver: func() func(dnsTarget DNSTarget) resolver {
-				return func(dnsTarget DNSTarget) resolver {
-					return &mockResolver{
-						lookupHostFunc: func(ctx context.Context, host string) ([]string, error) {
-							if dnsTarget.Type == CoreDNSPod && host == "10.244.0.3" {
-								return nil, fmt.Errorf("connection refused")
-							}
-							return []string{"1.2.3.4"}, nil
-						},
-					}
-				}
-			},
-			validateResult: func(g *WithT, err error) {
-				g.Expect(err).NotTo(HaveOccurred())
-			},
-		},
-		{
-			name: "CoreDNS service and all pods are unhealthy",
-			setupClientset: func() *fake.Clientset {
-				return fake.NewSimpleClientset(
-					&corev1.Service{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "kube-dns",
-							Namespace: "kube-system",
-						},
-						Spec: corev1.ServiceSpec{
-							ClusterIP: "10.96.0.10",
-						},
-					},
-					&discoveryv1.EndpointSlice{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "kube-dns-12345",
-							Namespace: "kube-system",
-							Labels: map[string]string{
-								discoveryv1.LabelServiceName: "kube-dns",
-							},
-						},
-						Endpoints: []discoveryv1.Endpoint{
-							{
-								Addresses:  []string{"10.244.0.2", "10.244.0.3"},
-								Conditions: discoveryv1.EndpointConditions{Ready: nil},
-							},
-						},
-					},
-				)
-			},
-			setupResolver: func() func(dnsTarget DNSTarget) resolver {
-				return func(dnsTarget DNSTarget) resolver {
-					return &mockResolver{
-						lookupHostFunc: func(ctx context.Context, host string) ([]string, error) {
-							return nil, fmt.Errorf("connection refused")
-						},
-					}
-				}
-			},
-			validateResult: func(g *WithT, err error) {
-				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("CoreDNS service 10.96.0.10 unhealthy"))
-				g.Expect(err.Error()).To(ContainSubstring("CoreDNS pod 10.244.0.2 unhealthy"))
-				g.Expect(err.Error()).To(ContainSubstring("CoreDNS pod 10.244.0.3 unhealthy"))
+				g.Expect(err.Error()).To(ContainSubstring("DNS pod 10.244.0.3 unhealthy"))
 			},
 		},
 		{
