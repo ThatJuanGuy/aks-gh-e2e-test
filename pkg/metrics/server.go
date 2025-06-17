@@ -32,21 +32,13 @@ type Server struct {
 // NewServer creates a new Metrics instance with a custom registry and listen address.
 func NewServer(port int) (*Server, error) {
 	reg := prometheus.NewRegistry()
-	counter := prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "cluster_health_monitor_checker_result_total",
-			Help: "Total number of checker runs, labeled by status and code",
-		},
-		[]string{"checker_type", "checker_name", "status", "error_code"},
-	)
-	if err := reg.Register(counter); err != nil {
+	if err := reg.Register(CheckerResultCounter); err != nil {
 		log.Printf("Failed to register checker counter: %v.", err)
 		return nil, err
 	}
 	return &Server{
-		registry:      reg,
-		port:          port,
-		resultCounter: counter,
+		registry: reg,
+		port:     port,
 	}, nil
 }
 
@@ -76,19 +68,4 @@ func (m *Server) Run(ctx context.Context) error {
 	case err := <-errCh:
 		return err
 	}
-}
-
-// IncHealth increments the health counter for a checker type and name.
-func (m *Server) IncHealth(chkType, chkName string) {
-	m.resultCounter.WithLabelValues(chkType, chkName, healthyStatus, healthyCode).Inc()
-}
-
-// IncUnhealth increments the unhealthy counter for a checker type, name, and error code.
-func (m *Server) IncUnhealth(chkType, chkName, code string) {
-	m.resultCounter.WithLabelValues(chkType, chkName, unhealthyStatus, code).Inc()
-}
-
-// IncUnknown increments the unknown counter for a checker type and name.
-func (m *Server) IncUnknown(chkType, chkName string) {
-	m.resultCounter.WithLabelValues(chkType, chkName, unknownStatus, unknownCode).Inc()
 }
