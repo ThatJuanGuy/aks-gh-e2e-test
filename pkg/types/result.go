@@ -4,9 +4,9 @@ package types
 type Status string
 
 const (
-	// StatusHealthy indicates the checker passed
+	// StatusHealthy indicates the checker passed.
 	StatusHealthy Status = "healthy"
-	// StatusUnhealthy indicates the checker failed
+	// StatusUnhealthy indicates the checker failed.
 	StatusUnhealthy Status = "unhealthy"
 )
 
