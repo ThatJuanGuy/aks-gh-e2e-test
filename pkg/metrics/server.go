@@ -76,14 +76,17 @@ func (m *Server) Run(ctx context.Context) error {
 	}
 }
 
+// IncHealth increments the health counter for a checker type and name.
 func (m *Server) IncHealth(chkType, chkName string) {
 	m.resultCounter.WithLabelValues(chkType, chkName, healthyStatus, healthyCode).Inc()
 }
 
+// IncUnhealth increments the unhealthy counter for a checker type, name, and error code.
 func (m *Server) IncUnhealth(chkType, chkName, code string) {
 	m.resultCounter.WithLabelValues(chkType, chkName, unhealthyStatus, code).Inc()
 }
 
+// IncUnknown increments the unknown counter for a checker type and name.
 func (m *Server) IncUnknown(chkType, chkName string) {
 	m.resultCounter.WithLabelValues(chkType, chkName, unknownStatus, unknownCode).Inc()
 }
