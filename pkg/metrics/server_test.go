@@ -10,8 +10,9 @@ import (
 )
 
 func TestIncHealthCounterValue(t *testing.T) {
+	t.Parallel()
 	g := NewWithT(t)
-	s, _ := NewServer(":0")
+	s, _ := NewServer(8080)
 	s.IncHealth("dns", "dns1")
 
 	// Gather metrics
@@ -37,8 +38,9 @@ func TestIncHealthCounterValue(t *testing.T) {
 }
 
 func TestIncUnhealthCounterValue(t *testing.T) {
+	t.Parallel()
 	g := NewWithT(t)
-	s, _ := NewServer(":0")
+	s, _ := NewServer(8080)
 	s.IncUnhealth("dns", "dns2", "timeout")
 
 	// Gather metrics
@@ -64,8 +66,9 @@ func TestIncUnhealthCounterValue(t *testing.T) {
 }
 
 func TestIncUnknownCounterValue(t *testing.T) {
+	t.Parallel()
 	g := NewWithT(t)
-	s, _ := NewServer(":0")
+	s, _ := NewServer(8080)
 	s.IncUnknown("dns", "dns3")
 
 	// Gather metrics

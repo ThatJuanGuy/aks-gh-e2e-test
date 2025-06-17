@@ -21,7 +21,7 @@ func main() {
 	defer cancel()
 
 	// Run the prometheus metrics server
-	m, err := metrics.NewServer(":9800")
+	m, err := metrics.NewServer(9800)
 	if err != nil {
 		log.Fatalf("Failed to create metrics server:%s.", err)
 	}
