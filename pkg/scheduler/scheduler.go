@@ -6,56 +6,61 @@ import (
 	"time"
 
 	"github.com/Azure/cluster-health-monitor/pkg/checker"
-	"github.com/Azure/cluster-health-monitor/pkg/config"
 	"golang.org/x/sync/errgroup"
 )
 
-// Scheduler manages and runs a set of checkers periodically.
-type Scheduler struct {
-	config     *config.Config
-	chkBuilder CheckerBuilder
+// CheckerSchedule defines the schedule for a health checker
+type CheckerSchedule struct {
+	// Interval defines how often the checker should run.
+	Interval time.Duration
+	// Timeout defines how long to wait for the checker to complete before considering it failed.
+	Timeout time.Duration
+	// Checker is the actual health checker that will be run according to the schedule.
+	Checker checker.Checker
 }
 
-// CheckerBuilder is a factory function type that builds a Checker from a configuration.
-type CheckerBuilder func(cfg config.CheckerConfig) (checker.Checker, error)
-
-func NewScheduler(cfg *config.Config) (*Scheduler, error) {
+func NewScheduler() *Scheduler {
 	return &Scheduler{
-		chkBuilder: nil, // TODO: set a default checker builder after refactoring checker's package
-		config:     cfg,
-	}, nil
+		chkSchedules: []CheckerSchedule{},
+	}
+}
+
+// Scheduler manages and runs a set of checkers periodically.
+type Scheduler struct {
+	chkSchedules []CheckerSchedule
+}
+
+func (r *Scheduler) AddChecker(CheckerSchedules ...CheckerSchedule) {
+	for _, chk := range CheckerSchedules {
+		r.chkSchedules = append(r.chkSchedules, chk)
+	}
 }
 
 // Start starts all checkers according to their configured intervals and timeouts.
-// Start create a new checker for each interval instead of reusing the same instance.
 func (r *Scheduler) Start(ctx context.Context) error {
 	var g errgroup.Group
-	for _, chkCfg := range r.config.Checkers {
+	for _, chkSch := range r.chkSchedules {
 		g.Go(func() error {
-			return r.scheduleChecker(ctx, chkCfg)
+			return r.scheduleChecker(ctx, chkSch)
 		})
+
 	}
 	return g.Wait()
 }
 
-func (r *Scheduler) scheduleChecker(ctx context.Context, cfg config.CheckerConfig) error {
-	ticker := time.NewTicker(cfg.Interval)
+func (r *Scheduler) scheduleChecker(ctx context.Context, chkSch CheckerSchedule) error {
+	ticker := time.NewTicker(chkSch.Interval)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
 			func() {
-				chk, err := r.chkBuilder(cfg)
-				if err != nil {
-					log.Printf("Failed to build checker %q: %v", cfg.Name, err)
-					return
-				}
-				runCtx, cancel := context.WithTimeout(ctx, cfg.Timeout)
+				runCtx, cancel := context.WithTimeout(ctx, chkSch.Timeout)
 				defer cancel()
-				if err := chk.Run(runCtx); err != nil {
+				if err := chkSch.Checker.Run(runCtx); err != nil {
 					// TODO: handle the error of the checker and emit corresponding metrics
-					log.Printf("Checker %q failed: %s", chk.Name(), err)
+					log.Printf("Checker %q failed: %s", chkSch.Checker.Name(), err)
 				}
 				// TODO: handle the result of the checker and emit corresponding metrics
 			}()
