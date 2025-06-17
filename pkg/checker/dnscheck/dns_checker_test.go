@@ -42,13 +42,14 @@ func TestBuildDNSChecker(t *testing.T) {
 				},
 			},
 			validateRes: func(g *WithT, checker checker.Checker, err error) {
-				g.Expect(checker).To(Equal(
-					&DNSChecker{
-						name: "test-dns-checker",
-						config: &config.DNSConfig{
-							Domain: "example.com",
-						},
-					}))
+				g.Expect(checker).To(BeAssignableToTypeOf(&DNSChecker{}))
+				dnsChecker := checker.(*DNSChecker)
+				g.Expect(dnsChecker.name).To(Equal("test-dns-checker"))
+				g.Expect(dnsChecker.config).To(Equal(&config.DNSConfig{
+					Domain: "example.com",
+				}))
+				g.Expect(dnsChecker.k8sClientset).To(BeNil())
+				g.Expect(dnsChecker.dnsResolver).NotTo(BeNil())
 				g.Expect(err).NotTo(HaveOccurred())
 			},
 		},
@@ -557,14 +558,21 @@ func TestRun(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			g := NewWithT(t)
-			checker, err := BuildDNSChecker("test-dns-checker", &config.DNSConfig{Domain: "example.com"})
+			checker, err := BuildDNSChecker(&config.CheckerConfig{
+				Name: "test-dns-checker",
+				Type: config.CheckTypeDNS,
+				DNSConfig: &config.DNSConfig{
+					Domain: "example.com",
+				},
+			})
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(checker).NotTo(BeNil())
 
-			checker.k8sClientset = tc.setupClientset()
-			checker.dnsResolver = tc.setupResolver()
+			dnsChecker := checker.(*DNSChecker)
+			dnsChecker.k8sClientset = tc.setupClientset()
+			dnsChecker.dnsResolver = tc.setupResolver()
 
-			err = checker.Run(context.Background())
+			err = dnsChecker.Run(context.Background())
 			tc.validateResult(g, err)
 		})
 	}
