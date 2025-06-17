@@ -13,6 +13,7 @@ import (
 
 	"github.com/Azure/cluster-health-monitor/pkg/checker"
 	"github.com/Azure/cluster-health-monitor/pkg/config"
+	"github.com/Azure/cluster-health-monitor/pkg/types"
 )
 
 func Register() {
@@ -96,7 +97,7 @@ func (c DNSChecker) Name() string {
 // It queries the CoreDNS service and pods for the configured domain.
 // If LocalDNS is configured, it should also query that.
 // If all queries succeed, the check is considered healthy.
-func (c DNSChecker) Run(ctx context.Context) error {
+func (c DNSChecker) Run(ctx context.Context) (*types.Result, error) {
 	var clientset kubernetes.Interface
 	if c.k8sClientset != nil {
 		// Use the provided client for testing
@@ -105,23 +106,23 @@ func (c DNSChecker) Run(ctx context.Context) error {
 		// Create a new client for production
 		k8sConfig, err := rest.InClusterConfig()
 		if err != nil {
-			return fmt.Errorf("failed to get in-cluster config: %w", err)
+			return nil, fmt.Errorf("failed to get in-cluster config: %w", err)
 		}
 
 		clientset, err = kubernetes.NewForConfig(k8sConfig)
 		if err != nil {
-			return fmt.Errorf("failed to create Kubernetes client: %w", err)
+			return nil, fmt.Errorf("failed to create Kubernetes client: %w", err)
 		}
 	}
 
 	coreDNSServiceTarget, err := getCoreDNSServiceIP(ctx, clientset)
 	if err != nil {
-		return fmt.Errorf("failed to get CoreDNS service IP: %w", err)
+		return nil, fmt.Errorf("failed to get CoreDNS service IP: %w", err)
 	}
 
 	coreDNSPodTargets, err := getCoreDNSPodIPs(ctx, clientset)
 	if err != nil {
-		return fmt.Errorf("failed to get CoreDNS pod IPs: %w", err)
+		return nil, fmt.Errorf("failed to get CoreDNS pod IPs: %w", err)
 	}
 
 	// TODO: Get LocalDNS IP.
@@ -134,7 +135,7 @@ func (c DNSChecker) Run(ctx context.Context) error {
 		}
 	}
 
-	return nil
+	return types.Healthy(), nil
 }
 
 // getCoreDNSServiceIP returns the ClusterIP of the CoreDNS service in the cluster as a DNSTarget.
