@@ -14,6 +14,25 @@ import (
 	"github.com/Azure/cluster-health-monitor/pkg/config"
 )
 
+const (
+	CoreDNSNamespace   = "kube-system"
+	CoreDNSServiceName = "kube-dns"
+)
+
+// DNSTargetType defines the type of DNS target.
+type DNSTargetType string
+
+const (
+	CoreDNSService DNSTargetType = "service"
+	CoreDNSPod     DNSTargetType = "pod"
+)
+
+// DNSTarget represents a DNS target with its IP and type.
+type DNSTarget struct {
+	IP   string
+	Type DNSTargetType
+}
+
 // DNSChecker implements the Checker interface for DNS checks.
 type DNSChecker struct {
 	name         string
@@ -46,25 +65,6 @@ func (r *defaultResolver) lookupHost(ctx context.Context, host string) ([]string
 // newDefaultResolver creates a new defaultResolver.
 func newDefaultResolver(target DNSTarget) resolver {
 	return &defaultResolver{target: target}
-}
-
-const (
-	CoreDNSNamespace   = "kube-system"
-	CoreDNSServiceName = "kube-dns"
-)
-
-// DNSTargetType defines the type of DNS target.
-type DNSTargetType string
-
-const (
-	CoreDNSService DNSTargetType = "service"
-	CoreDNSPod     DNSTargetType = "pod"
-)
-
-// DNSTarget represents a DNS target with its IP and type.
-type DNSTarget struct {
-	IP   string
-	Type DNSTargetType
 }
 
 // BuildDNSChecker creates a new DNSChecker instance.
