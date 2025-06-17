@@ -19,21 +19,16 @@ type CheckerSchedule struct {
 	Checker checker.Checker
 }
 
-func NewScheduler() *Scheduler {
+// NewScheduler creates a new Scheduler instance.
+func NewScheduler(chkSchedules []CheckerSchedule) *Scheduler {
 	return &Scheduler{
-		chkSchedules: []CheckerSchedule{},
+		chkSchedules: chkSchedules,
 	}
 }
 
 // Scheduler manages and runs a set of checkers periodically.
 type Scheduler struct {
 	chkSchedules []CheckerSchedule
-}
-
-func (r *Scheduler) AddChecker(CheckerSchedules ...CheckerSchedule) {
-	for _, chk := range CheckerSchedules {
-		r.chkSchedules = append(r.chkSchedules, chk)
-	}
 }
 
 // Start starts all checkers according to their configured intervals and timeouts.
@@ -60,13 +55,13 @@ func (r *Scheduler) scheduleChecker(ctx context.Context, chkSch CheckerSchedule)
 				defer cancel()
 				if err := chkSch.Checker.Run(runCtx); err != nil {
 					// TODO: handle the error of the checker and emit corresponding metrics
-					log.Printf("Checker %q failed: %s", chkSch.Checker.Name(), err)
+					log.Printf("Checker %q failed: %s.", chkSch.Checker.Name(), err)
 				}
 				// TODO: handle the result of the checker and emit corresponding metrics
 			}()
 
 		case <-ctx.Done():
-			log.Println("scheduler stopping")
+			log.Println("Scheduler stopping.")
 			return ctx.Err()
 		}
 	}

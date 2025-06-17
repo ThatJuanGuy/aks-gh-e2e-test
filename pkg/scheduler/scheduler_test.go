@@ -30,15 +30,17 @@ func (f *fakeChecker) Run(ctx context.Context) error {
 func TestScheduler_Run_Periodic(t *testing.T) {
 	t.Parallel()
 	g := NewWithT(t)
-	scheduler := NewScheduler()
+	fakeChk := &fakeChecker{name: "periodic1", runErr: nil, delay: 0}
+	chkSch := []CheckerSchedule{
+		{
+			Interval: 50 * time.Millisecond,
+			Timeout:  0,
+			Checker:  fakeChk,
+		},
+	}
+	scheduler := NewScheduler(chkSch)
 	ctx, cancel := context.WithTimeout(context.Background(), 160*time.Millisecond)
 	defer cancel()
-	fakeChk := &fakeChecker{name: "periodic1", runErr: nil, delay: 0}
-	scheduler.AddChecker(CheckerSchedule{
-		Interval: 50 * time.Millisecond,
-		Timeout:  0,
-		Checker:  fakeChk,
-	})
 	_ = scheduler.Start(ctx)
 	g.Expect(fakeChk.runCount).To(BeNumerically(">=", 2))
 }
