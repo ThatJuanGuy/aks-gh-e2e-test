@@ -6,6 +6,7 @@ import (
 
 	"github.com/Azure/cluster-health-monitor/pkg/checker"
 	"github.com/Azure/cluster-health-monitor/pkg/config"
+	"github.com/Azure/cluster-health-monitor/pkg/types"
 )
 
 func Register() {
@@ -28,6 +29,6 @@ func (c *PodStartupChecker) Name() string {
 	return c.name
 }
 
-func (c *PodStartupChecker) Run(ctx context.Context) error {
-	return errors.New("PodStartupChecker not implemented yet")
+func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
+	return nil, errors.New("PodStartupChecker not implemented yet")
 }
