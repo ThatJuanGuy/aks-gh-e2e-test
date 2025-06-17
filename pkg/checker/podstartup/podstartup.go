@@ -24,9 +24,6 @@ func Register() {
 
 // BuildPodStartupChecker creates a new PodStartupChecker instance.
 func BuildPodStartupChecker(config *config.CheckerConfig) (checker.Checker, error) {
-	if config.Name == "" {
-		return nil, fmt.Errorf("checker name cannot be empty")
-	}
 	if err := config.PodStartupConfig.ValidatePodStartupConfig(); err != nil {
 		return nil, err
 	}
