@@ -29,7 +29,7 @@ type PodStartupChecker struct {
 // The maximum number of synthetic pods created by the checker that can exist at any one time. If the limit has been reached, the checker
 // will not create any more synthetic pods until some of the existing ones are deleted. Instead, it will fail the run with an error.
 // Reaching this limit effectively disables the checker.
-const MaxSyntheticPods = 10
+const maxSyntheticPods = 10
 
 func Register() {
 	checker.RegisterChecker(config.CheckTypePodStartup, BuildPodStartupChecker)
@@ -84,9 +84,9 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 	}
 
 	// Do not run the checker if the maximum number of synthetic pods has been reached.
-	if len(pods.Items) >= MaxSyntheticPods {
+	if len(pods.Items) >= maxSyntheticPods {
 		return nil, fmt.Errorf("maximum number of synthetic pods reached in namespace %s, current: %d, max allowed: %d, delete some pods before running the checker again",
-			namespace, len(pods.Items), MaxSyntheticPods)
+			namespace, len(pods.Items), maxSyntheticPods)
 	}
 
 	// Create a synthetic pod to measure the startup time.
