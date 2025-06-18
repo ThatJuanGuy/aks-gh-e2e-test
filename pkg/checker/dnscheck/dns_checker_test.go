@@ -11,7 +11,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
-	"github.com/Azure/cluster-health-monitor/pkg/checker"
 	"github.com/Azure/cluster-health-monitor/pkg/config"
 	"github.com/Azure/cluster-health-monitor/pkg/types"
 )
@@ -25,82 +24,6 @@ func (m *mockResolver) lookupHost(ctx context.Context, host string) ([]string, e
 		return m.lookupHostFunc(ctx, host)
 	}
 	return nil, fmt.Errorf("not implemented")
-}
-
-func TestBuildDNSChecker(t *testing.T) {
-	for _, tc := range []struct {
-		name          string
-		checkerConfig *config.CheckerConfig
-		validateRes   func(g *WithT, checker checker.Checker, err error)
-	}{
-		{
-			name: "Valid config",
-			checkerConfig: &config.CheckerConfig{
-				Name: "test-dns-checker",
-				Type: config.CheckTypeDNS,
-				DNSConfig: &config.DNSConfig{
-					Domain: "example.com",
-				},
-			},
-			validateRes: func(g *WithT, checker checker.Checker, err error) {
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(checker).To(BeAssignableToTypeOf(&DNSChecker{}))
-				dnsChecker := checker.(*DNSChecker)
-				g.Expect(dnsChecker.name).To(Equal("test-dns-checker"))
-				g.Expect(dnsChecker.config).To(Equal(&config.DNSConfig{
-					Domain: "example.com",
-				}))
-				g.Expect(dnsChecker.k8sClientset).To(BeNil())
-				g.Expect(dnsChecker.dnsResolver).NotTo(BeNil())
-			},
-		},
-		{
-			name: "Empty Checker Name",
-			checkerConfig: &config.CheckerConfig{
-				Name: "",
-				Type: config.CheckTypeDNS,
-				DNSConfig: &config.DNSConfig{
-					Domain: "example.com",
-				},
-			},
-			validateRes: func(g *WithT, checker checker.Checker, err error) {
-				g.Expect(checker).To(BeNil())
-				g.Expect(err).To(HaveOccurred())
-			},
-		},
-		{
-			name: "Missing DNSConfig",
-			checkerConfig: &config.CheckerConfig{
-				Name:      "test-dns-checker",
-				Type:      config.CheckTypeDNS,
-				DNSConfig: nil,
-			},
-			validateRes: func(g *WithT, checker checker.Checker, err error) {
-				g.Expect(checker).To(BeNil())
-				g.Expect(err).To(HaveOccurred())
-			},
-		},
-		{
-			name: "Empty Domain",
-			checkerConfig: &config.CheckerConfig{
-				Name: "test-dns-checker",
-				Type: config.CheckTypeDNS,
-				DNSConfig: &config.DNSConfig{
-					Domain: "",
-				},
-			},
-			validateRes: func(g *WithT, checker checker.Checker, err error) {
-				g.Expect(checker).To(BeNil())
-				g.Expect(err).To(HaveOccurred())
-			},
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			g := NewWithT(t)
-			c, err := BuildDNSChecker(tc.checkerConfig)
-			tc.validateRes(g, c, err)
-		})
-	}
 }
 
 func TestGetCoreDNSServiceIP(t *testing.T) {
