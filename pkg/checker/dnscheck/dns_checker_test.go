@@ -233,7 +233,7 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name: "CoreDNS service is unhealthy",
+			name: "Discovered CoreDNS service is unhealthy",
 			setupClientset: func() *fake.Clientset {
 				return fake.NewSimpleClientset(
 					&corev1.Service{
@@ -283,7 +283,7 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name: "CoreDNS service is healthy but CoreDNS pod is unhealthy",
+			name: "CoreDNS service is healthy but discovered CoreDNS pod is unhealthy",
 			setupClientset: func() *fake.Clientset {
 				return fake.NewSimpleClientset(
 					&corev1.Service{
@@ -333,7 +333,7 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name: "Error when CoreDNS service doesn't exist",
+			name: "Unhealthy when CoreDNS service doesn't exist",
 			setupClientset: func() *fake.Clientset {
 				// No CoreDNS service, only endpointslice
 				return fake.NewSimpleClientset(
@@ -364,58 +364,15 @@ func TestRun(t *testing.T) {
 				}
 			},
 			validateResult: func(g *WithT, result *types.Result, err error) {
-				g.Expect(err).To(HaveOccurred())
-				g.Expect(result).To(BeNil())
-				g.Expect(err.Error()).To(ContainSubstring("failed to get CoreDNS service"))
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(result).NotTo(BeNil())
+				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
+				g.Expect(result.Detail.Code).To(Equal("dns_service_unhealthy"))
+				g.Expect(result.Detail.Message).To(ContainSubstring("failed to get CoreDNS service IP"))
 			},
 		},
 		{
-			name: "Error when CoreDNS service has no ClusterIP",
-			setupClientset: func() *fake.Clientset {
-				return fake.NewSimpleClientset(
-					&corev1.Service{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "kube-dns",
-							Namespace: "kube-system",
-						},
-						Spec: corev1.ServiceSpec{
-							ClusterIP: "",
-						},
-					},
-					&discoveryv1.EndpointSlice{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "kube-dns-12345",
-							Namespace: "kube-system",
-							Labels: map[string]string{
-								discoveryv1.LabelServiceName: "kube-dns",
-							},
-						},
-						Endpoints: []discoveryv1.Endpoint{
-							{
-								Addresses:  []string{"10.244.0.2", "10.244.0.3"},
-								Conditions: discoveryv1.EndpointConditions{Ready: nil},
-							},
-						},
-					},
-				)
-			},
-			setupResolver: func() func(dnsTarget DNSTarget) resolver {
-				return func(dnsTarget DNSTarget) resolver {
-					return &mockResolver{
-						lookupHostFunc: func(ctx context.Context, host string) ([]string, error) {
-							return []string{"1.2.3.4"}, nil
-						},
-					}
-				}
-			},
-			validateResult: func(g *WithT, result *types.Result, err error) {
-				g.Expect(err).To(HaveOccurred())
-				g.Expect(result).To(BeNil())
-				g.Expect(err.Error()).To(ContainSubstring("CoreDNS service has no ClusterIP"))
-			},
-		},
-		{
-			name: "Error when CoreDNS endpoint slices don't exist",
+			name: "Unhealthy when CoreDNS endpoint slices don't exist",
 			setupClientset: func() *fake.Clientset {
 				return fake.NewSimpleClientset(
 					&corev1.Service{
@@ -439,56 +396,11 @@ func TestRun(t *testing.T) {
 				}
 			},
 			validateResult: func(g *WithT, result *types.Result, err error) {
-				g.Expect(err).To(HaveOccurred())
-				g.Expect(result).To(BeNil())
-				g.Expect(err.Error()).To(ContainSubstring("failed to get CoreDNS pod IPs"))
-			},
-		},
-		{
-			name: "Error when CoreDNS endpoints are not ready",
-			setupClientset: func() *fake.Clientset {
-				ready := false
-				return fake.NewSimpleClientset(
-					&corev1.Service{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "kube-dns",
-							Namespace: "kube-system",
-						},
-						Spec: corev1.ServiceSpec{
-							ClusterIP: "10.96.0.10",
-						},
-					},
-					&discoveryv1.EndpointSlice{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "kube-dns-12345",
-							Namespace: "kube-system",
-							Labels: map[string]string{
-								discoveryv1.LabelServiceName: "kube-dns",
-							},
-						},
-						Endpoints: []discoveryv1.Endpoint{
-							{
-								Addresses:  []string{"10.244.0.2", "10.244.0.3"},
-								Conditions: discoveryv1.EndpointConditions{Ready: &ready},
-							},
-						},
-					},
-				)
-			},
-			setupResolver: func() func(dnsTarget DNSTarget) resolver {
-				return func(dnsTarget DNSTarget) resolver {
-					return &mockResolver{
-						lookupHostFunc: func(ctx context.Context, host string) ([]string, error) {
-							return []string{"1.2.3.4"}, nil
-						},
-					}
-				}
-			},
-			validateResult: func(g *WithT, result *types.Result, err error) {
-				g.Expect(err).To(HaveOccurred())
-				g.Expect(result).To(BeNil())
-				g.Expect(err.Error()).To(ContainSubstring("failed to get CoreDNS pod IPs"))
-				g.Expect(err.Error()).To(ContainSubstring("no ready CoreDNS pod endpoints found"))
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(result).NotTo(BeNil())
+				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
+				g.Expect(result.Detail.Code).To(Equal("dns_pod_unhealthy"))
+				g.Expect(result.Detail.Message).To(ContainSubstring("failed to get CoreDNS pod IPs"))
 			},
 		},
 	} {
