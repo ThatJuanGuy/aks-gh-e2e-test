@@ -98,8 +98,12 @@ func TestBuildCheckersFromConfig_Valid(t *testing.T) {
 checkers:
   - name: foo
     type: oktype
+    interval: 10s
+    timeout: 5s
   - name: bar
     type: oktype
+    interval: 10s
+    timeout: 5s
 `
 	checkers, err := BuildCheckersFromConfig([]byte(yaml))
 	g.Expect(err).ToNot(HaveOccurred())
