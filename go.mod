@@ -5,6 +5,7 @@ go 1.24.0
 require (
 	github.com/onsi/gomega v1.37.0
 	github.com/prometheus/client_golang v1.22.0
+	golang.org/x/sync v0.12.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.33.1
 	k8s.io/apimachinery v0.33.1

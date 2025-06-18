@@ -30,13 +30,13 @@ type CheckerConfig struct {
 
 	// Required.
 	// The interval at which the checker should run. The string format see https://pkg.go.dev/time#ParseDuration
-	// Default is 0, which means the checker will run only once.
+	// It must be greater than 0.
 	Interval time.Duration `yaml:"interval"`
 
 	// Required.
 	// The timeout for the checker, used to determine how long to wait for a response before considering the check failed.
 	// The string format see https://pkg.go.dev/time#ParseDuration
-	// Default is 0, which means the checker will wait indefinitely for a response.
+	// It must be greater than 0.
 	Timeout time.Duration `yaml:"timeout"`
 
 	// Optional.
