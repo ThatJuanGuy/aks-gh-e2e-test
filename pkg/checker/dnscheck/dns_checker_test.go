@@ -278,7 +278,7 @@ func TestRun(t *testing.T) {
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(result).NotTo(BeNil())
 				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
-				g.Expect(result.Detail.Code).To(Equal("DNS_SERVICE_UNHEALTHY"))
+				g.Expect(result.Detail.Code).To(Equal("dns_service_unhealthy"))
 				g.Expect(result.Detail.Message).To(ContainSubstring("DNS service 10.96.0.10 unhealthy"))
 			},
 		},
@@ -328,7 +328,7 @@ func TestRun(t *testing.T) {
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(result).NotTo(BeNil())
 				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
-				g.Expect(result.Detail.Code).To(Equal("DNS_POD_UNHEALTHY"))
+				g.Expect(result.Detail.Code).To(Equal("dns_pod_unhealthy"))
 				g.Expect(result.Detail.Message).To(ContainSubstring("DNS pod 10.244.0.3 unhealthy"))
 			},
 		},
