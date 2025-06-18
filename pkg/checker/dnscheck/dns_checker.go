@@ -123,6 +123,9 @@ func (c DNSChecker) Run(ctx context.Context) (*types.Result, error) {
 	// Resolve the domain against DNS targets.
 	dnsTargets := append([]DNSTarget{coreDNSServiceTarget}, coreDNSPodTargets...)
 	for _, target := range dnsTargets {
+		// TODO: Have a short timeout for each DNS query.
+		// The timeout is configurable from the DNSConfig.
+		// Have different error code for timeout: dns_<target.type>_timeout.
 		if err := c.resolveDomain(ctx, target); err != nil {
 			errorCode := fmt.Sprintf("dns_%s_unhealthy", target.Type)
 			return types.Unhealthy(errorCode, fmt.Sprintf("DNS %s %s unhealthy: %v", target.Type, target.IP, err)), nil
