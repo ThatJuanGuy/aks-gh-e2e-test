@@ -571,19 +571,14 @@ func TestRun(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			g := NewWithT(t)
-			checker, err := BuildDNSChecker(&config.CheckerConfig{
-				Name: "test-dns-checker",
-				Type: config.CheckTypeDNS,
-				DNSConfig: &config.DNSConfig{
+			dnsChecker := &DNSChecker{
+				name: "test-dns-checker",
+				config: &config.DNSConfig{
 					Domain: "example.com",
 				},
-			})
-			g.Expect(err).NotTo(HaveOccurred())
-			g.Expect(checker).NotTo(BeNil())
-
-			dnsChecker := checker.(*DNSChecker)
-			dnsChecker.k8sClientset = tc.setupClientset()
-			dnsChecker.dnsResolver = tc.setupResolver()
+				k8sClientset: tc.setupClientset(),
+				dnsResolver:  tc.setupResolver(),
+			}
 
 			result, err := dnsChecker.Run(context.Background())
 			tc.validateResult(g, result, err)
