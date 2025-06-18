@@ -1,0 +1,34 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cluster-health-monitor
+  namespace: cluster-health-monitor
+  labels:
+    app: cluster-health-monitor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cluster-health-monitor
+  template:
+    metadata:
+      labels:
+        app: cluster-health-monitor
+    spec:
+      serviceAccountName: cluster-health-monitor
+      containers:
+        - name: cluster-health-monitor
+          # TODO: Update the image to the correct registry and tag.
+          image: cluster-health-monitor:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9800
+              name: metrics
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
