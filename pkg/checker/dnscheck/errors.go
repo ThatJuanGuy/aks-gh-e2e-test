@@ -12,6 +12,6 @@ const (
 
 // This is the error list used by the DNSChecker.
 var (
-	errServiceNotReady = errors.New("Service not ready")
-	errPodsNotReady    = errors.New("Pod not ready")
+	errServiceNotReady = errors.New("service not ready")
+	errPodsNotReady    = errors.New("pod not ready")
 )

@@ -56,11 +56,11 @@ func BuildDNSChecker(config *config.CheckerConfig) (checker.Checker, error) {
 
 	k8sConfig, err := rest.InClusterConfig()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get in-cluster config: %w", err)
+		return nil, fmt.Errorf("failed to get in-cluster config: %w", err)
 	}
 	client, err := kubernetes.NewForConfig(k8sConfig)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create Kubernetes client: %w", err)
+		return nil, fmt.Errorf("failed to create Kubernetes client: %w", err)
 	}
 
 	return &DNSChecker{
@@ -126,7 +126,7 @@ func getCoreDNSSvcIP(ctx context.Context, kubeClient kubernetes.Interface) (stri
 		return "", errServiceNotReady
 	}
 	if err != nil {
-		return "", fmt.Errorf("Failed to get CoreDNS service: %w", err)
+		return "", fmt.Errorf("failed to get CoreDNS service: %w", err)
 	}
 
 	if svc.Spec.ClusterIP == "" || svc.Spec.ClusterIP == "None" {
@@ -145,7 +145,7 @@ func getCoreDNSPodIPs(ctx context.Context, kubeClient kubernetes.Interface) ([]s
 		return nil, errServiceNotReady
 	}
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get CoreDNS pod IPs: %w", err)
+		return nil, fmt.Errorf("failed to get CoreDNS pod IPs: %w", err)
 	}
 
 	var podIPs []string
@@ -156,9 +156,7 @@ func getCoreDNSPodIPs(ctx context.Context, kubeClient kubernetes.Interface) ([]s
 				continue
 			}
 
-			for _, addr := range ep.Addresses {
-				podIPs = append(podIPs, addr)
-			}
+			podIPs = append(podIPs, ep.Addresses...)
 		}
 	}
 
