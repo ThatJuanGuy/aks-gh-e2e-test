@@ -110,12 +110,12 @@ func (c DNSChecker) Name() string {
 func (c DNSChecker) Run(ctx context.Context) (*types.Result, error) {
 	coreDNSServiceTarget, err := getCoreDNSServiceIP(ctx, c.k8sClientset)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get CoreDNS service IP: %w", err)
+		return types.Unhealthy("dns_service_unhealthy", err.Error()), nil
 	}
 
 	coreDNSPodTargets, err := getCoreDNSPodIPs(ctx, c.k8sClientset)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get CoreDNS pod IPs: %w", err)
+		return types.Unhealthy("dns_pod_unhealthy", err.Error()), nil
 	}
 
 	// TODO: Get LocalDNS IP.
@@ -136,11 +136,11 @@ func (c DNSChecker) Run(ctx context.Context) (*types.Result, error) {
 func getCoreDNSServiceIP(ctx context.Context, clientset kubernetes.Interface) (DNSTarget, error) {
 	service, err := clientset.CoreV1().Services(CoreDNSNamespace).Get(ctx, CoreDNSServiceName, metav1.GetOptions{})
 	if err != nil {
-		return DNSTarget{}, fmt.Errorf("failed to get CoreDNS service: %w", err)
+		return DNSTarget{}, fmt.Errorf("failed to get CoreDNS service IP: %w", err)
 	}
 
 	if service.Spec.ClusterIP == "" {
-		return DNSTarget{}, fmt.Errorf("CoreDNS service has no ClusterIP")
+		return DNSTarget{}, fmt.Errorf("failed to get CoreDNS service IP: no ClusterIP")
 	}
 
 	return DNSTarget{
@@ -155,7 +155,7 @@ func getCoreDNSPodIPs(ctx context.Context, clientset kubernetes.Interface) ([]DN
 		LabelSelector: discoveryv1.LabelServiceName + "=" + CoreDNSServiceName,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to list CoreDNS endpoint slices: %w", err)
+		return nil, fmt.Errorf("failed to get CoreDNS pod IPs: %w", err)
 	}
 
 	var dnsTargets []DNSTarget
@@ -176,7 +176,7 @@ func getCoreDNSPodIPs(ctx context.Context, clientset kubernetes.Interface) ([]DN
 	}
 
 	if len(dnsTargets) == 0 {
-		return nil, fmt.Errorf("no ready CoreDNS pod endpoints found")
+		return nil, fmt.Errorf("failed to get CoreDNS pod IPs: no ready endpoints")
 	}
 
 	return dnsTargets, nil
