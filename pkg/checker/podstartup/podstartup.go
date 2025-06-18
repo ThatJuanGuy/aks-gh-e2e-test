@@ -23,6 +23,10 @@ import (
 type PodStartupChecker struct {
 	name         string
 	k8sClientset kubernetes.Interface
+	// READONLY: The namespace in which the the checker will create synthetic pods.
+	namespace string
+	// READONLY: Labels applied to all synthetic pods created by the checker.
+	podLabels map[string]string
 }
 
 // The maximum number of synthetic pods created by the checker that can exist at any one time. If the limit has been reached, the checker
@@ -45,9 +49,23 @@ func BuildPodStartupChecker(config *config.CheckerConfig) (checker.Checker, erro
 		return nil, fmt.Errorf("failed to create Kubernetes clientset: %w", err)
 	}
 
+	// Pods and service accounts must share the same namespace. Read the namespace the checker is running in.
+	data, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read namespace from service account: %w", err)
+	}
+	namespace := strings.TrimSpace(string(data))
+
+	podLabels := map[string]string{
+		"cluster-health-monitor/checker-name": config.Name,
+		"app":                                 "cluster-health-monitor-podstartup-synthetic",
+	}
+
 	return &PodStartupChecker{
 		name:         config.Name,
 		k8sClientset: k8sClientset,
+		namespace:    namespace,
+		podLabels:    podLabels,
 	}, nil
 }
 
@@ -59,43 +77,29 @@ func (c *PodStartupChecker) Name() string {
 // the checker is considered healthy. Otherwise, it is considered unhealthy. Before each run, the checker also attempts to garbage
 // collect any leftover synthetic pods from previous runs that may not have been previously deleted due to errors or other issues.
 func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
-	// Pods and service accounts must share the same namespace. Read the namespace the checker is running in and use it to create
-	// synthetic pods in the same namespace.
-	data, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
-	if err != nil {
-		return nil, fmt.Errorf("failed to read namespace from service account: %w", err)
-	}
-	namespace := strings.TrimSpace(string(data))
-
-	// podLabels are shared by all synthetic pods created by this checker.
-	podLabels := map[string]string{
-		"cluster-health-monitor/checker-name": c.name,
-		"app":                                 "cluster-health-monitor-podstartup-synthetic",
-	}
-
 	// Garbage collect any synthetic pods previously created by this checker using delete collection.
-	if err := c.garbageCollect(ctx, namespace, podLabels); err != nil {
+	if err := c.garbageCollect(ctx, c.namespace); err != nil {
 		// Logging instead of returning an error here to avoid failing the checker run.
 		klog.Warningf("failed to garbage collect old synthetic pods: %s", err.Error())
 	}
 
 	// List pods to check the current number of synthetic pods. Do not run the checker if the maximum number of synthetic pods has been reached.
-	pods, err := c.k8sClientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: labels.SelectorFromSet(labels.Set(podLabels)).String(),
+	pods, err := c.k8sClientset.CoreV1().Pods(c.namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: labels.SelectorFromSet(labels.Set(c.podLabels)).String(),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to list pods in namespace %s: %w", namespace, err)
+		return nil, fmt.Errorf("failed to list pods in namespace %s: %w", c.namespace, err)
 	}
 	if len(pods.Items) >= maxSyntheticPods {
 		return nil, fmt.Errorf("maximum number of synthetic pods reached in namespace %s, current: %d, max allowed: %d, delete some pods before running the checker again",
-			namespace, len(pods.Items), maxSyntheticPods)
+			c.namespace, len(pods.Items), maxSyntheticPods)
 	}
 
 	// Create a synthetic pod to measure the startup time.
-	synthPod, err := c.k8sClientset.CoreV1().Pods(namespace).Create(ctx, &corev1.Pod{
+	synthPod, err := c.k8sClientset.CoreV1().Pods(c.namespace).Create(ctx, &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   fmt.Sprintf("%s-synthetic-%d", c.name, time.Now().UnixNano()),
-			Labels: podLabels,
+			Labels: c.podLabels,
 		},
 		Spec: corev1.PodSpec{
 			// TODO? Maybe expose this in the config so this is not Azure-specific.
@@ -113,14 +117,14 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 		},
 	}, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create synthetic pod in namespace %s: %w", namespace, err)
+		return nil, fmt.Errorf("failed to create synthetic pod in namespace %s: %w", c.namespace, err)
 	}
 	// Ensure the synthetic pod is deleted when the function returns.
 	defer func() {
-		err := c.k8sClientset.CoreV1().Pods(namespace).Delete(ctx, synthPod.Name, metav1.DeleteOptions{})
+		err := c.k8sClientset.CoreV1().Pods(c.namespace).Delete(ctx, synthPod.Name, metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			// Logging instead of returning an error here to avoid failing the checker run.
-			klog.Warningf("failed to delete synthetic pod %s in namespace %s: %s", synthPod.Name, namespace, err.Error())
+			klog.Warningf("failed to delete synthetic pod %s in namespace %s: %s", synthPod.Name, c.namespace, err.Error())
 		}
 	}()
 
@@ -129,9 +133,9 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 	return nil, fmt.Errorf("pod startup checker is not fully implemented yet")
 }
 
-// garbageCollect deletes all synthetic pods matching the given labels in the specified namespace.
-func (c *PodStartupChecker) garbageCollect(ctx context.Context, namespace string, podLabels map[string]string) error {
-	labelSelector := labels.SelectorFromSet(labels.Set(podLabels)).String()
+// garbageCollect deletes all pods matching the given labels in the specified namespace.
+func (c *PodStartupChecker) garbageCollect(ctx context.Context, namespace string) error {
+	labelSelector := labels.SelectorFromSet(labels.Set(c.podLabels)).String()
 	return c.k8sClientset.CoreV1().Pods(namespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{
 		LabelSelector: labelSelector,
 	})
