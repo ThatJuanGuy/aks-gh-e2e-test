@@ -3,7 +3,7 @@ package dnscheck
 import "errors"
 
 const (
-	// this is the error code of the DNSChecker's result
+	// This is the error code of the DNSChecker's result.
 	ServiceNotReady = "service_not_ready"
 	PodsNotReady    = "pods_not_ready"
 	ServiceTimeout  = "service_timeout"
