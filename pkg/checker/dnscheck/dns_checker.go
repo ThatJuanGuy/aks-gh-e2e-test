@@ -70,29 +70,29 @@ func (c DNSChecker) Run(ctx context.Context) (*types.Result, error) {
 
 	svcIP, err := getCoreDNSSvcIP(ctx, c.kubeClient)
 	if errors.Is(err, errServiceNotReady) {
-		return types.Unhealthy(ServiceNotReady, "CoreDNS service is not ready"), nil
+		return types.Unhealthy(errCodeServiceNotReady, "CoreDNS service is not ready"), nil
 	}
 	if err != nil {
 		return nil, err
 	}
 	if _, err := c.resolver.lookupHost(ctx, svcIP, domain); err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return types.Unhealthy(ServiceTimeout, "CoreDNS service query timed out"), nil
+			return types.Unhealthy(errCodeServiceTimeout, "CoreDNS service query timed out"), nil
 		}
-		return types.Unhealthy(ServiceError, fmt.Sprintf("CoreDNS service query error: %s", err)), nil
+		return types.Unhealthy(errCodeServiceError, fmt.Sprintf("CoreDNS service query error: %s", err)), nil
 	}
 
 	podIPs, err := getCoreDNSPodIPs(ctx, c.kubeClient)
 	if errors.Is(err, errPodsNotReady) {
-		return types.Unhealthy(PodsNotReady, "CoreDNS Pods are not ready"), nil
+		return types.Unhealthy(errCodePodsNotReady, "CoreDNS Pods are not ready"), nil
 	}
 
 	for _, ip := range podIPs {
 		if _, err := c.resolver.lookupHost(ctx, ip, domain); err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
-				return types.Unhealthy(PodTimeout, "CoreDNS pod query timed out"), nil
+				return types.Unhealthy(errCodePodTimeout, "CoreDNS pod query timed out"), nil
 			}
-			return types.Unhealthy(PodError, fmt.Sprintf("CoreDNS pod query error: %s", err)), nil
+			return types.Unhealthy(errCodePodError, fmt.Sprintf("CoreDNS pod query error: %s", err)), nil
 		}
 	}
 

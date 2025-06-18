@@ -60,7 +60,7 @@ func TestDNSChecker_ServiceNotReady(t *testing.T) {
 	res, err := chk.Run(context.Background())
 	g.Expect(err).ToNot(HaveOccurred())
 	g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
-	g.Expect(res.Detail.Code).To(Equal(ServiceNotReady))
+	g.Expect(res.Detail.Code).To(Equal(errCodeServiceNotReady))
 }
 
 func TestDNSChecker_PodsNotReady(t *testing.T) {
@@ -82,7 +82,7 @@ func TestDNSChecker_PodsNotReady(t *testing.T) {
 	res, err := chk.Run(context.Background())
 	g.Expect(err).ToNot(HaveOccurred())
 	g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
-	g.Expect(res.Detail.Code).To(Equal(PodsNotReady))
+	g.Expect(res.Detail.Code).To(Equal(errCodePodsNotReady))
 }
 
 func TestDNSChecker_Timeout(t *testing.T) {
@@ -105,7 +105,7 @@ func TestDNSChecker_Timeout(t *testing.T) {
 	res, err := chk.Run(context.Background())
 	g.Expect(err).ToNot(HaveOccurred())
 	g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
-	g.Expect(res.Detail.Code).To(Equal(ServiceTimeout))
+	g.Expect(res.Detail.Code).To(Equal(errCodeServiceTimeout))
 }
 
 // --- helpers ---
