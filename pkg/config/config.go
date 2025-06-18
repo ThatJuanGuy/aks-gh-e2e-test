@@ -42,17 +42,10 @@ type CheckerConfig struct {
 	// Optional.
 	// The configuration for the DNS checker, this field is required if Type is CheckTypeDNS.
 	DNSConfig *DNSConfig `yaml:"dnsConfig,omitempty"`
-
-	// Optional.
-	// The configuration for the Pod startup checker, this field is required if Type is CheckTypePodStartup.
-	PodStartupConfig *PodStartupConfig `yaml:"podStartupConfig,omitempty"`
 }
 
 type DNSConfig struct {
 	// Required.
 	// The domain to check, used to determine the DNS records to query.
 	Domain string `yaml:"domain"`
-}
-
-type PodStartupConfig struct {
 }

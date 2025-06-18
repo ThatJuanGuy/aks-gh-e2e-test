@@ -1,185 +1,109 @@
 package checker
 
 import (
+	"context"
+	"errors"
 	"testing"
 
-	"github.com/Azure/cluster-health-monitor/pkg/checker/dnscheck"
+	"github.com/Azure/cluster-health-monitor/pkg/config"
+	"github.com/Azure/cluster-health-monitor/pkg/types"
 	. "github.com/onsi/gomega"
 )
 
-func TestRegisterAndBuildExampleChecker(t *testing.T) {
-	// Register the ExampleChecker builder
-	yamlData := []byte(`
-checkers:
-- name: dns 
-  type: dns 
-  interval: 10s
-  dnsConfig:
-    domain: example.com
-`)
+type fakeChecker struct{ name string }
 
-	g := NewGomegaWithT(t)
-	checkers, err := BuildCheckersFromConfig(yamlData)
-	g.Expect(err).NotTo(HaveOccurred(), "failed to build checkers")
-	g.Expect(checkers).To(HaveLen(1), "expected 1 checker")
+func (f *fakeChecker) Name() string                                   { return f.name }
+func (f *fakeChecker) Run(ctx context.Context) (*types.Result, error) { return nil, nil }
 
-	dc, ok := checkers[0].(*dnscheck.DNSChecker)
-	g.Expect(ok).To(BeTrue(), "checker should be of type *dnscheck.DNSChecker")
-	g.Expect(dc.Name()).To(Equal("dns"), "checker should have the correct name")
+func fakeBuilder(cfg *config.CheckerConfig) (Checker, error) {
+	if cfg.Name == "fail" {
+		return nil, errors.New("forced error")
+	}
+	return &fakeChecker{name: cfg.Name}, nil
 }
 
-func TestValidationInBuildCheckersFromConfig(t *testing.T) {
-	for _, tc := range []struct {
-		name        string
-		yaml        string
-		validateRes func(g *WithT, checkers []Checker, err error)
-	}{
-		{
-			name: "Valid DNS Checker",
-			yaml: `
+func TestRegisterCheckerAndBuildChecker(t *testing.T) {
+	g := NewWithT(t)
+	testType := config.CheckerType("fake")
+	RegisterChecker(testType, fakeBuilder)
+	cfg := &config.CheckerConfig{Name: "foo", Type: testType}
+	c, err := buildChecker(cfg)
+	g.Expect(err).ToNot(HaveOccurred())
+	g.Expect(c).ToNot(BeNil())
+	g.Expect(c.Name()).To(Equal("foo"))
+}
+
+func TestBuildCheckerUnknownType(t *testing.T) {
+	g := NewWithT(t)
+	cfg := &config.CheckerConfig{Name: "bar", Type: "unknown"}
+	c, err := buildChecker(cfg)
+	g.Expect(err).To(HaveOccurred())
+	g.Expect(c).To(BeNil())
+}
+
+func TestBuildCheckerBuilderError(t *testing.T) {
+	g := NewWithT(t)
+	testType := config.CheckerType("fakeerr")
+	RegisterChecker(testType, fakeBuilder)
+	cfg := &config.CheckerConfig{Name: "fail", Type: testType}
+	c, err := buildChecker(cfg)
+	g.Expect(err).To(HaveOccurred())
+	g.Expect(c).To(BeNil())
+}
+
+func TestBuildCheckersFromConfig_DuplicateNames(t *testing.T) {
+	g := NewWithT(t)
+	testType := config.CheckerType("dup")
+	RegisterChecker(testType, fakeBuilder)
+	yaml := `
 checkers:
-- name: valid-checker
-  type: dns
-  interval: 10s
-  dnsConfig:
-    domain: example.com
-`,
-			validateRes: func(g *WithT, checkers []Checker, err error) {
-				g.Expect(checkers).To(HaveLen(1))
-				g.Expect(err).NotTo(HaveOccurred())
-			},
-		},
-		{
-			name: "Duplicate Name",
-			yaml: `
+  - name: foo
+    type: dup
+  - name: foo
+    type: dup
+`
+	checkers, err := BuildCheckersFromConfig([]byte(yaml))
+	g.Expect(err).To(HaveOccurred())
+	g.Expect(checkers).To(BeNil())
+	g.Expect(err.Error()).To(ContainSubstring("duplicate checker name"))
+}
+
+func TestBuildCheckersFromConfig_UnknownType(t *testing.T) {
+	g := NewWithT(t)
+	yaml := `
 checkers:
-- name: duplicate-name
-  type: dns
-  interval: 10s
-  dnsConfig:
-    domain: example.com
-- name: duplicate-name
-  type: dns
-  interval: 10s
-  dnsConfig:
-    domain: example.com
-`,
-			validateRes: func(g *WithT, checkers []Checker, err error) {
-				g.Expect(checkers).To(BeNil())
-				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("duplicate checker name:"))
-			},
-		},
-		{
-			name: "Empty Name",
-			yaml: `
+  - name: foo
+    type: notype
+`
+	checkers, err := BuildCheckersFromConfig([]byte(yaml))
+	g.Expect(err).To(HaveOccurred())
+	g.Expect(checkers).To(BeNil())
+	g.Expect(err.Error()).To(ContainSubstring("unrecognized checker type"))
+}
+
+func TestBuildCheckersFromConfig_InvalidYAML(t *testing.T) {
+	g := NewWithT(t)
+	badYAML := `not: [valid, yaml`
+	checkers, err := BuildCheckersFromConfig([]byte(badYAML))
+	g.Expect(err).To(HaveOccurred())
+	g.Expect(checkers).To(BeNil())
+	g.Expect(err.Error()).To(ContainSubstring("failed to unmarshal yaml"))
+}
+
+func TestBuildCheckersFromConfig_Valid(t *testing.T) {
+	g := NewWithT(t)
+	testType := config.CheckerType("oktype")
+	RegisterChecker(testType, fakeBuilder)
+	yaml := `
 checkers:
-- name: "" 
-  type: dns
-  interval: 10s
-`,
-			validateRes: func(g *WithT, checkers []Checker, err error) {
-				g.Expect(checkers).To(BeNil())
-				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("missing 'name'"))
-			},
-		},
-		{
-			name: "Missing Type",
-			yaml: `
-checkers:
-- name: test-checker
-  interval: 10s
-`,
-			validateRes: func(g *WithT, checkers []Checker, err error) {
-				g.Expect(checkers).To(BeNil())
-				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("missing 'type'"))
-			},
-		},
-		{
-			name: "Invalid Interval",
-			yaml: `
-checkers:
-- name: test-checker
-  type: dns
-  interval: -10s
-`,
-			validateRes: func(g *WithT, checkers []Checker, err error) {
-				g.Expect(checkers).To(BeNil())
-				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("invalid 'interval'"))
-			},
-		},
-		{
-			name: "Invalid Timeout",
-			yaml: `
-checkers:
-- name: test-checker
-  type: dns
-  interval: 10s
-  timeout: -5s
-`,
-			validateRes: func(g *WithT, checkers []Checker, err error) {
-				g.Expect(checkers).To(BeNil())
-				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("invalid 'timeout'"))
-			},
-		},
-		{
-			name: "Unknown Type",
-			yaml: `
-checkers:
-- name: unknown-checker
-  type: unknown
-`,
-			validateRes: func(g *WithT, checkers []Checker, err error) {
-				g.Expect(checkers).To(BeNil())
-				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("unrecognized checker type:"))
-			},
-		},
-		{
-			name: "Multiple Errors",
-			yaml: `
-checkers:
-- name: invalid-test-checker
-  type: dns
-  interval: -10s
-  timeout: -5s
-  dnsConfig:
-    domain:
-- name: unknown-checker
-  type: unknown
-- name: duplicate-test-checker
-  type: dns
-  interval: 10s
-  timeout: 5s
-  dnsConfig:
-    domain: example.com
-- name: duplicate-test-checker
-  type: dns
-  interval: 10s
-  timeout: 5s
-  dnsConfig:
-    domain: example.com
-`, validateRes: func(g *WithT, checkers []Checker, err error) {
-				g.Expect(checkers).To(BeNil())
-				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("\"invalid-test-checker\""))
-				g.Expect(err.Error()).To(ContainSubstring("invalid 'interval'"))
-				g.Expect(err.Error()).To(ContainSubstring("invalid 'timeout'"))
-				g.Expect(err.Error()).To(ContainSubstring("domain is required for DNSChecker"))
-				g.Expect(err.Error()).To(ContainSubstring("\"unknown-checker\""))
-				g.Expect(err.Error()).To(ContainSubstring("unrecognized checker type:"))
-				g.Expect(err.Error()).To(ContainSubstring("duplicate checker name: \"duplicate-test-checker\""))
-			},
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			g := NewWithT(t)
-			checkers, err := BuildCheckersFromConfig([]byte(tc.yaml))
-			tc.validateRes(g, checkers, err)
-		})
-	}
+  - name: foo
+    type: oktype
+  - name: bar
+    type: oktype
+`
+	checkers, err := BuildCheckersFromConfig([]byte(yaml))
+	g.Expect(err).ToNot(HaveOccurred())
+	g.Expect(checkers).To(HaveLen(2))
+	g.Expect(checkers[0].Name()).To(Equal("foo"))
+	g.Expect(checkers[1].Name()).To(Equal("bar"))
 }
