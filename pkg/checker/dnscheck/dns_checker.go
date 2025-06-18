@@ -26,20 +26,6 @@ const (
 	CoreDNSServiceName = "kube-dns"
 )
 
-// targetType defines the type of DNS target.
-type targetType string
-
-const (
-	CoreDNSService targetType = "service"
-	CoreDNSPod     targetType = "pod"
-)
-
-// Target represents a DNS target with its IP and type.
-type Target struct {
-	IP   string
-	Type targetType
-}
-
 // DNSChecker implements the Checker interface for DNS checks.
 type DNSChecker struct {
 	name       string
