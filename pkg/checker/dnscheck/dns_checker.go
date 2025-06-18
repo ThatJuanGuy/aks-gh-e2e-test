@@ -79,15 +79,12 @@ func (c DNSChecker) Run(ctx context.Context) (*types.Result, error) {
 		if errors.Is(err, context.DeadlineExceeded) {
 			return types.Unhealthy(ServiceTimeout, "CoreDNS service query timed out"), nil
 		}
-		return nil, err
+		return types.Unhealthy(ServiceError, fmt.Sprintf("CoreDNS service query error: %s", err)), nil
 	}
 
 	podIPs, err := getCoreDNSPodIPs(ctx, c.kubeClient)
 	if errors.Is(err, errPodsNotReady) {
 		return types.Unhealthy(PodsNotReady, "CoreDNS Pods are not ready"), nil
-	}
-	if err != nil {
-		return nil, err
 	}
 
 	for _, ip := range podIPs {
@@ -95,7 +92,7 @@ func (c DNSChecker) Run(ctx context.Context) (*types.Result, error) {
 			if errors.Is(err, context.DeadlineExceeded) {
 				return types.Unhealthy(PodTimeout, "CoreDNS pod query timed out"), nil
 			}
-			return nil, err
+			return types.Unhealthy(PodError, fmt.Sprintf("CoreDNS pod query error: %s", err)), nil
 		}
 	}
 

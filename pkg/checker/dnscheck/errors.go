@@ -8,6 +8,8 @@ const (
 	PodsNotReady    = "pods_not_ready"
 	ServiceTimeout  = "service_timeout"
 	PodTimeout      = "pod_timeout"
+	ServiceError    = "service_error"
+	PodError        = "pod_error"
 )
 
 // This is the error list used by the DNSChecker.
