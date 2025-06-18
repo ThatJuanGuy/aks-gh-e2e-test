@@ -51,6 +51,24 @@ func TestGetCoreDNSServiceIP(t *testing.T) {
 			},
 		},
 		{
+			name: "Error when ClusterIP is empty",
+			setupClientset: func() *fake.Clientset {
+				return fake.NewSimpleClientset(&corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "kube-dns",
+						Namespace: "kube-system",
+					},
+					Spec: corev1.ServiceSpec{
+						ClusterIP: "",
+					},
+				})
+			},
+			validateTarget: func(g *WithT, target DNSTarget, err error) {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(target).To(Equal(DNSTarget{}))
+			},
+		},
+		{
 			name: "Error when service does not exist",
 			setupClientset: func() *fake.Clientset {
 				return fake.NewSimpleClientset()
