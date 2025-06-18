@@ -43,6 +43,7 @@ func TestBuildDNSChecker(t *testing.T) {
 				},
 			},
 			validateRes: func(g *WithT, checker checker.Checker, err error) {
+				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(checker).To(BeAssignableToTypeOf(&DNSChecker{}))
 				dnsChecker := checker.(*DNSChecker)
 				g.Expect(dnsChecker.name).To(Equal("test-dns-checker"))
@@ -51,7 +52,6 @@ func TestBuildDNSChecker(t *testing.T) {
 				}))
 				g.Expect(dnsChecker.k8sClientset).To(BeNil())
 				g.Expect(dnsChecker.dnsResolver).NotTo(BeNil())
-				g.Expect(err).NotTo(HaveOccurred())
 			},
 		},
 		{
