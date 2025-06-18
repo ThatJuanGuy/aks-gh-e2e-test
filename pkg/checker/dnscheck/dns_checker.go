@@ -83,10 +83,20 @@ func BuildDNSChecker(config *config.CheckerConfig) (checker.Checker, error) {
 		return nil, err
 	}
 
+	k8sConfig, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get in-cluster config: %w", err)
+	}
+	clientset, err := kubernetes.NewForConfig(k8sConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Kubernetes client: %w", err)
+	}
+
 	return &DNSChecker{
-		name:        config.Name,
-		config:      config.DNSConfig,
-		dnsResolver: newDefaultResolver,
+		name:         config.Name,
+		config:       config.DNSConfig,
+		k8sClientset: clientset,
+		dnsResolver:  newDefaultResolver,
 	}, nil
 }
 
@@ -99,29 +109,12 @@ func (c DNSChecker) Name() string {
 // If LocalDNS is configured, it should also query that.
 // If all queries succeed, the check is considered healthy.
 func (c DNSChecker) Run(ctx context.Context) (*types.Result, error) {
-	var clientset kubernetes.Interface
-	if c.k8sClientset != nil {
-		// Use the provided client for testing
-		clientset = c.k8sClientset
-	} else {
-		// Create a new client for production
-		k8sConfig, err := rest.InClusterConfig()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get in-cluster config: %w", err)
-		}
-
-		clientset, err = kubernetes.NewForConfig(k8sConfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create Kubernetes client: %w", err)
-		}
-	}
-
-	coreDNSServiceTarget, err := getCoreDNSServiceIP(ctx, clientset)
+	coreDNSServiceTarget, err := getCoreDNSServiceIP(ctx, c.k8sClientset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get CoreDNS service IP: %w", err)
 	}
 
-	coreDNSPodTargets, err := getCoreDNSPodIPs(ctx, clientset)
+	coreDNSPodTargets, err := getCoreDNSPodIPs(ctx, c.k8sClientset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get CoreDNS pod IPs: %w", err)
 	}
