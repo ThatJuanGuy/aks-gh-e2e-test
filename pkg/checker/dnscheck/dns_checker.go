@@ -125,7 +125,7 @@ func getCoreDNSPodIPs(ctx context.Context, kubeClient kubernetes.Interface) ([]s
 		LabelSelector: discoveryv1.LabelServiceName + "=" + CoreDNSServiceName,
 	})
 	if err != nil && apierrors.IsNotFound(err) {
-		return nil, errServiceNotReady
+		return nil, errPodsNotReady
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get CoreDNS pod IPs: %w", err)
