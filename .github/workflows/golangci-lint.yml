@@ -3,8 +3,10 @@ on:
   push:
     branches:
       - main
-      - master
   pull_request:
+    branches:
+      - main
+    paths-ignore: [docs/**, "**.md", "**.mdx", "**.png", "**.jpg"]
 
 permissions:
   contents: read
@@ -24,3 +26,16 @@ jobs:
         uses: golangci/golangci-lint-action@v8
         with:
           version: v2.1
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Download dependencies
+        run: go mod download
+      - name: Run tests
+        run: go test ./...
