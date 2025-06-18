@@ -14,7 +14,6 @@ import (
 
 type PodStartupChecker struct {
 	name         string
-	config       *config.PodStartupConfig
 	k8sClientset kubernetes.Interface
 }
 
@@ -24,10 +23,6 @@ func Register() {
 
 // BuildPodStartupChecker creates a new PodStartupChecker instance.
 func BuildPodStartupChecker(config *config.CheckerConfig) (checker.Checker, error) {
-	if err := config.PodStartupConfig.ValidatePodStartupConfig(); err != nil {
-		return nil, err
-	}
-
 	k8sConfig, err := rest.InClusterConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get in-cluster config: %w", err)
@@ -39,7 +34,6 @@ func BuildPodStartupChecker(config *config.CheckerConfig) (checker.Checker, erro
 
 	return &PodStartupChecker{
 		name:         config.Name,
-		config:       config.PodStartupConfig,
 		k8sClientset: k8sClientset,
 	}, nil
 }

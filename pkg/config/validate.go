@@ -33,17 +33,3 @@ func (c *DNSConfig) ValidateDNSConfig() error {
 	}
 	return nil
 }
-
-func (c *PodStartupConfig) ValidatePodStartupConfig() error {
-	if c == nil {
-		return fmt.Errorf("podStartupConfig is required for PodStartupChecker")
-	}
-	var errs []error
-	if c.Namespace == "" {
-		errs = append(errs, fmt.Errorf("namespace is required for PodStartupChecker"))
-	}
-	if c.MaxSyntheticPods <= 0 {
-		errs = append(errs, fmt.Errorf("maxSyntheticPods must be greater than 0 for PodStartupChecker"))
-	}
-	return errors.Join(errs...)
-}

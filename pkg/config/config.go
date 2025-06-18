@@ -42,25 +42,10 @@ type CheckerConfig struct {
 	// Optional.
 	// The configuration for the DNS checker, this field is required if Type is CheckTypeDNS.
 	DNSConfig *DNSConfig `yaml:"dnsConfig,omitempty"`
-
-	// Optional.
-	// The configuration for the Pod startup checker, this field is required if Type is CheckTypePodStartup.
-	PodStartupConfig *PodStartupConfig `yaml:"podStartupConfig,omitempty"`
 }
 
 type DNSConfig struct {
 	// Required.
 	// The domain to check, used to determine the DNS records to query.
 	Domain string `yaml:"domain"`
-}
-
-type PodStartupConfig struct {
-	// Required.
-	// The namespace in which to create synthetic pods for startup checks.
-	Namespace string `yaml:"namespace"`
-	// Required.
-	// The maximum number of synthetic pods created by the checker that can exist at any one time. If the limit has been reached, the checker
-	// will not create any more synthetic pods until some of the existing ones are deleted. Instead, it will fail the run with an error.
-	// Reaching this limit effectively disables the checker.
-	MaxSyntheticPods int `yaml:"maxSyntheticPods"`
 }
