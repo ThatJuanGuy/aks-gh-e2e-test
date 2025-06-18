@@ -24,7 +24,7 @@ func (f *fakeResolver) lookupHost(ctx context.Context, ip, domain string) ([]str
 func TestDNSChecker_Healthy(t *testing.T) {
 	t.Parallel()
 	g := NewWithT(t)
-	client := k8sfake.NewSimpleClientset(
+	client := k8sfake.NewClientset(
 		makeCoreDNSService("10.0.0.10"),
 		makeCoreDNSEndpointSlice([]string{"10.0.0.11", "10.0.0.12"}),
 	)
@@ -66,7 +66,7 @@ func TestDNSChecker_ServiceNotReady(t *testing.T) {
 func TestDNSChecker_PodsNotReady(t *testing.T) {
 	t.Parallel()
 	g := NewWithT(t)
-	client := k8sfake.NewSimpleClientset(
+	client := k8sfake.NewClientset(
 		makeCoreDNSService("10.0.0.10"),
 	)
 	chk := &DNSChecker{
@@ -88,7 +88,7 @@ func TestDNSChecker_PodsNotReady(t *testing.T) {
 func TestDNSChecker_Timeout(t *testing.T) {
 	t.Parallel()
 	g := NewWithT(t)
-	client := k8sfake.NewSimpleClientset(
+	client := k8sfake.NewClientset(
 		makeCoreDNSService("10.0.0.10"),
 		makeCoreDNSEndpointSlice([]string{"10.0.0.11"}),
 	)
