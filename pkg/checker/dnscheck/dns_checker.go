@@ -5,10 +5,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
-	"sync"
 
 	discoveryv1 "k8s.io/api/discovery/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -22,43 +21,39 @@ func Register() {
 	checker.RegisterChecker(config.CheckTypeDNS, BuildDNSChecker)
 }
 
-// DNSChecker implements the Checker interface for DNS checks.
-type DNSChecker struct {
-	name   string
-	config *config.DNSConfig
-}
-
 const (
 	CoreDNSNamespace   = "kube-system"
 	CoreDNSServiceName = "kube-dns"
 )
 
-// DNSTargetType defines the type of DNS target.
-type DNSTargetType string
-
-const (
-	CoreDNSService DNSTargetType = "service"
-	CoreDNSPod     DNSTargetType = "pod"
-)
-
-// DNSTarget represents a DNS target with its IP and type.
-type DNSTarget struct {
-	IP   string
-	Type DNSTargetType
+// DNSChecker implements the Checker interface for DNS checks.
+type DNSChecker struct {
+	name       string
+	config     *config.DNSConfig
+	kubeClient kubernetes.Interface
+	resolver   resolver
 }
 
 // BuildDNSChecker creates a new DNSChecker instance.
 func BuildDNSChecker(config *config.CheckerConfig) (checker.Checker, error) {
-	if config.Name == "" {
-		return nil, fmt.Errorf("checker name cannot be empty")
-	}
 	if err := config.DNSConfig.ValidateDNSConfig(); err != nil {
 		return nil, err
 	}
 
+	k8sConfig, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get in-cluster config: %w", err)
+	}
+	client, err := kubernetes.NewForConfig(k8sConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Kubernetes client: %w", err)
+	}
+
 	return &DNSChecker{
-		name:   config.Name,
-		config: config.DNSConfig,
+		name:       config.Name,
+		config:     config.DNSConfig,
+		kubeClient: client,
+		resolver:   &defaultResolver{},
 	}, nil
 }
 
@@ -66,121 +61,91 @@ func (c DNSChecker) Name() string {
 	return c.name
 }
 
+// Run executes the DNS check.
+// It queries the CoreDNS service and pods for the configured domain.
+// If LocalDNS is configured, it should also query that.
+// If all queries succeed, the check is considered healthy.
 func (c DNSChecker) Run(ctx context.Context) (*types.Result, error) {
-	k8sConfig, err := rest.InClusterConfig()
+	domain := c.config.Domain
+
+	svcIP, err := getCoreDNSSvcIP(ctx, c.kubeClient)
+	if errors.Is(err, errServiceNotReady) {
+		return types.Unhealthy(errCodeServiceNotReady, "CoreDNS service is not ready"), nil
+	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to get in-cluster config: %w", err)
+		return nil, err
+	}
+	if _, err := c.resolver.lookupHost(ctx, svcIP, domain); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return types.Unhealthy(errCodeServiceTimeout, "CoreDNS service query timed out"), nil
+		}
+		return types.Unhealthy(errCodeServiceError, fmt.Sprintf("CoreDNS service query error: %s", err)), nil
 	}
 
-	clientset, err := kubernetes.NewForConfig(k8sConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Kubernetes client: %w", err)
+	podIPs, err := getCoreDNSPodIPs(ctx, c.kubeClient)
+	if errors.Is(err, errPodsNotReady) {
+		return types.Unhealthy(errCodePodsNotReady, "CoreDNS Pods are not ready"), nil
 	}
 
-	coreDNSServiceTarget, err := getCoreDNSServiceIP(ctx, clientset)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get CoreDNS service IP: %w", err)
-	}
-
-	coreDNSPodTargets, err := getCoreDNSPodIPs(ctx, clientset)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get CoreDNS pod IPs: %w", err)
+	for _, ip := range podIPs {
+		if _, err := c.resolver.lookupHost(ctx, ip, domain); err != nil {
+			if errors.Is(err, context.DeadlineExceeded) {
+				return types.Unhealthy(errCodePodTimeout, "CoreDNS pod query timed out"), nil
+			}
+			return types.Unhealthy(errCodePodError, fmt.Sprintf("CoreDNS pod query error: %s", err)), nil
+		}
 	}
 
 	// TODO: Get LocalDNS IP.
 
-	dnsTargets := make(map[DNSTarget]struct{})
-	dnsTargets[coreDNSServiceTarget] = struct{}{}
-	for _, target := range coreDNSPodTargets {
-		dnsTargets[target] = struct{}{}
-	}
-
-	var wg sync.WaitGroup
-	for target := range dnsTargets {
-		wg.Add(1)
-		go func(t DNSTarget) {
-			defer wg.Done()
-			err := c.resolveDomain(ctx, t)
-
-			if err != nil {
-				if errors.Is(err, context.DeadlineExceeded) {
-					// TODO: Collect timeout.
-					return
-				}
-				// TODO: Collect error.
-				return
-			}
-
-			// TODO: Collect success.
-		}(target)
-	}
-	wg.Wait()
-
-	// TODO: Aggregate results.
-
 	return types.Healthy(), nil
 }
 
-// getCoreDNSServiceIP returns the ClusterIP of the CoreDNS service in the cluster as a DNSTarget.
-func getCoreDNSServiceIP(ctx context.Context, clientset kubernetes.Interface) (DNSTarget, error) {
-	service, err := clientset.CoreV1().Services(CoreDNSNamespace).Get(ctx, CoreDNSServiceName, metav1.GetOptions{})
+// getCoreDNSSvcIP returns the ClusterIP of the CoreDNS service in the cluster as a DNSTarget.
+func getCoreDNSSvcIP(ctx context.Context, kubeClient kubernetes.Interface) (string, error) {
+	svc, err := kubeClient.CoreV1().Services(CoreDNSNamespace).Get(ctx, CoreDNSServiceName, metav1.GetOptions{})
+
+	if err != nil && apierrors.IsNotFound(err) {
+		return "", errServiceNotReady
+	}
 	if err != nil {
-		return DNSTarget{}, fmt.Errorf("failed to get CoreDNS service: %w", err)
+		return "", fmt.Errorf("failed to get CoreDNS service: %w", err)
 	}
 
-	if service.Spec.ClusterIP == "" {
-		return DNSTarget{}, fmt.Errorf("CoreDNS service has no ClusterIP")
+	if svc.Spec.ClusterIP == "" || svc.Spec.ClusterIP == "None" {
+		return "", errServiceNotReady
 	}
 
-	return DNSTarget{
-		IP:   service.Spec.ClusterIP,
-		Type: CoreDNSService,
-	}, nil
+	return svc.Spec.ClusterIP, nil
 }
 
 // getCoreDNSPodIPs returns the IPs of all CoreDNS pods in the cluster as DNSTargets.
-func getCoreDNSPodIPs(ctx context.Context, clientset kubernetes.Interface) ([]DNSTarget, error) {
-	endpointSliceList, err := clientset.DiscoveryV1().EndpointSlices(CoreDNSNamespace).List(ctx, metav1.ListOptions{
+func getCoreDNSPodIPs(ctx context.Context, kubeClient kubernetes.Interface) ([]string, error) {
+	endpointSliceList, err := kubeClient.DiscoveryV1().EndpointSlices(CoreDNSNamespace).List(ctx, metav1.ListOptions{
 		LabelSelector: discoveryv1.LabelServiceName + "=" + CoreDNSServiceName,
 	})
+	if err != nil && apierrors.IsNotFound(err) {
+		return nil, errPodsNotReady
+	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to list CoreDNS endpoint slices: %w", err)
+		return nil, fmt.Errorf("failed to get CoreDNS pod IPs: %w", err)
 	}
 
-	var dnsTargets []DNSTarget
+	var podIPs []string
 	for _, endpointSlice := range endpointSliceList.Items {
-		for _, endpoint := range endpointSlice.Endpoints {
+		for _, ep := range endpointSlice.Endpoints {
 			// According to Kubernetes docs: "A nil value should be interpreted as 'true'".
-			if endpoint.Conditions.Ready != nil && !*endpoint.Conditions.Ready {
+			if ep.Conditions.Ready != nil && !*ep.Conditions.Ready {
 				continue
 			}
 
-			for _, address := range endpoint.Addresses {
-				dnsTargets = append(dnsTargets, DNSTarget{
-					IP:   address,
-					Type: CoreDNSPod,
-				})
-			}
+			podIPs = append(podIPs, ep.Addresses...)
 		}
 	}
 
-	if len(dnsTargets) == 0 {
-		return nil, fmt.Errorf("no ready CoreDNS pod endpoints found")
+	if len(podIPs) == 0 {
+		return nil, errPodsNotReady
 	}
 
-	return dnsTargets, nil
-}
-
-// resolveDomain performs the DNS query against the specified DNSTarget.
-func (c *DNSChecker) resolveDomain(ctx context.Context, dnsTarget DNSTarget) error {
-	resolver := &net.Resolver{
-		PreferGo: true,
-		Dial: func(ctx context.Context, network, _ string) (net.Conn, error) {
-			d := net.Dialer{}
-			return d.DialContext(ctx, network, net.JoinHostPort(dnsTarget.IP, "53"))
-		},
-	}
-
-	_, err := resolver.LookupHost(ctx, c.config.Domain)
-	return err
+	return podIPs, nil
 }

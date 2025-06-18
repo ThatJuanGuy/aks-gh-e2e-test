@@ -4,241 +4,142 @@ import (
 	"context"
 	"testing"
 
+	"github.com/Azure/cluster-health-monitor/pkg/config"
+	"github.com/Azure/cluster-health-monitor/pkg/types"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/fake"
-
-	"github.com/Azure/cluster-health-monitor/pkg/checker"
-	"github.com/Azure/cluster-health-monitor/pkg/config"
+	k8sfake "k8s.io/client-go/kubernetes/fake"
 )
 
-func TestBuildDNSChecker(t *testing.T) {
-	for _, tc := range []struct {
-		name          string
-		checkerConfig *config.CheckerConfig
-		validateRes   func(g *WithT, checker checker.Checker, err error)
-	}{
-		{
-			name: "Valid config",
-			checkerConfig: &config.CheckerConfig{
-				Name: "test-dns-checker",
-				Type: config.CheckTypeDNS,
-				DNSConfig: &config.DNSConfig{
-					Domain: "example.com",
-				},
-			},
-			validateRes: func(g *WithT, checker checker.Checker, err error) {
-				g.Expect(checker).To(Equal(
-					&DNSChecker{
-						name: "test-dns-checker",
-						config: &config.DNSConfig{
-							Domain: "example.com",
-						},
-					}))
-				g.Expect(err).NotTo(HaveOccurred())
+type fakeResolver struct {
+	lookupHostFunc func(ctx context.Context, ip, domain string) ([]string, error)
+}
+
+func (f *fakeResolver) lookupHost(ctx context.Context, ip, domain string) ([]string, error) {
+	return f.lookupHostFunc(ctx, ip, domain)
+}
+
+func TestDNSChecker_Healthy(t *testing.T) {
+	t.Parallel()
+	g := NewWithT(t)
+	client := k8sfake.NewClientset(
+		makeCoreDNSService("10.0.0.10"),
+		makeCoreDNSEndpointSlice([]string{"10.0.0.11", "10.0.0.12"}),
+	)
+	chk := &DNSChecker{
+		name:       "dns-test",
+		config:     &config.DNSConfig{Domain: "example.com"},
+		kubeClient: client,
+		resolver: &fakeResolver{
+			lookupHostFunc: func(ctx context.Context, ip, domain string) ([]string, error) {
+				return []string{"1.2.3.4"}, nil
 			},
 		},
-		{
-			name: "Empty Checker Name",
-			checkerConfig: &config.CheckerConfig{
-				Name: "",
-				Type: config.CheckTypeDNS,
-				DNSConfig: &config.DNSConfig{
-					Domain: "example.com",
-				},
-			},
-			validateRes: func(g *WithT, checker checker.Checker, err error) {
-				g.Expect(checker).To(BeNil())
-				g.Expect(err).To(HaveOccurred())
-			},
-		},
-		{
-			name: "Missing DNSConfig",
-			checkerConfig: &config.CheckerConfig{
-				Name:      "test-dns-checker",
-				Type:      config.CheckTypeDNS,
-				DNSConfig: nil,
-			},
-			validateRes: func(g *WithT, checker checker.Checker, err error) {
-				g.Expect(checker).To(BeNil())
-				g.Expect(err).To(HaveOccurred())
+	}
+	res, err := chk.Run(context.Background())
+	g.Expect(err).ToNot(HaveOccurred())
+	g.Expect(res.Status).To(Equal(types.StatusHealthy))
+}
+
+func TestDNSChecker_ServiceNotReady(t *testing.T) {
+	t.Parallel()
+	g := NewWithT(t)
+	client := k8sfake.NewClientset() // no service
+	chk := &DNSChecker{
+		name:       "dns-test",
+		config:     &config.DNSConfig{Domain: "example.com"},
+		kubeClient: client,
+		resolver: &fakeResolver{
+			lookupHostFunc: func(ctx context.Context, ip, domain string) ([]string, error) {
+				return []string{"1.2.3.4"}, nil
 			},
 		},
-		{
-			name: "Empty Domain",
-			checkerConfig: &config.CheckerConfig{
-				Name: "test-dns-checker",
-				Type: config.CheckTypeDNS,
-				DNSConfig: &config.DNSConfig{
-					Domain: "",
-				},
-			},
-			validateRes: func(g *WithT, checker checker.Checker, err error) {
-				g.Expect(checker).To(BeNil())
-				g.Expect(err).To(HaveOccurred())
+	}
+	res, err := chk.Run(context.Background())
+	g.Expect(err).ToNot(HaveOccurred())
+	g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
+	g.Expect(res.Detail.Code).To(Equal(errCodeServiceNotReady))
+}
+
+func TestDNSChecker_PodsNotReady(t *testing.T) {
+	t.Parallel()
+	g := NewWithT(t)
+	client := k8sfake.NewClientset(
+		makeCoreDNSService("10.0.0.10"),
+	)
+	chk := &DNSChecker{
+		name:       "dns-test",
+		config:     &config.DNSConfig{Domain: "example.com"},
+		kubeClient: client,
+		resolver: &fakeResolver{
+			lookupHostFunc: func(ctx context.Context, ip, domain string) ([]string, error) {
+				return []string{"1.2.3.4"}, nil
 			},
 		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			g := NewWithT(t)
-			c, err := BuildDNSChecker(tc.checkerConfig)
-			tc.validateRes(g, c, err)
-		})
+	}
+	res, err := chk.Run(context.Background())
+	g.Expect(err).ToNot(HaveOccurred())
+	g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
+	g.Expect(res.Detail.Code).To(Equal(errCodePodsNotReady))
+}
+
+func TestDNSChecker_Timeout(t *testing.T) {
+	t.Parallel()
+	g := NewWithT(t)
+	client := k8sfake.NewClientset(
+		makeCoreDNSService("10.0.0.10"),
+		makeCoreDNSEndpointSlice([]string{"10.0.0.11"}),
+	)
+	chk := &DNSChecker{
+		name:       "dns-test",
+		config:     &config.DNSConfig{Domain: "example.com"},
+		kubeClient: client,
+		resolver: &fakeResolver{
+			lookupHostFunc: func(ctx context.Context, ip, domain string) ([]string, error) {
+				return nil, context.DeadlineExceeded
+			},
+		},
+	}
+	res, err := chk.Run(context.Background())
+	g.Expect(err).ToNot(HaveOccurred())
+	g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
+	g.Expect(res.Detail.Code).To(Equal(errCodeServiceTimeout))
+}
+
+// --- helpers ---
+
+func makeCoreDNSService(ip string) *corev1.Service {
+	return &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: CoreDNSNamespace,
+			Name:      CoreDNSServiceName,
+		},
+		Spec: corev1.ServiceSpec{
+			ClusterIP: ip,
+		},
 	}
 }
 
-func TestGetCoreDNSServiceIP(t *testing.T) {
-	for _, tc := range []struct {
-		name           string
-		setupClientset func() *fake.Clientset
-		validateTarget func(*WithT, DNSTarget, error)
-	}{
-		{
-			name: "Success",
-			setupClientset: func() *fake.Clientset {
-				return fake.NewSimpleClientset(&corev1.Service{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "kube-dns",
-						Namespace: "kube-system",
-					},
-					Spec: corev1.ServiceSpec{
-						ClusterIP: "10.96.0.10",
-					},
-				})
+func makeCoreDNSEndpointSlice(ips []string) *discoveryv1.EndpointSlice {
+	endpoints := []discoveryv1.Endpoint{}
+	for _, ip := range ips {
+		ready := true
+		endpoints = append(endpoints, discoveryv1.Endpoint{
+			Addresses: []string{ip},
+			Conditions: discoveryv1.EndpointConditions{
+				Ready: &ready,
 			},
-			validateTarget: func(g *WithT, target DNSTarget, err error) {
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(target).To(Equal(DNSTarget{IP: "10.96.0.10", Type: CoreDNSService}))
-			},
-		},
-		{
-			name: "Error when service does not exist",
-			setupClientset: func() *fake.Clientset {
-				return fake.NewSimpleClientset()
-			},
-			validateTarget: func(g *WithT, target DNSTarget, err error) {
-				g.Expect(err).To(HaveOccurred())
-				g.Expect(target).To(Equal(DNSTarget{}))
-			},
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			g := NewWithT(t)
-			target, err := getCoreDNSServiceIP(context.Background(), tc.setupClientset())
-			tc.validateTarget(g, target, err)
 		})
 	}
-}
-
-func TestGetCoreDNSPodIPs(t *testing.T) {
-	for _, tc := range []struct {
-		name            string
-		setupClientset  func() *fake.Clientset
-		validateTargets func(*WithT, []DNSTarget, error)
-	}{
-		{
-			name: "Success with ready endpoints",
-			setupClientset: func() *fake.Clientset {
-				ready := true
-				return fake.NewSimpleClientset(
-					&discoveryv1.EndpointSlice{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "kube-dns-12345",
-							Namespace: "kube-system",
-							Labels: map[string]string{
-								discoveryv1.LabelServiceName: "kube-dns",
-							},
-						},
-						Endpoints: []discoveryv1.Endpoint{
-							{
-								Addresses:  []string{"10.244.0.2", "10.244.0.3"},
-								Conditions: discoveryv1.EndpointConditions{Ready: &ready},
-							},
-						},
-					},
-				)
-			},
-			validateTargets: func(g *WithT, targets []DNSTarget, err error) {
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(targets).To(ConsistOf(
-					DNSTarget{IP: "10.244.0.2", Type: CoreDNSPod},
-					DNSTarget{IP: "10.244.0.3", Type: CoreDNSPod},
-				))
+	return &discoveryv1.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: CoreDNSNamespace,
+			Labels: map[string]string{
+				discoveryv1.LabelServiceName: CoreDNSServiceName,
 			},
 		},
-		{
-			name: "Success with nil ready condition endpoints",
-			setupClientset: func() *fake.Clientset {
-				return fake.NewSimpleClientset(
-					&discoveryv1.EndpointSlice{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "kube-dns-12345",
-							Namespace: "kube-system",
-							Labels: map[string]string{
-								discoveryv1.LabelServiceName: "kube-dns",
-							},
-						},
-						Endpoints: []discoveryv1.Endpoint{
-							{
-								Addresses:  []string{"10.244.0.2", "10.244.0.3"},
-								Conditions: discoveryv1.EndpointConditions{Ready: nil},
-							},
-						},
-					},
-				)
-			},
-			validateTargets: func(g *WithT, targets []DNSTarget, err error) {
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(targets).To(ConsistOf(
-					DNSTarget{IP: "10.244.0.2", Type: CoreDNSPod},
-					DNSTarget{IP: "10.244.0.3", Type: CoreDNSPod},
-				))
-			},
-		},
-		{
-			name: "Error when endpoints are not ready",
-			setupClientset: func() *fake.Clientset {
-				ready := false
-				return fake.NewSimpleClientset(
-					&discoveryv1.EndpointSlice{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "kube-dns-12345",
-							Namespace: "kube-system",
-							Labels: map[string]string{
-								discoveryv1.LabelServiceName: "kube-dns",
-							},
-						},
-						Endpoints: []discoveryv1.Endpoint{
-							{
-								Addresses:  []string{"10.244.0.2", "10.244.0.3"},
-								Conditions: discoveryv1.EndpointConditions{Ready: &ready},
-							},
-						},
-					},
-				)
-			},
-			validateTargets: func(g *WithT, targets []DNSTarget, err error) {
-				g.Expect(err).To(HaveOccurred())
-				g.Expect(targets).To(BeNil())
-			},
-		},
-		{
-			name: "Error when endpoints do not exist",
-			setupClientset: func() *fake.Clientset {
-				return fake.NewSimpleClientset()
-			},
-			validateTargets: func(g *WithT, targets []DNSTarget, err error) {
-				g.Expect(err).To(HaveOccurred())
-				g.Expect(targets).To(BeNil())
-			},
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			g := NewWithT(t)
-			targets, err := getCoreDNSPodIPs(context.Background(), tc.setupClientset())
-			tc.validateTargets(g, targets, err)
-		})
+		Endpoints: endpoints,
 	}
 }
