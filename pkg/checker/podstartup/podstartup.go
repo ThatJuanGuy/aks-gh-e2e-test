@@ -96,30 +96,10 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 	}
 
 	// Create a synthetic pod to measure the startup time.
-	synthPod, err := c.k8sClientset.CoreV1().Pods(c.namespace).Create(ctx, &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   fmt.Sprintf("%s-synthetic-%d", c.name, time.Now().UnixNano()),
-			Labels: c.podLabels,
-		},
-		Spec: corev1.PodSpec{
-			// TODO? Maybe expose this in the config so this is not Azure-specific.
-			NodeSelector: map[string]string{
-				"kubernetes.azure.com/mode": "system",
-			},
-			Containers: []corev1.Container{
-				{
-					// TODO? Maybe use a different image
-					Name:  "pause",
-					Image: "k8s.gcr.io/pause:3.2",
-				},
-			},
-			// TODO: Add pod cpu/memory requests and/or limits.
-		},
-	}, metav1.CreateOptions{})
+	synthPod, err := c.k8sClientset.CoreV1().Pods(c.namespace).Create(ctx, c.generateSyntheticPod(), metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create synthetic pod in namespace %s: %w", c.namespace, err)
 	}
-	// Ensure the synthetic pod is deleted when the function returns.
 	defer func() {
 		err := c.k8sClientset.CoreV1().Pods(c.namespace).Delete(ctx, synthPod.Name, metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
@@ -139,4 +119,64 @@ func (c *PodStartupChecker) garbageCollect(ctx context.Context, namespace string
 	return c.k8sClientset.CoreV1().Pods(namespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{
 		LabelSelector: labelSelector,
 	})
+}
+
+func (c *PodStartupChecker) generateSyntheticPod() *corev1.Pod {
+	return &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   fmt.Sprintf("%s-synthetic-%d", c.name, time.Now().UnixNano()),
+			Labels: c.podLabels,
+		},
+		// TODO? maybe allow configuring the pod spec in the config
+		Spec: corev1.PodSpec{
+			Tolerations: []corev1.Toleration{
+				{
+					Key:    "node-role.kubernetes.io/master",
+					Effect: corev1.TaintEffectNoSchedule,
+				},
+				{
+					Key:      "CriticalAddonsOnly",
+					Operator: corev1.TolerationOpExists,
+				},
+			},
+			Affinity: &corev1.Affinity{
+				NodeAffinity: &corev1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "kubernetes.azure.com/cluster",
+										Operator: corev1.NodeSelectorOpExists},
+									{
+										Key:      "type",
+										Operator: corev1.NodeSelectorOpNotIn,
+										Values:   []string{"virtual-kubelet"},
+									},
+									{
+										Key:      "kubernetes.io/os",
+										Operator: corev1.NodeSelectorOpIn,
+										Values:   []string{"linux"},
+									},
+									{
+										Key:      "kubernetes.azure.com/mode",
+										Operator: corev1.NodeSelectorOpIn,
+										Values:   []string{"system"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			Containers: []corev1.Container{
+				{
+					// TODO? Maybe use a different image
+					Name:  "pause",
+					Image: "k8s.gcr.io/pause:3.2",
+				},
+			},
+			// TODO: Add pod cpu/memory requests and/or limits.
+		},
+	}
 }
