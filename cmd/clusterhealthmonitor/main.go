@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"os/signal"
 	"syscall"
@@ -17,6 +18,9 @@ func init() {
 }
 
 func main() {
+	flag.Parse()
+	defer klog.Flush()
+
 	registerCheckers()
 
 	ctx := context.Background()
