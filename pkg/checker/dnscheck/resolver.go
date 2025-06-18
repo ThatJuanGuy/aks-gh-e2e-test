@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	queryTimeout = 2 * time.Second // seconds
+	queryTimeout = 2 * time.Second
 )
 
 // resolver is an interface for DNS resolution.
