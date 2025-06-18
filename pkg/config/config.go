@@ -30,29 +30,22 @@ type CheckerConfig struct {
 
 	// Required.
 	// The interval at which the checker should run. The string format see https://pkg.go.dev/time#ParseDuration
-	// Default is 0, which means the checker will run only once.
+	// It must be greater than 0.
 	Interval time.Duration `yaml:"interval"`
 
 	// Required.
 	// The timeout for the checker, used to determine how long to wait for a response before considering the check failed.
 	// The string format see https://pkg.go.dev/time#ParseDuration
-	// Default is 0, which means the checker will wait indefinitely for a response.
+	// It must be greater than 0.
 	Timeout time.Duration `yaml:"timeout"`
 
 	// Optional.
 	// The configuration for the DNS checker, this field is required if Type is CheckTypeDNS.
 	DNSConfig *DNSConfig `yaml:"dnsConfig,omitempty"`
-
-	// Optional.
-	// The configuration for the Pod startup checker, this field is required if Type is CheckTypePodStartup.
-	PodStartupConfig *PodStartupConfig `yaml:"podStartupConfig,omitempty"`
 }
 
 type DNSConfig struct {
 	// Required.
 	// The domain to check, used to determine the DNS records to query.
 	Domain string `yaml:"domain"`
-}
-
-type PodStartupConfig struct {
 }

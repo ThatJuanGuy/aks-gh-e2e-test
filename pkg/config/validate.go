@@ -14,11 +14,11 @@ func (c *CheckerConfig) ValidateCommon() error {
 	if c.Type == "" {
 		errs = append(errs, fmt.Errorf("checker config missing 'type'"))
 	}
-	if c.Interval < 0 {
-		errs = append(errs, fmt.Errorf("checker config invalid 'interval'"))
+	if c.Interval <= 0 {
+		errs = append(errs, fmt.Errorf("checker config invalid 'interval': %s", c.Interval))
 	}
-	if c.Timeout < 0 {
-		errs = append(errs, fmt.Errorf("checker config invalid 'timeout'"))
+	if c.Timeout <= 0 {
+		errs = append(errs, fmt.Errorf("checker config invalid 'timeout': %s", c.Timeout))
 	}
 	return errors.Join(errs...)
 }
