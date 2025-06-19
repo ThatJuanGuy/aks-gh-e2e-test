@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"os/signal"
 	"syscall"
@@ -9,9 +10,17 @@ import (
 	"github.com/Azure/cluster-health-monitor/pkg/checker/dnscheck"
 	"github.com/Azure/cluster-health-monitor/pkg/checker/podstartup"
 	"github.com/Azure/cluster-health-monitor/pkg/metrics"
+	"k8s.io/klog/v2"
 )
 
+func init() {
+	klog.InitFlags(nil)
+}
+
 func main() {
+	flag.Parse()
+	defer klog.Flush()
+
 	registerCheckers()
 
 	ctx := context.Background()
