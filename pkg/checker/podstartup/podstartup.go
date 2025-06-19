@@ -54,9 +54,12 @@ func BuildPodStartupChecker(config *config.CheckerConfig) (checker.Checker, erro
 	// Pods and service accounts must share the same namespace. Read the namespace the checker is running in.
 	data, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 	if err != nil {
-		return nil, fmt.Errorf("failed to read namespace from service account: %w", err)
+		return nil, fmt.Errorf("failed to read namespace from service account: %s", err)
 	}
 	namespace := strings.TrimSpace(string(data))
+	if namespace == "" {
+		return nil, fmt.Errorf("read empty namespace from service account, please ensure the checker is running in a valid namespace")
+	}
 
 	podLabels := map[string]string{
 		"cluster-health-monitor/checker-name": config.Name,
@@ -101,7 +104,11 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 	// Create a synthetic pod to measure the startup time.
 	synthPod, err := c.k8sClientset.CoreV1().Pods(c.namespace).Create(ctx, c.generateSyntheticPod(), metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create synthetic pod in namespace %s: %w", c.namespace, err)
+		if errors.Is(err, context.DeadlineExceeded) {
+			return types.Unhealthy(errCodePodCreationTimeout, "timed out creating synthetic pod"), nil
+		} else {
+			return types.Unhealthy(errCodePodCreationError, fmt.Sprintf("error creating synthetic pod: %s", err)), nil
+		}
 	}
 	defer func() {
 		err := c.k8sClientset.CoreV1().Pods(c.namespace).Delete(ctx, synthPod.Name, metav1.DeleteOptions{})
