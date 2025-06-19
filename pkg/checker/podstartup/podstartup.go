@@ -58,7 +58,7 @@ func BuildPodStartupChecker(config *config.CheckerConfig) (checker.Checker, erro
 	}
 	namespace := strings.TrimSpace(string(data))
 	if namespace == "" {
-		return nil, fmt.Errorf("read empty namespace from service account, please ensure the checker is running in a valid namespace")
+		return nil, fmt.Errorf("read empty namespace from service account")
 	}
 
 	podLabels := map[string]string{
@@ -94,11 +94,11 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 		LabelSelector: labels.SelectorFromSet(labels.Set(c.podLabels)).String(),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to list pods in namespace %s: %w", c.namespace, err)
+		return nil, fmt.Errorf("failed to list pods: %s", err.Error())
 	}
 	if len(pods.Items) >= maxSyntheticPods {
-		return nil, fmt.Errorf("maximum number of synthetic pods reached in namespace %s, current: %d, max allowed: %d, delete some pods before running the checker again",
-			c.namespace, len(pods.Items), maxSyntheticPods)
+		return nil, fmt.Errorf("maximum number of synthetic pods reached, current: %d, max allowed: %d, delete some pods before running the checker again",
+			len(pods.Items), maxSyntheticPods)
 	}
 
 	// Create a synthetic pod to measure the startup time.
@@ -114,7 +114,7 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 		err := c.k8sClientset.CoreV1().Pods(c.namespace).Delete(ctx, synthPod.Name, metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			// Logging instead of returning an error here to avoid failing the checker run.
-			klog.Warningf("failed to delete synthetic pod %s in namespace %s: %s", synthPod.Name, c.namespace, err.Error())
+			klog.Warningf("failed to delete synthetic pod %s: %s", synthPod.Name, err.Error())
 		}
 	}()
 
@@ -136,7 +136,7 @@ func (c *PodStartupChecker) garbageCollect(ctx context.Context) error {
 		if time.Since(pod.CreationTimestamp.Time) > c.timeout {
 			err := c.k8sClientset.CoreV1().Pods(c.namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
-				errs = append(errs, fmt.Errorf("failed to delete old synthetic pod %s in namespace %s: %s", pod.Name, c.namespace, err.Error()))
+				errs = append(errs, fmt.Errorf("failed to delete old synthetic pod %s: %s", pod.Name, err.Error()))
 			}
 		}
 	}
