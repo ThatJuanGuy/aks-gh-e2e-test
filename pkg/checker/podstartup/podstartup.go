@@ -2,6 +2,7 @@ package podstartup
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -22,6 +23,7 @@ import (
 
 type PodStartupChecker struct {
 	name         string
+	timeout      time.Duration
 	k8sClientset kubernetes.Interface
 	// READONLY: The namespace in which the the checker will create synthetic pods.
 	namespace string
@@ -63,6 +65,7 @@ func BuildPodStartupChecker(config *config.CheckerConfig) (checker.Checker, erro
 
 	return &PodStartupChecker{
 		name:         config.Name,
+		timeout:      config.Timeout,
 		k8sClientset: k8sClientset,
 		namespace:    namespace,
 		podLabels:    podLabels,
@@ -77,8 +80,8 @@ func (c *PodStartupChecker) Name() string {
 // the checker is considered healthy. Otherwise, it is considered unhealthy. Before each run, the checker also attempts to garbage
 // collect any leftover synthetic pods from previous runs that may not have been previously deleted due to errors or other issues.
 func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
-	// Garbage collect any synthetic pods previously created by this checker using delete collection.
-	if err := c.garbageCollect(ctx, c.namespace); err != nil {
+	// Garbage collect any leftover synthetic pods previously created by this checker.
+	if err := c.garbageCollect(ctx); err != nil {
 		// Logging instead of returning an error here to avoid failing the checker run.
 		klog.Warningf("failed to garbage collect old synthetic pods: %s", err.Error())
 	}
@@ -113,12 +116,24 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 	return nil, fmt.Errorf("pod startup checker is not fully implemented yet")
 }
 
-// garbageCollect deletes all pods matching the given labels in the specified namespace.
-func (c *PodStartupChecker) garbageCollect(ctx context.Context, namespace string) error {
-	labelSelector := labels.SelectorFromSet(labels.Set(c.podLabels)).String()
-	return c.k8sClientset.CoreV1().Pods(namespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{
-		LabelSelector: labelSelector,
+// garbageCollect deletes all pods created by the checker that are older than the checker's timeout.
+func (c *PodStartupChecker) garbageCollect(ctx context.Context) error {
+	podList, err := c.k8sClientset.CoreV1().Pods(c.namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: labels.SelectorFromSet(labels.Set(c.podLabels)).String(),
 	})
+	if err != nil {
+		return fmt.Errorf("failed to list pods for garbage collection: %w", err)
+	}
+	var errs []error
+	for _, pod := range podList.Items {
+		if time.Since(pod.CreationTimestamp.Time) > c.timeout {
+			err := c.k8sClientset.CoreV1().Pods(c.namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			if err != nil && !apierrors.IsNotFound(err) {
+				errs = append(errs, fmt.Errorf("failed to delete old synthetic pod %s in namespace %s: %s", pod.Name, c.namespace, err.Error()))
+			}
+		}
+	}
+	return errors.Join(errs...)
 }
 
 func (c *PodStartupChecker) generateSyntheticPod() *corev1.Pod {
