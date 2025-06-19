@@ -3,11 +3,11 @@ package metrics
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -32,7 +32,7 @@ type Server struct {
 func NewServer(port int) (*Server, error) {
 	reg := prometheus.NewRegistry()
 	if err := reg.Register(checkerResultCounter); err != nil {
-		log.Printf("Failed to register checker counter: %v.", err)
+		klog.Errorf("Failed to register checker counter: %v.", err)
 		return nil, err
 	}
 	return &Server{
@@ -52,13 +52,13 @@ func (m *Server) Run(ctx context.Context) error {
 	}
 	errCh := make(chan error, 1)
 	go func() {
-		log.Printf("Starting Prometheus metrics server at %s/metrics.", addr)
+		klog.Infof("Starting Prometheus metrics server at %s/metrics.", addr)
 		errCh <- m.server.ListenAndServe()
 	}()
 	select {
 	case <-ctx.Done():
 		// Context canceled, initiate graceful shutdown.
-		log.Println("Shutting down metrics server due to context cancel...")
+		klog.Infoln("Shutting down metrics server due to context cancel...")
 		shutdownErr := m.server.Shutdown(ctx)
 		if shutdownErr != nil {
 			return shutdownErr

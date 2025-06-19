@@ -2,12 +2,12 @@ package scheduler
 
 import (
 	"context"
-	"log"
 	"time"
 
 	"github.com/Azure/cluster-health-monitor/pkg/checker"
 	"github.com/Azure/cluster-health-monitor/pkg/metrics"
 	"golang.org/x/sync/errgroup"
+	"k8s.io/klog/v2"
 )
 
 // CheckerSchedule defines the schedule for a health checker
@@ -60,7 +60,7 @@ func (r *Scheduler) scheduleChecker(ctx context.Context, chkSch CheckerSchedule)
 			}()
 
 		case <-ctx.Done():
-			log.Println("Scheduler stopping.")
+			klog.Infoln("Scheduler stopping.")
 			return ctx.Err()
 		}
 	}
