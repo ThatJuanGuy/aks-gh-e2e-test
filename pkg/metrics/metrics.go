@@ -26,19 +26,17 @@ func RecordCheckerResult(checkerType, checkerName string, result *types.Result, 
 		return
 	}
 
-	// If there's a valid result, record based on its status.
-	if result != nil {
-		var status string
-		var errorCode string
-
-		if result.Status == types.StatusHealthy {
-			status = healthyStatus
-			errorCode = healthyCode
-		} else {
-			status = unhealthyStatus
-			errorCode = result.Detail.Code
-		}
-
-		checkerResultCounter.WithLabelValues(checkerType, checkerName, status, errorCode).Inc()
+	// Record based on result status.
+	var status string
+	var errorCode string
+	switch result.Status {
+	case types.StatusHealthy:
+		status = healthyStatus
+		errorCode = healthyCode
+	case types.StatusUnhealthy:
+		status = unhealthyStatus
+		errorCode = result.Detail.Code
 	}
+
+	checkerResultCounter.WithLabelValues(checkerType, checkerName, status, errorCode).Inc()
 }
