@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -43,35 +42,35 @@ func main() {
 	// Run the prometheus metrics server.
 	m, err := metrics.NewServer(9800)
 	if err != nil {
-		log.Fatalf("Failed to create metrics server:%s.", err)
+		klog.Fatalf("Failed to create metrics server:%s.", err)
 	}
 	go func() {
 		if err := m.Run(ctx); err != nil {
-			log.Fatalf("Metrics server error: %v.", err)
+			klog.Fatalf("Metrics server error: %v.", err)
 		}
 	}()
 
 	// Load checkers from config.
 	configBytes, err := os.ReadFile(*configPath)
 	if err != nil {
-		log.Fatalf("Failed to read config file: %v", err)
+		klog.Fatalf("Failed to read config file: %v", err)
 	}
 
 	checkers, err := checker.BuildCheckersFromConfig(configBytes)
 	if err != nil {
-		log.Fatalf("Failed to build checkers: %v", err)
+		klog.Fatalf("Failed to build checkers: %v", err)
 	}
 
 	if len(checkers) == 0 {
-		log.Printf("Warning: No checkers were loaded from the config file.")
+		klog.Infof("Warning: No checkers were loaded from the config file.")
 	} else {
-		log.Printf("Loaded %d checkers from config", len(checkers))
+		klog.Infof("Loaded %d checkers from config", len(checkers))
 	}
 
 	// TODO: refactor config parsing to only parse once for building checkers and for intervals/timeouts.
 	var parsedConfig config.Config
 	if err := yaml.Unmarshal(configBytes, &parsedConfig); err != nil {
-		log.Fatalf("Failed to parse config for intervals and timeouts: %v", err)
+		klog.Fatalf("Failed to parse config for intervals and timeouts: %v", err)
 	}
 
 	intervalTimeoutMap := make(map[string]struct {
@@ -95,7 +94,7 @@ func main() {
 		// Get interval and timeout from config for each checker.
 		itConfig, ok := intervalTimeoutMap[chk.Name()]
 		if !ok {
-			log.Fatalf("Failed to find interval/timeout config for checker %q", chk.Name())
+			klog.Fatalf("Failed to find interval/timeout config for checker %q", chk.Name())
 		}
 
 		checkerSchedules = append(checkerSchedules, scheduler.CheckerSchedule{
@@ -103,7 +102,7 @@ func main() {
 			Interval: itConfig.interval,
 			Timeout:  itConfig.timeout,
 		})
-		log.Printf("Scheduled checker %q with interval %s and timeout %s",
+		klog.Infof("Scheduled checker %q with interval %s and timeout %s",
 			chk.Name(), itConfig.interval, itConfig.timeout)
 	}
 
@@ -111,11 +110,11 @@ func main() {
 	sched := scheduler.NewScheduler(checkerSchedules)
 	go func() {
 		if err := sched.Start(ctx); err != nil {
-			log.Fatalf("Scheduler error: %v", err)
+			klog.Fatalf("Scheduler error: %v", err)
 		}
 	}()
 
-	log.Printf("Cluster Health Monitor started, using config from %s", *configPath)
+	klog.Infof("Cluster Health Monitor started, using config from %s", *configPath)
 	<-ctx.Done()
 }
 
