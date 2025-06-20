@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -36,6 +37,12 @@ type PodStartupChecker struct {
 // Reaching this limit effectively disables the checker.
 const maxSyntheticPods = 10
 
+// The maximum pod startup duration for which the checker will return healthy status. The pod startup duration is defined as the time
+// between  pod creation and the container being ready, minus the image pull duration (including waiting).
+const maxHealthyPodStartupDuration = 5 * time.Second
+
+var sleepTime = maxHealthyPodStartupDuration // used for unit tests
+
 func Register() {
 	checker.RegisterChecker(config.CheckTypePodStartup, BuildPodStartupChecker)
 }
@@ -66,6 +73,10 @@ func BuildPodStartupChecker(config *config.CheckerConfig) (checker.Checker, erro
 		"app":                                 "cluster-health-monitor-podstartup-synthetic",
 	}
 
+	if config.Timeout <= maxHealthyPodStartupDuration {
+		return nil, fmt.Errorf("timeout must be greater than the maximum healthy pod startup duration (%s), got: %s", config.Timeout, maxHealthyPodStartupDuration)
+	}
+
 	return &PodStartupChecker{
 		name:         config.Name,
 		timeout:      config.Timeout,
@@ -83,9 +94,10 @@ func (c *PodStartupChecker) Type() config.CheckerType {
 	return config.CheckTypePodStartup
 }
 
-// Run executes the pod startup checker logic. It creates synthetic pods to measure the startup time. If it is within the allowed linit,
-// the checker is considered healthy. Otherwise, it is considered unhealthy. Before each run, the checker also attempts to garbage
-// collect any leftover synthetic pods from previous runs that may not have been previously deleted due to errors or other issues.
+// Run executes the pod startup checker logic. It creates synthetic pods to measure the startup time. The startup time is defined as the
+// duration between the pod creation and the container being ready, minus the image pull duration (including waiting). If it is within the
+// allowed limit, the checker is considered healthy. Otherwise, it is considered unhealthy. Before each run, the checker also attempts to
+// garbage collect any leftover synthetic pods from previous runs that may not have been previously deleted due to errors or other issues.
 func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 	// Garbage collect any leftover synthetic pods previously created by this checker.
 	if err := c.garbageCollect(ctx); err != nil {
@@ -122,9 +134,27 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 		}
 	}()
 
-	// TODO measure the pod startup time and determine if result is healthy or not.
+	// Sleep to allow the pod to start and events to be generated.
+	time.Sleep(sleepTime)
 
-	return nil, fmt.Errorf("pod startup checker is not fully implemented yet")
+	podCreationToContainerReadyDuration, err := c.getPodCreationToContainerReadyDuration(ctx, synthPod.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get pod creation to container ready duration for pod %s: %s", synthPod.Name, err.Error())
+	}
+	imagePullDuration, err := c.getImagePullDuration(ctx, synthPod.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get image pull duration for pod %s: %s", synthPod.Name, err.Error())
+	}
+
+	// Calculate the pod startup duration. Round to the seconds place because that is the unit of the least precise measurement.
+	podStartupDuration := (podCreationToContainerReadyDuration - imagePullDuration).Round(time.Second)
+	if podStartupDuration > maxHealthyPodStartupDuration {
+		return types.Unhealthy(
+			errCodeHealthyPodStartupDurationExceeded, fmt.Sprintf("pod %s exceeded the maximum healthy startup duration", synthPod.Name),
+		), nil
+	}
+
+	return types.Healthy(), nil
 }
 
 // garbageCollect deletes all pods created by the checker that are older than the checker's timeout.
@@ -145,6 +175,62 @@ func (c *PodStartupChecker) garbageCollect(ctx context.Context) error {
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// Returns the duration between the pod creation and the container being ready. This is precise to the second.
+func (c *PodStartupChecker) getPodCreationToContainerReadyDuration(ctx context.Context, podName string) (time.Duration, error) {
+	pod, err := c.k8sClientset.CoreV1().Pods(c.namespace).Get(ctx, podName, metav1.GetOptions{})
+	if err != nil {
+		return 0, fmt.Errorf("failed to get pod %s: %s", podName, err.Error())
+	}
+	if len(pod.Status.ContainerStatuses) == 0 {
+		return 0, fmt.Errorf("no container statuses found for pod %s", podName)
+	}
+	for _, status := range pod.Status.ContainerStatuses {
+		if status.State.Running != nil {
+			podCreationTime := pod.CreationTimestamp.Time
+			containerReadyTime := status.State.Running.StartedAt.Time
+			return containerReadyTime.Sub(podCreationTime), nil
+		}
+	}
+	return 0, fmt.Errorf("no running containers for pod %s", podName)
+}
+
+// Returns the image pull duration including waiting time. This is precise to the millisecond.
+func (c *PodStartupChecker) getImagePullDuration(ctx context.Context, podName string) (time.Duration, error) {
+	events, err := c.k8sClientset.CoreV1().Events(c.namespace).List(ctx, metav1.ListOptions{
+		FieldSelector: fmt.Sprintf("involvedObject.name=%s,reason=Pulled", podName),
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to list events for pod %s: %s", podName, err.Error())
+	}
+
+	// events with reason=Pulled have messages expected to be in one of two formats:
+	// 1. "Successfully pulled image \"k8s.gcr.io/pause:3.2\" in 426ms (426ms including waiting). Image size: 299513 bytes."
+	// 2. "Container image \"k8s.gcr.io/pause:3.2\" already present on machine"
+	for _, event := range events.Items {
+		if strings.Contains(event.Message, "Successfully pulled image") {
+			return c.parseImagePullDuration(event.Message)
+		} else if strings.Contains(event.Message, "already present on machine") {
+			return 0, nil
+		} else {
+			// Logging instead of returning an error to avoid failing the checker run.
+			klog.Warningf("Unexpected event message format for pod %s: %s\n", podName, event.Message)
+		}
+	}
+	return 0, fmt.Errorf("no image pull events found for pod %s", podName)
+}
+
+// Parses the image pull duration (including waiting) from a kubernetes event message expected to be in a format like:
+// "Successfully pulled image \"k8s.gcr.io/pause:3.2\" in 426ms (426ms including waiting). Image size: 299513 bytes." or
+// "Successfully pulled image \"k8s.gcr.io/pause:3.2\" in 426ms (1s34ms including waiting). Image size: 299513 bytes."
+func (c *PodStartupChecker) parseImagePullDuration(message string) (time.Duration, error) {
+	re := regexp.MustCompile(`\(([a-zA-Z0-9]+) including waiting\)`)
+	matches := re.FindStringSubmatch(message)
+	if len(matches) != 2 {
+		return 0, fmt.Errorf("failed to extract image pull duration from event message: message in unexpected format: %s", message)
+	}
+	return time.ParseDuration(matches[1])
 }
 
 func (c *PodStartupChecker) generateSyntheticPod() *corev1.Pod {
