@@ -140,7 +140,7 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 
 	podCreationToContainerRunningDuration, err := c.pollPodCreationToContainerRunningDuration(ctx, synthPod.Name)
 	if err != nil {
-		return types.Unhealthy(errCodePodStartupDurationExceeded, fmt.Sprintf("pod %s has no running container", synthPod.Name)), nil
+		return types.Unhealthy(errCodePodStartupDurationExceeded, "pod has no running container"), nil
 	}
 	imagePullDuration, err := c.getImagePullDuration(ctx, synthPod.Name)
 	if err != nil {
@@ -150,9 +150,7 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 	// Calculate the pod startup duration. Round to the seconds place because that is the unit of the least precise measurement.
 	podStartupDuration := (podCreationToContainerRunningDuration - imagePullDuration).Round(time.Second)
 	if podStartupDuration > maxHealthyPodStartupDuration {
-		return types.Unhealthy(
-			errCodePodStartupDurationExceeded, fmt.Sprintf("pod %s exceeded the maximum healthy startup duration", synthPod.Name),
-		), nil
+		return types.Unhealthy(errCodePodStartupDurationExceeded, "pod exceeded the maximum healthy startup duration"), nil
 	}
 
 	return types.Healthy(), nil
