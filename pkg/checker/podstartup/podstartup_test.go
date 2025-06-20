@@ -419,7 +419,7 @@ func TestPodStartupChecker_getImagePullDuration(t *testing.T) {
 		{
 			name: "valid image pulled event",
 			client: k8sfake.NewClientset(
-				imageSuccesfullyPulledEvent(namespace, podName, 800*time.Millisecond),
+				imageSuccessfullyPulledEvent(namespace, podName, 800*time.Millisecond),
 			),
 			validateRes: func(g *WithT, duration time.Duration, err error) {
 				g.Expect(err).NotTo(HaveOccurred())
@@ -485,7 +485,7 @@ func podWithLabels(name string, namespace string, labels map[string]string, crea
 	}
 }
 
-func imageSuccesfullyPulledEvent(namespace, podName string, pullDuration time.Duration) *corev1.Event {
+func imageSuccessfullyPulledEvent(namespace, podName string, pullDuration time.Duration) *corev1.Event {
 	return &corev1.Event{
 		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "event1"},
 		Message: fmt.Sprintf("Successfully pulled image \"k8s.gcr.io/pause:3.2\" in %s (%s including waiting). Image size: 299513 bytes.",
