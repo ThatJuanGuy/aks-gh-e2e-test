@@ -48,6 +48,64 @@ docker-build-cluster-health-monitor: docker-buildx-builder
 		--pull \
 		--tag $(REGISTRY)/$(CLUSTER_HEALTH_MONITOR_IMAGE_NAME):$(CLUSTER_HEALTH_MONITOR_IMAGE_VERSION) .
 
+## --------------------------------------
+## Local Test with Kind
+## --------------------------------------
+
+GIT_ROOT = $(shell git rev-parse --show-toplevel)
+LOCAL_IMAGE_NAME = cluster-health-monitor
+LOCAL_IMAGE_TAG = test-latest
+KIND_CLUSTER_NAME ?= chm-test
+KUBECONFIG ?= $(HOME)/.kube/config
+
+.PHONY: kind-create-cluster
+kind-create-cluster:
+	@echo "Creating Kind cluster '$(KIND_CLUSTER_NAME)' with kubeconfig at $(KUBECONFIG)"
+	@if ! kind get clusters | grep -q $(KIND_CLUSTER_NAME); then \
+		kind create cluster --name $(KIND_CLUSTER_NAME) --kubeconfig $(KUBECONFIG); \
+	else \
+		echo "Kind cluster '$(KIND_CLUSTER_NAME)' already exists."; \
+	fi
+
+.PHONY: kind-build-image
+kind-build-image:
+	docker build \
+		--file ${GIT_ROOT}/docker/$(LOCAL_IMAGE_NAME).Dockerfile \
+		--tag $(LOCAL_IMAGE_NAME):$(LOCAL_IMAGE_TAG) .
+
+.PHONY: kind-load-image
+kind-load-image: kind-build-image
+	kind load docker-image $(LOCAL_IMAGE_NAME):$(LOCAL_IMAGE_TAG) --name $(KIND_CLUSTER_NAME)
+
+.PHONY: kind-export-kubeconfig
+kind-export-kubeconfig:
+	kind export kubeconfig --name $(KIND_CLUSTER_NAME)
+
+.PHONY: kind-apply-manifests
+kind-apply-manifests: kind-export-kubeconfig
+	kubectl apply -k ${GIT_ROOT}/manifests/overlays/test
+
+.PHONY: kind-delete-deployment
+kind-delete-deployment: kind-export-kubeconfig
+	kubectl delete -k ${GIT_ROOT}/manifests/overlays/test
+
+.PHONY: kind-redeploy
+kind-redeploy: kind-delete-deployment kind-build-image kind-load-image kind-apply-manifests
+	@echo "Redeployed cluster health monitor to Kind cluster '$(KIND_CLUSTER_NAME)'"
+
+.PHONY: kind-delete-cluster
+kind-delete-cluster:
+	kind delete cluster --name $(KIND_CLUSTER_NAME)
+
+.PHONY: kind-test-local
+kind-test-local: kind-create-cluster kind-load-image kind-apply-manifests
+	@echo "Cluster health monitor deployed to Kind cluster '$(KIND_CLUSTER_NAME)'"
+	@echo "Use 'make kind-export-kubeconfig' to set the kubectl context for Kind cluster '$(KIND_CLUSTER_NAME)'"
+	@echo "Use 'kubectl -n cluster-health-monitor get pods' to check the status"
+	@echo "Use 'kubectl -n cluster-health-monitor port-forward deployment/cluster-health-monitor 9800' to access metrics"
+	@echo "Use 'make kind-redeploy' to redeploy the cluster health monitor"
+	@echo "Use 'make kind-delete-cluster' when you're done testing"
+
 ## -----------------------------------
 ## Cleanup
 ## -----------------------------------
