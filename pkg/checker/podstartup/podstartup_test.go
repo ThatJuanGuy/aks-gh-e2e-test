@@ -49,13 +49,13 @@ func TestPodStartupChecker_Run(t *testing.T) {
 						},
 					}},
 				}
-				client.Fake.PrependReactor("create", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				client.PrependReactor("create", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
 					return true, fakePod, nil
 				})
-				client.Fake.PrependReactor("get", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				client.PrependReactor("get", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
 					return true, fakePod, nil
 				})
-				client.Fake.PrependReactor("delete", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				client.PrependReactor("delete", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
 					return true, fakePod, nil
 				})
 				return client
@@ -83,13 +83,13 @@ func TestPodStartupChecker_Run(t *testing.T) {
 						},
 					}},
 				}
-				client.Fake.PrependReactor("create", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				client.PrependReactor("create", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
 					return true, fakePod, nil
 				})
-				client.Fake.PrependReactor("get", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				client.PrependReactor("get", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
 					return true, fakePod, nil
 				})
-				client.Fake.PrependReactor("delete", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				client.PrependReactor("delete", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
 					return true, fakePod, nil
 				})
 				return client
@@ -108,11 +108,11 @@ func TestPodStartupChecker_Run(t *testing.T) {
 				// preload client with the maximum number of synthetic pods
 				for i := range maxSyntheticPods {
 					podName := fmt.Sprintf("pod%d", i)
-					client.CoreV1().Pods(checkerNamespace).Create(context.Background(),
+					client.CoreV1().Pods(checkerNamespace).Create(context.Background(), //nolint:errcheck // ignore error for test setup
 						podWithLabels(podName, checkerNamespace, checkerLabels, timestamp), metav1.CreateOptions{})
 				}
 				// prevent pod deletion from succeeding
-				client.Fake.PrependReactor("delete", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				client.PrependReactor("delete", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
 					return true, nil, errors.New("error occured")
 				})
 				return client
@@ -353,7 +353,7 @@ func TestPodStartupChecker_getPodCreationToContainerReadyDuration(t *testing.T) 
 
 			client := k8sfake.NewClientset()
 			if tt.pod != nil {
-				client.CoreV1().Pods(checkerNamespace).Create(context.Background(), tt.pod, metav1.CreateOptions{})
+				client.CoreV1().Pods(checkerNamespace).Create(context.Background(), tt.pod, metav1.CreateOptions{}) //nolint:errcheck // ignore error for test setup
 			}
 			checker := &PodStartupChecker{
 				k8sClientset: client,
