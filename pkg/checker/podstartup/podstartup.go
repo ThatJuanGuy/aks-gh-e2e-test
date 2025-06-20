@@ -110,7 +110,7 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 		LabelSelector: labels.SelectorFromSet(labels.Set(c.podLabels)).String(),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to list pods: %s", err.Error())
+		return nil, fmt.Errorf("failed to list pods: %w", err)
 	}
 	if len(pods.Items) >= maxSyntheticPods {
 		return nil, fmt.Errorf("maximum number of synthetic pods reached, current: %d, max allowed: %d, delete some pods before running the checker again",
@@ -139,11 +139,11 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 
 	podCreationToContainerReadyDuration, err := c.getPodCreationToContainerReadyDuration(ctx, synthPod.Name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get pod creation to container ready duration for pod %s: %s", synthPod.Name, err.Error())
+		return nil, fmt.Errorf("failed to get pod creation to container ready duration for pod %s: %w", synthPod.Name, err)
 	}
 	imagePullDuration, err := c.getImagePullDuration(ctx, synthPod.Name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get image pull duration for pod %s: %s", synthPod.Name, err.Error())
+		return nil, fmt.Errorf("failed to get image pull duration for pod %s: %w", synthPod.Name, err)
 	}
 
 	// Calculate the pod startup duration. Round to the seconds place because that is the unit of the least precise measurement.
@@ -170,7 +170,7 @@ func (c *PodStartupChecker) garbageCollect(ctx context.Context) error {
 		if time.Since(pod.CreationTimestamp.Time) > c.timeout {
 			err := c.k8sClientset.CoreV1().Pods(c.namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
-				errs = append(errs, fmt.Errorf("failed to delete old synthetic pod %s: %s", pod.Name, err.Error()))
+				errs = append(errs, fmt.Errorf("failed to delete old synthetic pod %s: %w", pod.Name, err))
 			}
 		}
 	}
@@ -181,7 +181,7 @@ func (c *PodStartupChecker) garbageCollect(ctx context.Context) error {
 func (c *PodStartupChecker) getPodCreationToContainerReadyDuration(ctx context.Context, podName string) (time.Duration, error) {
 	pod, err := c.k8sClientset.CoreV1().Pods(c.namespace).Get(ctx, podName, metav1.GetOptions{})
 	if err != nil {
-		return 0, fmt.Errorf("failed to get pod %s: %s", podName, err.Error())
+		return 0, fmt.Errorf("failed to get pod %s: %w", podName, err)
 	}
 	if len(pod.Status.ContainerStatuses) == 0 {
 		return 0, fmt.Errorf("no container statuses found for pod %s", podName)
@@ -202,7 +202,7 @@ func (c *PodStartupChecker) getImagePullDuration(ctx context.Context, podName st
 		FieldSelector: fmt.Sprintf("involvedObject.name=%s,reason=Pulled", podName),
 	})
 	if err != nil {
-		return 0, fmt.Errorf("failed to list events for pod %s: %s", podName, err.Error())
+		return 0, fmt.Errorf("failed to list events for pod %s: %w", podName, err)
 	}
 
 	// events with reason=Pulled have messages expected to be in one of two formats:
