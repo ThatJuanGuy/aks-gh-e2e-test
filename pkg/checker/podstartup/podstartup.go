@@ -13,6 +13,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
@@ -41,7 +42,8 @@ const maxSyntheticPods = 10
 // between pod creation and the container running, minus the image pull duration (including waiting).
 const maxHealthyPodStartupDuration = 5 * time.Second
 
-var sleepTime = maxHealthyPodStartupDuration // used for unit tests
+// How often to poll the pod status to check if the container is running.
+var pollingInterval = 1 * time.Second // used for unit tests
 
 // The regular expression used to parse the image pull duration from a k8s event message for successfully pulling an image.
 var imagePullDurationRegex = regexp.MustCompile(`\(([a-zA-Z0-9]+) including waiting\)`)
@@ -136,15 +138,9 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 		}
 	}()
 
-	// Sleep to allow the pod to start and events to be generated.
-	time.Sleep(sleepTime)
-
-	podCreationToContainerRunningDuration, err := c.getPodCreationToContainerRunningDuration(ctx, synthPod.Name)
+	podCreationToContainerRunningDuration, err := c.pollPodCreationToContainerRunningDuration(ctx, synthPod.Name)
 	if err != nil {
-		if errors.Is(err, errPodHasNoRunningContainer) {
-			return types.Unhealthy(errCodePodStartupDurationExceeded, fmt.Sprintf("pod %s has no running container", synthPod.Name)), nil
-		}
-		return nil, fmt.Errorf("failed to get pod creation to container running duration for pod %s: %w", synthPod.Name, err)
+		return types.Unhealthy(errCodePodStartupDurationExceeded, fmt.Sprintf("pod %s has no running container", synthPod.Name)), nil
 	}
 	imagePullDuration, err := c.getImagePullDuration(ctx, synthPod.Name)
 	if err != nil {
@@ -183,22 +179,26 @@ func (c *PodStartupChecker) garbageCollect(ctx context.Context) error {
 }
 
 // Returns the duration between the pod creation and the container running. This is precise to the second.
-func (c *PodStartupChecker) getPodCreationToContainerRunningDuration(ctx context.Context, podName string) (time.Duration, error) {
-	pod, err := c.k8sClientset.CoreV1().Pods(c.namespace).Get(ctx, podName, metav1.GetOptions{})
-	if err != nil {
-		return 0, fmt.Errorf("failed to get pod %s: %w", podName, err)
-	}
-	if len(pod.Status.ContainerStatuses) == 0 {
-		return 0, errPodHasNoRunningContainer
-	}
-	for _, status := range pod.Status.ContainerStatuses {
-		if status.State.Running != nil {
-			podCreationTime := pod.CreationTimestamp.Time
-			containerRunningTime := status.State.Running.StartedAt.Time
-			return containerRunningTime.Sub(podCreationTime), nil
+func (c *PodStartupChecker) pollPodCreationToContainerRunningDuration(ctx context.Context, podName string) (time.Duration, error) {
+	var podCreationToContainerRunningDuration time.Duration
+	err := wait.PollUntilContextCancel(ctx, pollingInterval, true, func(ctx context.Context) (bool, error) {
+		pod, err := c.k8sClientset.CoreV1().Pods(c.namespace).Get(ctx, podName, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
 		}
-	}
-	return 0, errPodHasNoRunningContainer
+		if len(pod.Status.ContainerStatuses) == 0 {
+			return false, nil
+		}
+		for _, status := range pod.Status.ContainerStatuses {
+			if status.State.Running != nil {
+				containerRunningTime := status.State.Running.StartedAt.Time
+				podCreationToContainerRunningDuration = containerRunningTime.Sub(pod.CreationTimestamp.Time)
+				return true, nil
+			}
+		}
+		return false, nil
+	})
+	return podCreationToContainerRunningDuration, err
 }
 
 // Returns the image pull duration including waiting time. This is precise to the millisecond.

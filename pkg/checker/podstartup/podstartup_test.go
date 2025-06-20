@@ -20,7 +20,6 @@ import (
 func TestPodStartupChecker_Run(t *testing.T) {
 	timestamp := time.Now()
 	checkerName := "test-checker"
-	checkerTimeout := 10 * time.Second
 	checkerNamespace := "test-namespace"
 	checkerLabels := map[string]string{
 		"cluster-health-monitor/checker-name": checkerName,
@@ -124,13 +123,6 @@ func TestPodStartupChecker_Run(t *testing.T) {
 		},
 	}
 
-	// Set sleepTime to 0 so tests run faster
-	origSleepTime := sleepTime
-	sleepTime = 0
-	defer func() {
-		sleepTime = origSleepTime
-	}()
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			g := NewWithT(t)
@@ -142,8 +134,9 @@ func TestPodStartupChecker_Run(t *testing.T) {
 				k8sClientset: tt.client,
 			}
 
-			ctx, cancel := context.WithTimeout(context.Background(), checkerTimeout)
+			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 			defer cancel()
+
 			result, err := podStartupChecker.Run(ctx)
 			tt.validateResult(g, result, err)
 		})
@@ -274,9 +267,10 @@ func TestPodStartupChecker_garbageCollect(t *testing.T) {
 	}
 }
 
-func TestPodStartupChecker_getPodCreationToContainerRunningDuration(t *testing.T) {
+func TestPodStartupChecker_pollPodCreationToContainerRunningDuration(t *testing.T) {
 	podName := "pod1"
 	checkerNamespace := "test"
+	timestamp := time.Now()
 	tests := []struct {
 		name        string
 		pod         *corev1.Pod
@@ -288,45 +282,23 @@ func TestPodStartupChecker_getPodCreationToContainerRunningDuration(t *testing.T
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              podName,
 					Namespace:         checkerNamespace,
-					CreationTimestamp: metav1.NewTime(time.Now().Add(-10 * time.Second)),
+					CreationTimestamp: metav1.NewTime(timestamp.Add(-10 * time.Second)),
 				},
 				Status: corev1.PodStatus{
 					ContainerStatuses: []corev1.ContainerStatus{{
 						State: corev1.ContainerState{
-							Running: &corev1.ContainerStateRunning{StartedAt: metav1.NewTime(time.Now())},
+							Running: &corev1.ContainerStateRunning{StartedAt: metav1.NewTime(timestamp)},
 						},
 					}},
 				},
 			},
 			validateRes: func(g *WithT, duration time.Duration, err error) {
 				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(duration).To(BeNumerically(">=", 10*time.Second-1*time.Second)) // allow some clock drift and prevent flakes
+				g.Expect(duration).To(Equal(10 * time.Second))
 			},
 		},
 		{
-			name: "error - failed to get pod",
-			validateRes: func(g *WithT, duration time.Duration, err error) {
-				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("failed to get pod"))
-				g.Expect(duration).To(Equal(0 * time.Second))
-			},
-		},
-		{
-			name: "error - no container statuses",
-			pod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      podName,
-					Namespace: checkerNamespace,
-				},
-			},
-			validateRes: func(g *WithT, duration time.Duration, err error) {
-				g.Expect(err).To(HaveOccurred())
-				g.Expect(err).To(Equal(errPodHasNoRunningContainer))
-				g.Expect(duration).To(Equal(0 * time.Second))
-			},
-		},
-		{
-			name: "error - no running containers",
+			name: "error - polling timeout",
 			pod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      podName,
@@ -342,7 +314,7 @@ func TestPodStartupChecker_getPodCreationToContainerRunningDuration(t *testing.T
 			},
 			validateRes: func(g *WithT, duration time.Duration, err error) {
 				g.Expect(err).To(HaveOccurred())
-				g.Expect(err).To(Equal(errPodHasNoRunningContainer))
+				g.Expect(err).To(Equal(context.DeadlineExceeded))
 				g.Expect(duration).To(Equal(0 * time.Second))
 			},
 		},
@@ -360,7 +332,10 @@ func TestPodStartupChecker_getPodCreationToContainerRunningDuration(t *testing.T
 				namespace:    checkerNamespace,
 			}
 
-			dur, err := checker.getPodCreationToContainerRunningDuration(context.Background(), podName)
+			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+			defer cancel()
+
+			dur, err := checker.pollPodCreationToContainerRunningDuration(ctx, podName)
 			tt.validateRes(g, dur, err)
 		})
 	}
