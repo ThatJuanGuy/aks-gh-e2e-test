@@ -214,12 +214,12 @@ func (c *PodStartupChecker) getImagePullDuration(ctx context.Context, podName st
 	for _, event := range events.Items {
 		if strings.Contains(event.Message, "Successfully pulled image") {
 			return c.parseImagePullDuration(event.Message)
-		} else if strings.Contains(event.Message, "already present on machine") {
-			return 0, nil
-		} else {
-			// Logging instead of returning an error to avoid failing the checker run.
-			klog.Warningf("Unexpected event message format for pod %s: %s\n", podName, event.Message)
 		}
+		if strings.Contains(event.Message, "already present on machine") {
+			return 0, nil
+		}
+		// Logging instead of returning an error to avoid failing the checker run.
+		klog.Warningf("Unexpected event message format for pod %s: %s\n", podName, event.Message)
 	}
 	return 0, fmt.Errorf("no image pull events found for pod %s", podName)
 }
