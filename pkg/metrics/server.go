@@ -10,17 +10,6 @@ import (
 	"k8s.io/klog/v2"
 )
 
-const (
-	healthyStatus   = "healthy"
-	unhealthyStatus = "unhealthy"
-	unknownStatus   = "unknown"
-
-	// error_code is required although healthy and unknown checkers do not use it.
-	// We set a default value for healthy and unknown result.
-	healthyCode = healthyStatus
-	unknownCode = unknownStatus
-)
-
 // Server holds Prometheus collectors and exposes them via HTTP.
 type Server struct {
 	registry *prometheus.Registry
@@ -31,7 +20,7 @@ type Server struct {
 // NewServer creates a new Metrics instance with a custom registry and listen address.
 func NewServer(port int) (*Server, error) {
 	reg := prometheus.NewRegistry()
-	if err := reg.Register(checkerResultCounter); err != nil {
+	if err := reg.Register(CheckerResultCounter); err != nil {
 		klog.Errorf("Failed to register checker counter: %v.", err)
 		return nil, err
 	}
