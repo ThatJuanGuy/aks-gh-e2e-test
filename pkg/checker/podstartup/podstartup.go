@@ -38,7 +38,7 @@ type PodStartupChecker struct {
 const maxSyntheticPods = 10
 
 // The maximum pod startup duration for which the checker will return healthy status. The pod startup duration is defined as the time
-// between  pod creation and the container being ready, minus the image pull duration (including waiting).
+// between pod creation and the container running, minus the image pull duration (including waiting).
 const maxHealthyPodStartupDuration = 5 * time.Second
 
 var sleepTime = maxHealthyPodStartupDuration // used for unit tests
@@ -98,7 +98,7 @@ func (c *PodStartupChecker) Type() config.CheckerType {
 }
 
 // Run executes the pod startup checker logic. It creates synthetic pods to measure the startup time. The startup time is defined as the
-// duration between the pod creation and the container being ready, minus the image pull duration (including waiting). If it is within the
+// duration between the pod creation and the container running, minus the image pull duration (including waiting). If it is within the
 // allowed limit, the checker is considered healthy. Otherwise, it is considered unhealthy. Before each run, the checker also attempts to
 // garbage collect any leftover synthetic pods from previous runs that may not have been previously deleted due to errors or other issues.
 func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
@@ -140,9 +140,9 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 	// Sleep to allow the pod to start and events to be generated.
 	time.Sleep(sleepTime)
 
-	podCreationToContainerReadyDuration, err := c.getPodCreationToContainerReadyDuration(ctx, synthPod.Name)
+	podCreationToContainerRunningDuration, err := c.getPodCreationToContainerRunningDuration(ctx, synthPod.Name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get pod creation to container ready duration for pod %s: %w", synthPod.Name, err)
+		return nil, fmt.Errorf("failed to get pod creation to container running duration for pod %s: %w", synthPod.Name, err)
 	}
 	imagePullDuration, err := c.getImagePullDuration(ctx, synthPod.Name)
 	if err != nil {
@@ -150,7 +150,7 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 	}
 
 	// Calculate the pod startup duration. Round to the seconds place because that is the unit of the least precise measurement.
-	podStartupDuration := (podCreationToContainerReadyDuration - imagePullDuration).Round(time.Second)
+	podStartupDuration := (podCreationToContainerRunningDuration - imagePullDuration).Round(time.Second)
 	if podStartupDuration > maxHealthyPodStartupDuration {
 		return types.Unhealthy(
 			errCodePodStartupDurationExceeded, fmt.Sprintf("pod %s exceeded the maximum healthy startup duration", synthPod.Name),
@@ -180,8 +180,8 @@ func (c *PodStartupChecker) garbageCollect(ctx context.Context) error {
 	return errors.Join(errs...)
 }
 
-// Returns the duration between the pod creation and the container being ready. This is precise to the second.
-func (c *PodStartupChecker) getPodCreationToContainerReadyDuration(ctx context.Context, podName string) (time.Duration, error) {
+// Returns the duration between the pod creation and the container running. This is precise to the second.
+func (c *PodStartupChecker) getPodCreationToContainerRunningDuration(ctx context.Context, podName string) (time.Duration, error) {
 	pod, err := c.k8sClientset.CoreV1().Pods(c.namespace).Get(ctx, podName, metav1.GetOptions{})
 	if err != nil {
 		return 0, fmt.Errorf("failed to get pod %s: %w", podName, err)
@@ -192,8 +192,8 @@ func (c *PodStartupChecker) getPodCreationToContainerReadyDuration(ctx context.C
 	for _, status := range pod.Status.ContainerStatuses {
 		if status.State.Running != nil {
 			podCreationTime := pod.CreationTimestamp.Time
-			containerReadyTime := status.State.Running.StartedAt.Time
-			return containerReadyTime.Sub(podCreationTime), nil
+			containerRunningTime := status.State.Running.StartedAt.Time
+			return containerRunningTime.Sub(podCreationTime), nil
 		}
 	}
 	return 0, fmt.Errorf("no running containers for pod %s", podName)

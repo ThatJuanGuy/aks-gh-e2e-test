@@ -274,7 +274,7 @@ func TestPodStartupChecker_garbageCollect(t *testing.T) {
 	}
 }
 
-func TestPodStartupChecker_getPodCreationToContainerReadyDuration(t *testing.T) {
+func TestPodStartupChecker_getPodCreationToContainerRunningDuration(t *testing.T) {
 	podName := "pod1"
 	checkerNamespace := "test"
 	tests := []struct {
@@ -360,7 +360,7 @@ func TestPodStartupChecker_getPodCreationToContainerReadyDuration(t *testing.T) 
 				namespace:    checkerNamespace,
 			}
 
-			dur, err := checker.getPodCreationToContainerReadyDuration(context.Background(), podName)
+			dur, err := checker.getPodCreationToContainerRunningDuration(context.Background(), podName)
 			tt.validateRes(g, dur, err)
 		})
 	}
