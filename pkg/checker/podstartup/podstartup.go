@@ -43,6 +43,9 @@ const maxHealthyPodStartupDuration = 5 * time.Second
 
 var sleepTime = maxHealthyPodStartupDuration // used for unit tests
 
+// The regular expression used to parse the image pull duration from a k8s event message for successfully pulling an image.
+var imagePullDurationRegex = regexp.MustCompile(`\(([a-zA-Z0-9]+) including waiting\)`)
+
 func Register() {
 	checker.RegisterChecker(config.CheckTypePodStartup, BuildPodStartupChecker)
 }
@@ -225,8 +228,7 @@ func (c *PodStartupChecker) getImagePullDuration(ctx context.Context, podName st
 // "Successfully pulled image \"k8s.gcr.io/pause:3.2\" in 426ms (426ms including waiting). Image size: 299513 bytes." or
 // "Successfully pulled image \"k8s.gcr.io/pause:3.2\" in 426ms (1s34ms including waiting). Image size: 299513 bytes."
 func (c *PodStartupChecker) parseImagePullDuration(message string) (time.Duration, error) {
-	re := regexp.MustCompile(`\(([a-zA-Z0-9]+) including waiting\)`)
-	matches := re.FindStringSubmatch(message)
+	matches := imagePullDurationRegex.FindStringSubmatch(message)
 	if len(matches) != 2 {
 		return 0, fmt.Errorf("failed to extract image pull duration from event message: message in unexpected format: %s", message)
 	}
