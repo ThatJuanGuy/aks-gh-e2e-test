@@ -112,7 +112,7 @@ func TestPodStartupChecker_Run(t *testing.T) {
 				}
 				// prevent pod deletion from succeeding
 				client.PrependReactor("delete", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.New("error occured")
+					return true, nil, errors.New("error occurred")
 				})
 				return client
 			}(),
