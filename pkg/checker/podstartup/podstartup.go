@@ -149,7 +149,7 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 
 	// Calculate the pod startup duration. Round to the seconds place because that is the unit of the least precise measurement.
 	podStartupDuration := (podCreationToContainerRunningDuration - imagePullDuration).Round(time.Second)
-	if podStartupDuration > maxHealthyPodStartupDuration {
+	if podStartupDuration >= maxHealthyPodStartupDuration {
 		return types.Unhealthy(errCodePodStartupDurationExceeded, "pod exceeded the maximum healthy startup duration"), nil
 	}
 
