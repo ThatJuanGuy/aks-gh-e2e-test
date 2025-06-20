@@ -79,6 +79,10 @@ func (c *PodStartupChecker) Name() string {
 	return c.name
 }
 
+func (c *PodStartupChecker) Type() config.CheckerType {
+	return config.CheckTypePodStartup
+}
+
 // Run executes the pod startup checker logic. It creates synthetic pods to measure the startup time. If it is within the allowed linit,
 // the checker is considered healthy. Otherwise, it is considered unhealthy. Before each run, the checker also attempts to garbage
 // collect any leftover synthetic pods from previous runs that may not have been previously deleted due to errors or other issues.

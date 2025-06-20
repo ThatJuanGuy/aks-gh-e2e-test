@@ -2,6 +2,17 @@ package metrics
 
 import "github.com/prometheus/client_golang/prometheus"
 
+const (
+	HealthyStatus   = "healthy"
+	UnhealthyStatus = "unhealthy"
+	UnknownStatus   = "unknown"
+
+	// error_code is required although healthy and unknown checkers do not use it.
+	// We set a default value for healthy and unknown result.
+	HealthyCode = HealthyStatus
+	UnknownCode = UnknownStatus
+)
+
 var (
 	// CheckerResultCounter is a Prometheus counter that tracks the results of checker runs.
 	CheckerResultCounter = prometheus.NewCounterVec(
