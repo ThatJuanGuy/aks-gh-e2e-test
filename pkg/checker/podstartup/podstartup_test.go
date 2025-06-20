@@ -98,7 +98,7 @@ func TestPodStartupChecker_Run(t *testing.T) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
 				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
-				g.Expect(result.Detail.Code).To(Equal(errCodeHealthyPodStartupDurationExceeded))
+				g.Expect(result.Detail.Code).To(Equal(errCodePodStartupDurationExceeded))
 			},
 		},
 		{

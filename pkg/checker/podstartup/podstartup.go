@@ -153,7 +153,7 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 	podStartupDuration := (podCreationToContainerReadyDuration - imagePullDuration).Round(time.Second)
 	if podStartupDuration > maxHealthyPodStartupDuration {
 		return types.Unhealthy(
-			errCodeHealthyPodStartupDurationExceeded, fmt.Sprintf("pod %s exceeded the maximum healthy startup duration", synthPod.Name),
+			errCodePodStartupDurationExceeded, fmt.Sprintf("pod %s exceeded the maximum healthy startup duration", synthPod.Name),
 		), nil
 	}
 
