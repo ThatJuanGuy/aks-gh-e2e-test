@@ -125,9 +125,8 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			return types.Unhealthy(errCodePodCreationTimeout, "timed out creating synthetic pod"), nil
-		} else {
-			return types.Unhealthy(errCodePodCreationError, fmt.Sprintf("error creating synthetic pod: %s", err)), nil
 		}
+		return types.Unhealthy(errCodePodCreationError, fmt.Sprintf("error creating synthetic pod: %s", err)), nil
 	}
 	defer func() {
 		err := c.k8sClientset.CoreV1().Pods(c.namespace).Delete(ctx, synthPod.Name, metav1.DeleteOptions{})
@@ -142,6 +141,9 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 
 	podCreationToContainerRunningDuration, err := c.getPodCreationToContainerRunningDuration(ctx, synthPod.Name)
 	if err != nil {
+		if errors.Is(err, errPodHasNoRunningContainer) {
+			return types.Unhealthy(errCodePodStartupDurationExceeded, fmt.Sprintf("pod %s has no running container", synthPod.Name)), nil
+		}
 		return nil, fmt.Errorf("failed to get pod creation to container running duration for pod %s: %w", synthPod.Name, err)
 	}
 	imagePullDuration, err := c.getImagePullDuration(ctx, synthPod.Name)
@@ -187,7 +189,7 @@ func (c *PodStartupChecker) getPodCreationToContainerRunningDuration(ctx context
 		return 0, fmt.Errorf("failed to get pod %s: %w", podName, err)
 	}
 	if len(pod.Status.ContainerStatuses) == 0 {
-		return 0, fmt.Errorf("no container statuses found for pod %s", podName)
+		return 0, errPodHasNoRunningContainer
 	}
 	for _, status := range pod.Status.ContainerStatuses {
 		if status.State.Running != nil {
@@ -196,7 +198,7 @@ func (c *PodStartupChecker) getPodCreationToContainerRunningDuration(ctx context
 			return containerRunningTime.Sub(podCreationTime), nil
 		}
 	}
-	return 0, fmt.Errorf("no running containers for pod %s", podName)
+	return 0, errPodHasNoRunningContainer
 }
 
 // Returns the image pull duration including waiting time. This is precise to the millisecond.

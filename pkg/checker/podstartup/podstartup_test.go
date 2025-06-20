@@ -321,7 +321,7 @@ func TestPodStartupChecker_getPodCreationToContainerRunningDuration(t *testing.T
 			},
 			validateRes: func(g *WithT, duration time.Duration, err error) {
 				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("no container statuses"))
+				g.Expect(err).To(Equal(errPodHasNoRunningContainer))
 				g.Expect(duration).To(Equal(0 * time.Second))
 			},
 		},
@@ -342,7 +342,7 @@ func TestPodStartupChecker_getPodCreationToContainerRunningDuration(t *testing.T
 			},
 			validateRes: func(g *WithT, duration time.Duration, err error) {
 				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("no running containers"))
+				g.Expect(err).To(Equal(errPodHasNoRunningContainer))
 				g.Expect(duration).To(Equal(0 * time.Second))
 			},
 		},
