@@ -50,10 +50,10 @@ func beforeSuiteAllProcesses() {
 
 	// Ensure environment variables are set.
 	kubeConfigPath := filepath.Join(testDir, "kubeconfig")
-	os.Setenv(kubeConfigPathEnvVarName, kubeConfigPath)
-	Expect(os.Getenv(kubeConfigPathEnvVarName)).To(Equal(kubeConfigPath), "Environment variable KUBECONFIG is not set")
-	os.Setenv(kindClusterNameEnvVarName, clusterName)
-	Expect(os.Getenv(kindClusterNameEnvVarName)).To(Equal(clusterName), "Environment variable KIND_CLUSTER_NAME is not set")
+	err = os.Setenv(kubeConfigPathEnvVarName, kubeConfigPath)
+	Expect(err).NotTo(HaveOccurred(), "Failed to set environment variable %s: %s", kubeConfigPathEnvVarName, kubeConfigPath)
+	err = os.Setenv(kindClusterNameEnvVarName, clusterName)
+	Expect(err).NotTo(HaveOccurred(), "Failed to set environment variable %s: %s", kindClusterNameEnvVarName, clusterName)
 
 	By("Setting up a Kind cluster for E2E")
 	cmd := exec.Command("make", "kind-test-local")
@@ -158,7 +158,11 @@ var _ = Describe("Cluster health monitor deployment", func() {
 			By("Checking if metrics endpoint is accessible")
 			res, err := http.Get(fmt.Sprintf("http://localhost:%d/metrics", metricsPort))
 			Expect(err).NotTo(HaveOccurred(), "Failed to access metrics endpoint")
-			defer res.Body.Close()
+			defer func() {
+				if err := res.Body.Close(); err != nil {
+					GinkgoWriter.Printf("Failed to close response body: %v\n", err)
+				}
+			}()
 			Expect(res.StatusCode).To(Equal(http.StatusOK), "Metrics endpoint did not return 200 OK")
 
 			By("Reading metrics response body")
