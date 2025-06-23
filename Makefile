@@ -48,6 +48,18 @@ docker-build-cluster-health-monitor: docker-buildx-builder
 		--pull \
 		--tag $(REGISTRY)/$(CLUSTER_HEALTH_MONITOR_IMAGE_NAME):$(CLUSTER_HEALTH_MONITOR_IMAGE_VERSION) .
 
+## -----------------------------------
+## Tests
+## -----------------------------------
+
+.PHONY: test-e2e
+test-e2e:
+	ginkgo -v -p --race ./test/e2e/
+
+.PHONY: test-unit
+test-unit:
+	go test -v --race $$(go list ./... | grep -v /e2e)
+
 ## --------------------------------------
 ## Local Test with Kind
 ## --------------------------------------
