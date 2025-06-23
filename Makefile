@@ -61,11 +61,7 @@ KUBECONFIG ?= $(HOME)/.kube/config
 .PHONY: kind-create-cluster
 kind-create-cluster:
 	@echo "Creating Kind cluster '$(KIND_CLUSTER_NAME)' with kubeconfig at $(KUBECONFIG)"
-	@if ! kind get clusters | grep -q $(KIND_CLUSTER_NAME); then \
-		kind create cluster --name $(KIND_CLUSTER_NAME) --kubeconfig $(KUBECONFIG); \
-	else \
-		echo "Kind cluster '$(KIND_CLUSTER_NAME)' already exists."; \
-	fi
+	@kind create cluster --name $(KIND_CLUSTER_NAME) --kubeconfig $(KUBECONFIG)
 
 .PHONY: kind-build-image
 kind-build-image:
