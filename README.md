@@ -6,17 +6,38 @@ A Kubernetes cluster health monitoring tool that checks various aspects of clust
 
 Cluster Health Monitor runs as a Kubernetes deployment and exposes metrics about the health of your cluster through a Prometheus endpoint.
 
-## Local Testing
+## Testing
 
-Kind (Kubernetes IN Docker) is used to create a local Kubernetes cluster.
+### Running Unit Tests
 
-### Prerequisites
+To run unit tests:
+
+```bash
+make test-unit
+```
+
+### Running End-to-End (E2E) Tests
+
+To run E2E tests:
+
+1. Ensure [Ginkgo](https://onsi.github.io/ginkgo/#getting-started) is installed.
+1. Run:
+
+    ```bash
+    make test-e2e
+    ```
+
+### Local Testing with Kind
+
+Kind (Kubernetes IN Docker) is used to create a local Kubernetes cluster for testing and development.
+
+#### Prerequisites
 
 - [Docker](https://www.docker.com/)
 - [Kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation)
 - [kubectl](https://kubernetes.io/docs/tasks/tools/)
 
-### Testing Locally with Kind
+#### Setting Up a Local Environment
 
 To set up a local test environment with Kind:
 
