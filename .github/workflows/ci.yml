@@ -38,4 +38,21 @@ jobs:
       - name: Download dependencies
         run: go mod download
       - name: Run tests
-        run: go test ./...
+        run: go test --race $(go list ./... | grep -v /e2e)
+
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - uses: azure/setup-kubectl@v4
+      - name: Install kind
+        run: go install sigs.k8s.io/kind@v0.29.0
+      - name: Install ginkgo
+        run: go install github.com/onsi/ginkgo/v2/ginkgo
+      - name: Run E2E tests
+        run: ginkgo -v -p --race ./test/e2e/
