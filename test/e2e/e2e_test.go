@@ -19,7 +19,6 @@ import (
 	"github.com/prometheus/common/expfmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 func TestE2E(t *testing.T) {
@@ -43,9 +42,10 @@ var (
 	testDir   string
 )
 
-func beforeSuiteAllProcesses() {
+func beforeSuiteAllProcesses() []byte {
 	// Create a temporary directory for test artifacts.
-	testDir, err := os.MkdirTemp("", "cluster-health-monitor-e2e-")
+	var err error
+	testDir, err = os.MkdirTemp("", "cluster-health-monitor-e2e-")
 	Expect(err).NotTo(HaveOccurred())
 
 	// Ensure environment variables are set.
@@ -62,9 +62,7 @@ func beforeSuiteAllProcesses() {
 	GinkgoWriter.Println(string(output))
 
 	// Initialize Kubernetes client.
-	config, err := clientcmd.BuildConfigFromFlags("", kubeConfigPath)
-	Expect(err).NotTo(HaveOccurred())
-	clientset, err = kubernetes.NewForConfig(config)
+	clientset, err = getKubeClient(kubeConfigPath)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Waiting for CoreDNS pods to be running")
@@ -97,9 +95,15 @@ func beforeSuiteAllProcesses() {
 	output, err = run(cmd)
 	Expect(err).NotTo(HaveOccurred(), "Failed to list pods: %s", string(output))
 	GinkgoWriter.Println(string(output))
+
+	return []byte(kubeConfigPath)
 }
 
-var _ = SynchronizedBeforeSuite(beforeSuiteAllProcesses, func() {})
+var _ = SynchronizedBeforeSuite(beforeSuiteAllProcesses, func(kubeConfigPath []byte) {
+	var err error
+	clientset, err = getKubeClient(string(kubeConfigPath))
+	Expect(err).NotTo(HaveOccurred())
+})
 
 func afterSuiteAllProcesses() {
 	By("Deleting the Kind cluster")

@@ -5,6 +5,9 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 // run executes the provided command in the Git root directory and returns its output.
@@ -24,4 +27,17 @@ func getGitRoot() (string, error) {
 		return "", fmt.Errorf("failed to get Git root directory: %w", err)
 	}
 	return strings.TrimSpace(string(output)), nil
+}
+
+// getKubeClient creates a Kubernetes clientset using the provided kubeconfig path.
+func getKubeClient(kubeConfigPath string) (*kubernetes.Clientset, error) {
+	config, err := clientcmd.BuildConfigFromFlags("", kubeConfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build Kubernetes config: %w", err)
+	}
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Kubernetes clientset: %w", err)
+	}
+	return clientset, nil
 }
