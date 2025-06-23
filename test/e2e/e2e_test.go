@@ -3,13 +3,20 @@ package e2e
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
+	"github.com/onsi/gomega/gexec"
+	"github.com/prometheus/common/expfmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -24,9 +31,11 @@ const (
 	kubeConfigPathEnvVarName  = "KUBECONFIG"
 	kindClusterNameEnvVarName = "KIND_CLUSTER_NAME"
 
-	clusterName    = "chm-e2e-test"
-	namespace      = "cluster-health-monitor"
-	deploymentName = "cluster-health-monitor"
+	clusterName          = "chm-e2e-test"
+	namespace            = "cluster-health-monitor"
+	deploymentName       = "cluster-health-monitor"
+	metricsPort          = 9800
+	checkerConfigMapName = "cluster-health-monitor-config"
 )
 
 var (
@@ -123,5 +132,46 @@ var _ = Describe("Cluster health monitor deployment", func() {
 		for _, containerStatus := range pod.Status.ContainerStatuses {
 			Expect(containerStatus.Ready).To(BeTrue(), "Container %s in pod %s should be ready", containerStatus.Name, pod.Name)
 		}
+	})
+
+	It("should expose metrics endpoint", func() {
+		By("Port-forwarding to the cluster health monitor pod")
+		podList, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: "app=" + deploymentName,
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(podList.Items).NotTo(BeEmpty())
+		pod := podList.Items[0]
+		cmd := exec.Command("kubectl", "port-forward",
+			fmt.Sprintf("pod/%s", pod.Name),
+			fmt.Sprintf("%d:%d", metricsPort, metricsPort),
+			"-n", namespace)
+		cmd.Env = os.Environ()
+		session, err := gexec.Start(cmd, GinkgoWriter, GinkgoWriter)
+		Expect(err).NotTo(HaveOccurred())
+		defer session.Kill()
+		Eventually(session, "5s", "1s").Should(gbytes.Say("Forwarding from"), "Failed to establish port-forwarding")
+
+		By("Waiting for metrics endpoint to contain data")
+		var body []byte
+		Eventually(func() bool {
+			By("Checking if metrics endpoint is accessible")
+			res, err := http.Get(fmt.Sprintf("http://localhost:%d/metrics", metricsPort))
+			Expect(err).NotTo(HaveOccurred(), "Failed to access metrics endpoint")
+			defer res.Body.Close()
+			Expect(res.StatusCode).To(Equal(http.StatusOK), "Metrics endpoint did not return 200 OK")
+
+			By("Reading metrics response body")
+			body, err = io.ReadAll(res.Body)
+			Expect(err).NotTo(HaveOccurred(), "Failed to read metrics response body")
+			return len(body) > 0
+		}, "30s", "10s").Should(BeTrue(), "Metrics response body is empty")
+
+		By("Parsing metrics response body")
+		var parser expfmt.TextParser
+		metrics, err := parser.TextToMetricFamilies(strings.NewReader(string(body)))
+		Expect(err).NotTo(HaveOccurred(), "Failed to parse metrics")
+		metric := metrics["cluster_health_monitor_checker_result_total"]
+		Expect(metric).NotTo(BeNil(), "Expected cluster_health_monitor_checker_result_total metric not found", string(body))
 	})
 })
