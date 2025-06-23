@@ -181,5 +181,7 @@ var _ = Describe("Cluster health monitor deployment", func() {
 		Expect(err).NotTo(HaveOccurred(), "Failed to parse metrics")
 		metric := metrics["cluster_health_monitor_checker_result_total"]
 		Expect(metric).NotTo(BeNil(), "Expected cluster_health_monitor_checker_result_total metric not found", string(body))
+
+		// TODO: Check if the metric has expected labels and values
 	})
 })
