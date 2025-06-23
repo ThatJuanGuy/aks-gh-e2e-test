@@ -6,6 +6,28 @@ A Kubernetes cluster health monitoring tool that checks various aspects of clust
 
 Cluster Health Monitor runs as a Kubernetes deployment and exposes metrics about the health of your cluster through a Prometheus endpoint.
 
+## Deployment
+
+### Deploying Base Manifests
+
+To deploy the Cluster Health Monitor using the base manifests:
+
+```bash
+kubectl apply -k manifests/base/
+```
+
+### Removing Deployment
+
+To remove the base deployment:
+
+```bash
+kubectl delete -k manifests/base/
+```
+
+### Customizing Deployment
+
+For custom deployments, create your own overlay in `manifests/overlays/` and change the directory to the directory containing `kustomization.yaml`, e.g., `manifests/overlays/test`.
+
 ## Local Testing
 
 Kind (Kubernetes IN Docker) is used to create a local Kubernetes cluster.
