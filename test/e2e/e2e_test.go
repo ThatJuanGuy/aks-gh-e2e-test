@@ -160,6 +160,7 @@ var _ = Describe("Cluster health monitor deployment", func() {
 		session, err := gexec.Start(cmd, GinkgoWriter, GinkgoWriter)
 		Expect(err).NotTo(HaveOccurred())
 		defer session.Kill()
+		GinkgoWriter.Printf("Port-forwarding to pod %s in namespace %s on port %d\n", pod.Name, namespace, metricsPort)
 		Eventually(session, "5s", "1s").Should(gbytes.Say("Forwarding from"), "Failed to establish port-forwarding")
 
 		By("Waiting for metrics endpoint to contain data")
