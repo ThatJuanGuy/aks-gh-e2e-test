@@ -31,7 +31,7 @@ const (
 	kindClusterNameEnvVarName = "KIND_CLUSTER_NAME"
 
 	clusterName          = "chm-e2e-test"
-	namespace            = "cluster-health-monitor"
+	namespace            = "kube-system"
 	deploymentName       = "cluster-health-monitor"
 	metricsPort          = 9800
 	checkerConfigMapName = "cluster-health-monitor-config"
