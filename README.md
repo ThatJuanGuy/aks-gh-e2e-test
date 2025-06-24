@@ -40,14 +40,38 @@ make test-unit
 
 ### Running End-to-End (E2E) Tests
 
-To run E2E tests:
+To run E2E tests, ensure [Ginkgo](https://onsi.github.io/ginkgo/#getting-started) is installed.
 
-1. Ensure [Ginkgo](https://onsi.github.io/ginkgo/#getting-started) is installed.
-1. Run:
+There are 2 options for running E2E test:
+
+1. Full run from setting and cleaning up the Kind cluster used for E2E:
 
     ```bash
-    make test-e2e
+    make test-e2e-full
     ```
+
+2. Reuse existing Kind cluster:
+
+    ```bash
+    make test-e2e-reuse
+    ```
+
+    To setup Kind cluster for this, you can run:
+
+    ```bash
+    make kind-setup-e2e
+    ```
+
+    See [useful commands](#useful-commands) for other commands that can be used once the test environment is set up.
+
+#### Customizing E2E Tests
+
+You can customize the Kind cluster name used for E2E by setting `KIND_CLUSTER_NAME`:
+
+```bash
+KIND_CLUSTER_NAME=my-custom-cluster make kind-setup-e2e
+KIND_CLUSTER_NAME=my-custom-cluster make test-e2e-reuse
+```
 
 ### Local Testing with Kind
 
