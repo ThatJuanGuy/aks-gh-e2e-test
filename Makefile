@@ -58,7 +58,7 @@ test-e2e:
 
 .PHONY: test-unit
 test-unit:
-	go test -v --race $$(go list ./... | grep -v /e2e)
+	go test --race $$(go list ./... | grep -v /e2e)
 
 ## --------------------------------------
 ## Local Test with Kind
