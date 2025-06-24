@@ -52,13 +52,9 @@ docker-build-cluster-health-monitor: docker-buildx-builder
 ## Tests
 ## -----------------------------------
 
-.PHONY: test-e2e-full
-test-e2e-full:
+.PHONY: test-e2e
+test-e2e:
 	ginkgo -v -p --race ./test/e2e/
-
-.PHONY: test-e2e-reuse
-test-e2e-reuse:
-	E2E_SKIP_CLUSTER_SETUP=true E2E_SKIP_CLUSTER_CLEANUP=true ginkgo -v -p --race ./test/e2e/
 
 .PHONY: test-unit
 test-unit:
