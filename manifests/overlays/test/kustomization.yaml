@@ -6,5 +6,5 @@ patches:
   - target:
       kind: Deployment
       name: cluster-health-monitor
-      namespace: cluster-health-monitor
+      namespace: kube-system
     path: image.patch.yaml
