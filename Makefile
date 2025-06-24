@@ -109,8 +109,11 @@ kind-redeploy: kind-delete-deployment kind-build-image kind-load-image kind-appl
 kind-delete-cluster:
 	kind delete cluster --name $(KIND_CLUSTER_NAME)
 
+.PHONY: kind-setup-e2e
+kind-setup-e2e: kind-create-cluster kind-load-image
+
 .PHONY: kind-test-local
-kind-test-local: kind-create-cluster kind-load-image kind-apply-manifests
+kind-test-local: kind-setup-e2e kind-apply-manifests
 	@echo "Cluster health monitor deployed to Kind cluster '$(KIND_CLUSTER_NAME)'"
 	@echo "Use 'make kind-export-kubeconfig' to set the kubectl context for Kind cluster '$(KIND_CLUSTER_NAME)'"
 	@echo "Use 'kubectl -n kube-system get pods' to check the status"
