@@ -40,38 +40,30 @@ make test-unit
 
 ### Running End-to-End (E2E) Tests
 
-To run E2E tests, ensure [Ginkgo](https://onsi.github.io/ginkgo/#getting-started) is installed.
-
-There are 2 options for running E2E test:
-
-1. Full run from setting and cleaning up the Kind cluster used for E2E:
-
-    ```bash
-    make test-e2e-full
-    ```
-
-2. Reuse existing Kind cluster:
-
-    ```bash
-    make test-e2e-reuse
-    ```
-
-    To setup Kind cluster for this, you can run:
-
-    ```bash
-    make kind-setup-e2e
-    ```
-
-    See [useful commands](#useful-commands) for other commands that can be used once the test environment is set up.
-
-#### Customizing E2E Tests
-
-You can customize the Kind cluster name used for E2E by setting `KIND_CLUSTER_NAME`:
+To run E2E tests, ensure [Ginkgo](https://onsi.github.io/ginkgo/#getting-started) is installed and run:
 
 ```bash
-KIND_CLUSTER_NAME=my-custom-cluster make kind-setup-e2e
-KIND_CLUSTER_NAME=my-custom-cluster make test-e2e-reuse
+# Full E2E test: set up cluster, run tests, clean up cluster.
+make test-e2e
 ```
+
+This command supports the following environment variables:
+
+- `E2E_SKIP_CLUSTER_SETUP=true` - Skip cluster setup and use existing Kind cluster.
+- `E2E_SKIP_CLUSTER_CLEANUP=true` - Skip cluster cleanup after tests.
+- `KIND_CLUSTER_NAME=<name>` - Customize the name of the Kind cluster to use or create.
+
+#### Setting Up a Kind Cluster for E2E Testing
+
+To set up a Kind cluster for E2E tests:
+
+```bash
+make kind-setup-e2e
+```
+
+This creates a Kind cluster and loads the necessary images without deploying the application. You can also set `KIND_CLUSTER_NAME` to use a custom cluster name.
+
+See [useful commands](#useful-commands) for other commands that can be used once the test environment is set up.
 
 ### Local Testing with Kind
 
