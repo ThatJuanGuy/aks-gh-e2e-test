@@ -27,10 +27,6 @@ func TestE2E(t *testing.T) {
 }
 
 const (
-	kubeConfigPathEnvVarName  = "KUBECONFIG"
-	kindClusterNameEnvVarName = "KIND_CLUSTER_NAME"
-
-	clusterName          = "chm-e2e-test"
 	namespace            = "kube-system"
 	deploymentName       = "cluster-health-monitor"
 	metricsPort          = 9800
@@ -38,31 +34,35 @@ const (
 )
 
 var (
-	clientset *kubernetes.Clientset
-	testDir   string
+	clientset          *kubernetes.Clientset
+	skipClusterSetup   = os.Getenv("E2E_SKIP_CLUSTER_SETUP") == "true"
+	skipClusterCleanup = os.Getenv("E2E_SKIP_CLUSTER_CLEANUP") == "true"
 )
 
 func beforeSuiteAllProcesses() []byte {
-	// Create a temporary directory for test artifacts.
-	var err error
-	testDir, err = os.MkdirTemp("", "cluster-health-monitor-e2e-")
-	Expect(err).NotTo(HaveOccurred())
+	By("Getting kubeconfig path from KUBECONFIG or defaulting to $(HOME)/.kube/config")
+	kubeConfigPath := os.Getenv("KUBECONFIG")
+	if kubeConfigPath == "" {
+		kubeConfigPath = filepath.Join(os.Getenv("HOME"), ".kube", "config")
+	}
+	GinkgoWriter.Println("Using kubeconfig:", kubeConfigPath)
 
-	// Ensure environment variables are set.
-	kubeConfigPath := filepath.Join(testDir, "kubeconfig")
-	err = os.Setenv(kubeConfigPathEnvVarName, kubeConfigPath)
-	Expect(err).NotTo(HaveOccurred(), "Failed to set environment variable %s: %s", kubeConfigPathEnvVarName, kubeConfigPath)
-	err = os.Setenv(kindClusterNameEnvVarName, clusterName)
-	Expect(err).NotTo(HaveOccurred(), "Failed to set environment variable %s: %s", kindClusterNameEnvVarName, clusterName)
-
-	By("Setting up a Kind cluster for E2E")
-	cmd := exec.Command("make", "kind-test-local")
-	output, err := run(cmd)
-	Expect(err).NotTo(HaveOccurred(), "Failed to setup Kind cluster for E2E: %s", string(output))
-	GinkgoWriter.Println(string(output))
+	if skipClusterSetup {
+		By("Applying the cluster health monitor deployment")
+		cmd := exec.Command("make", "kind-apply-manifests")
+		output, err := run(cmd)
+		Expect(err).NotTo(HaveOccurred(), "Failed to apply cluster health monitor manifests: %s", string(output))
+		GinkgoWriter.Println(string(output))
+	} else {
+		By("Setting up a Kind cluster for E2E")
+		cmd := exec.Command("make", "kind-test-local")
+		output, err := run(cmd)
+		Expect(err).NotTo(HaveOccurred(), "Failed to setup Kind cluster for E2E: %s", string(output))
+		GinkgoWriter.Println(string(output))
+	}
 
 	// Initialize Kubernetes client.
-	clientset, err = getKubeClient(kubeConfigPath)
+	clientset, err := getKubeClient(kubeConfigPath)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Waiting for CoreDNS pods to be running")
@@ -91,8 +91,8 @@ func beforeSuiteAllProcesses() []byte {
 	}, "90s", "2s").Should(BeTrue())
 
 	By("Listing all pods in all namespaces")
-	cmd = exec.Command("kubectl", "get", "po", "-A")
-	output, err = run(cmd)
+	cmd := exec.Command("kubectl", "get", "po", "-A")
+	output, err := run(cmd)
 	Expect(err).NotTo(HaveOccurred(), "Failed to list pods: %s", string(output))
 	GinkgoWriter.Println(string(output))
 
@@ -106,14 +106,20 @@ var _ = SynchronizedBeforeSuite(beforeSuiteAllProcesses, func(kubeConfigPath []b
 })
 
 func afterSuiteAllProcesses() {
+	if skipClusterCleanup {
+		By("Deleting the test deployment")
+		cmd := exec.Command("make", "kind-delete-deployment")
+		output, err := run(cmd)
+		Expect(err).NotTo(HaveOccurred(), "Failed to delete deployment: %s", string(output))
+		GinkgoWriter.Println(string(output))
+		return
+	}
+
 	By("Deleting the Kind cluster")
 	cmd := exec.Command("make", "kind-delete-cluster")
 	output, err := run(cmd)
 	Expect(err).NotTo(HaveOccurred(), "Failed to delete Kind cluster: %s", string(output))
 	GinkgoWriter.Println(string(output))
-
-	err = os.RemoveAll(testDir)
-	Expect(err).NotTo(HaveOccurred(), "Failed to remove test directory: %s", testDir)
 }
 
 var _ = SynchronizedAfterSuite(func() {}, afterSuiteAllProcesses)
