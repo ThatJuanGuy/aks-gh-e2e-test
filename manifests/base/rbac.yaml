@@ -3,7 +3,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: cluster-health-monitor
-  namespace: cluster-health-monitor
+  namespace: kube-system
 ---
 # Role for accessing kube-dns and endpointslices in kube-system.
 apiVersion: rbac.authorization.k8s.io/v1
@@ -33,4 +33,30 @@ roleRef:
   kind: Role
   name: cluster-health-monitor-kube-system-reader
   apiGroup: rbac.authorization.k8s.io
-# TODO: Add a pod management role for pod startup check.
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: synthetic-pod-manager
+  namespace: kube-system
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "create", "list", "delete"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cluster-health-monitor-pod-manager
+  namespace: kube-system
+subjects:
+  - kind: ServiceAccount
+    name: cluster-health-monitor
+    namespace: kube-system
+roleRef:
+  kind: Role
+  name: synthetic-pod-manager
+  apiGroup: rbac.authorization.k8s.io
