@@ -48,6 +48,18 @@ docker-build-cluster-health-monitor: docker-buildx-builder
 		--pull \
 		--tag $(REGISTRY)/$(CLUSTER_HEALTH_MONITOR_IMAGE_NAME):$(CLUSTER_HEALTH_MONITOR_IMAGE_VERSION) .
 
+## -----------------------------------
+## Tests
+## -----------------------------------
+
+.PHONY: test-e2e
+test-e2e:
+	ginkgo -v -p --race ./test/e2e/
+
+.PHONY: test-unit
+test-unit:
+	go test --race $$(go list ./... | grep -v /e2e)
+
 ## --------------------------------------
 ## Local Test with Kind
 ## --------------------------------------
@@ -61,11 +73,7 @@ KUBECONFIG ?= $(HOME)/.kube/config
 .PHONY: kind-create-cluster
 kind-create-cluster:
 	@echo "Creating Kind cluster '$(KIND_CLUSTER_NAME)' with kubeconfig at $(KUBECONFIG)"
-	@if ! kind get clusters | grep -q $(KIND_CLUSTER_NAME); then \
-		kind create cluster --name $(KIND_CLUSTER_NAME) --kubeconfig $(KUBECONFIG); \
-	else \
-		echo "Kind cluster '$(KIND_CLUSTER_NAME)' already exists."; \
-	fi
+	@kind create cluster --name $(KIND_CLUSTER_NAME) --kubeconfig $(KUBECONFIG)
 
 .PHONY: kind-build-image
 kind-build-image:
@@ -97,8 +105,11 @@ kind-redeploy: kind-delete-deployment kind-build-image kind-load-image kind-appl
 kind-delete-cluster:
 	kind delete cluster --name $(KIND_CLUSTER_NAME)
 
+.PHONY: kind-setup-e2e
+kind-setup-e2e: kind-create-cluster kind-load-image
+
 .PHONY: kind-test-local
-kind-test-local: kind-create-cluster kind-load-image kind-apply-manifests
+kind-test-local: kind-setup-e2e kind-apply-manifests
 	@echo "Cluster health monitor deployed to Kind cluster '$(KIND_CLUSTER_NAME)'"
 	@echo "Use 'make kind-export-kubeconfig' to set the kubectl context for Kind cluster '$(KIND_CLUSTER_NAME)'"
 	@echo "Use 'kubectl -n kube-system get pods' to check the status"

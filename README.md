@@ -28,17 +28,54 @@ kubectl delete -k manifests/base/
 
 For custom deployments, create your own overlay in `manifests/overlays/` and change the directory to the directory containing `kustomization.yaml`, e.g., `manifests/overlays/test`.
 
-## Local Testing
+## Testing
 
-Kind (Kubernetes IN Docker) is used to create a local Kubernetes cluster.
+### Running Unit Tests
 
-### Prerequisites
+To run unit tests:
+
+```bash
+make test-unit
+```
+
+### Running End-to-End (E2E) Tests
+
+To run E2E tests, ensure [Ginkgo](https://onsi.github.io/ginkgo/#getting-started) is installed and run:
+
+```bash
+# Full E2E test: set up cluster, run tests, clean up cluster.
+make test-e2e
+```
+
+This command supports the following environment variables:
+
+- `E2E_SKIP_CLUSTER_SETUP=true` - Skip cluster setup and use existing Kind cluster.
+- `E2E_SKIP_CLUSTER_CLEANUP=true` - Skip cluster cleanup after tests.
+- `KIND_CLUSTER_NAME=<name>` - Customize the name of the Kind cluster to use or create.
+
+#### Setting Up a Kind Cluster for E2E Testing
+
+To set up a Kind cluster for E2E tests:
+
+```bash
+make kind-setup-e2e
+```
+
+This creates a Kind cluster and loads the necessary images without deploying the application. You can also set `KIND_CLUSTER_NAME` to use a custom cluster name.
+
+See [useful commands](#useful-commands) for other commands that can be used once the test environment is set up.
+
+### Local Testing with Kind
+
+Kind (Kubernetes IN Docker) is used to create a local Kubernetes cluster for testing and development.
+
+#### Prerequisites
 
 - [Docker](https://www.docker.com/)
 - [Kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation)
 - [kubectl](https://kubernetes.io/docs/tasks/tools/)
 
-### Testing Locally with Kind
+#### Setting Up a Local Environment
 
 To set up a local test environment with Kind:
 
