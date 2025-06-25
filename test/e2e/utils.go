@@ -98,10 +98,11 @@ func getMetrics(port int) (map[string]*dto.MetricFamily, error) {
 // getUniquePort generates a port number that is likely to be unique for parallel tests.
 func getUniquePort(basePort int) (int, error) {
 	processID := ginkgo.GinkgoParallelProcess()
-	initialPort := basePort + (processID * 100)
+	portRangeSize := 1000
+	initialPort := basePort + (processID * portRangeSize)
 
-	// Try ports in range initialPort to initialPort+1000.
-	for port := initialPort; port < initialPort+1000; port++ {
+	// Try ports in range initialPort to initialPort+portRangeSize
+	for port := initialPort; port < initialPort+portRangeSize; port++ {
 		addr := fmt.Sprintf("localhost:%d", port)
 		conn, err := net.Listen("tcp", addr)
 		if err != nil {
@@ -115,5 +116,5 @@ func getUniquePort(basePort int) (int, error) {
 		return port, nil
 	}
 
-	return 0, fmt.Errorf("no available ports found between %d and %d", initialPort, initialPort+1000)
+	return 0, fmt.Errorf("no available ports found between %d and %d", initialPort, initialPort+portRangeSize)
 }
