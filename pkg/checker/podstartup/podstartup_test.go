@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/cluster-health-monitor/pkg/config"
 	"github.com/Azure/cluster-health-monitor/pkg/types"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -21,11 +22,9 @@ import (
 func TestPodStartupChecker_Run(t *testing.T) {
 	timestamp := time.Now()
 	checkerName := "test-checker"
-	checkerNamespace := "test-namespace"
-	checkerLabels := map[string]string{
-		"cluster-health-monitor/checker-name": checkerName,
-		"app":                                 "cluster-health-monitor-podstartup-synthetic",
-	}
+	syntheticPodNamespace := "test-namespace"
+	syntheticPodLabelKey := "cluster-health-monitor/checker-name"
+	maxSyntheticPods := 3
 
 	tests := []struct {
 		name           string
@@ -38,10 +37,10 @@ func TestPodStartupChecker_Run(t *testing.T) {
 				podName := "pod1"
 				client := k8sfake.NewClientset(
 					// pre-create a fake image pull event for the pod
-					imageAlreadyPresentEvent(checkerNamespace, podName),
+					imageAlreadyPresentEvent(syntheticPodNamespace, podName),
 				)
 				// create/get/delete pod calls will succeed with this pod
-				fakePod := podWithLabels(podName, checkerNamespace, checkerLabels, timestamp)
+				fakePod := podWithLabels(podName, syntheticPodNamespace, map[string]string{syntheticPodLabelKey: checkerName}, timestamp)
 				fakePod.Status = corev1.PodStatus{
 					ContainerStatuses: []corev1.ContainerStatus{{
 						State: corev1.ContainerState{
@@ -72,10 +71,10 @@ func TestPodStartupChecker_Run(t *testing.T) {
 				podName := "pod1"
 				client := k8sfake.NewClientset(
 					// pre-create a fake image pull event for the pod
-					imageAlreadyPresentEvent(checkerNamespace, podName),
+					imageAlreadyPresentEvent(syntheticPodNamespace, podName),
 				)
 				// create/get pod calls will return this pod
-				fakePod := podWithLabels(podName, checkerNamespace, checkerLabels, timestamp)
+				fakePod := podWithLabels(podName, syntheticPodNamespace, map[string]string{syntheticPodLabelKey: checkerName}, timestamp)
 				fakePod.Status = corev1.PodStatus{
 					ContainerStatuses: []corev1.ContainerStatus{{
 						State: corev1.ContainerState{
@@ -108,8 +107,8 @@ func TestPodStartupChecker_Run(t *testing.T) {
 				// preload client with the maximum number of synthetic pods
 				for i := range maxSyntheticPods {
 					podName := fmt.Sprintf("pod%d", i)
-					client.CoreV1().Pods(checkerNamespace).Create(context.Background(), //nolint:errcheck // ignore error for test setup
-						podWithLabels(podName, checkerNamespace, checkerLabels, timestamp), metav1.CreateOptions{})
+					client.CoreV1().Pods(syntheticPodNamespace).Create(context.Background(), //nolint:errcheck // ignore error for test setup
+						podWithLabels(podName, syntheticPodNamespace, map[string]string{syntheticPodLabelKey: checkerName}, timestamp), metav1.CreateOptions{})
 				}
 				// prevent pod deletion from succeeding
 				client.PrependReactor("delete", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
@@ -129,9 +128,14 @@ func TestPodStartupChecker_Run(t *testing.T) {
 			g := NewWithT(t)
 
 			podStartupChecker := &PodStartupChecker{
-				name:         checkerName,
-				namespace:    checkerNamespace,
-				podLabels:    checkerLabels,
+				name: checkerName,
+				config: &config.PodStartupConfig{
+					SyntheticPodNamespace:      syntheticPodNamespace,
+					SyntheticPodLabelKey:       syntheticPodLabelKey,
+					SyntheticPodStartupTimeout: 5 * time.Second,
+					MaxSyntheticPods:           maxSyntheticPods,
+				},
+				timeout:      5 * time.Second,
 				k8sClientset: tt.client,
 			}
 
@@ -145,13 +149,10 @@ func TestPodStartupChecker_Run(t *testing.T) {
 }
 
 func TestPodStartupChecker_garbageCollect(t *testing.T) {
-	checkerName := "checker"
-	checkerNamespace := "checker-ns"
+	checkerName := "chk"
+	syntheticPodNamespace := "checker-ns"
 	checkerTimeout := 5 * time.Second
-	checkerPodLabels := map[string]string{
-		"cluster-health-monitor/checker-name": checkerName,
-		"app":                                 "cluster-health-monitor-podstartup-synthetic",
-	}
+	syntheticPodLabelKey := "cluster-health-monitor/checker-name"
 
 	tests := []struct {
 		name        string
@@ -161,41 +162,42 @@ func TestPodStartupChecker_garbageCollect(t *testing.T) {
 		{
 			name: "only removes pods older than timeout",
 			client: k8sfake.NewClientset(
-				podWithLabels("old-pod", checkerNamespace, checkerPodLabels, time.Now().Add(-2*time.Hour)),
-				podWithLabels("new-pod", checkerNamespace, checkerPodLabels, time.Now()),
+				podWithLabels("chk-synthetic-old", syntheticPodNamespace, map[string]string{syntheticPodLabelKey: checkerName}, time.Now().Add(-2*time.Hour)),
+				podWithLabels("chk-synthetic-new", syntheticPodNamespace, map[string]string{syntheticPodLabelKey: checkerName}, time.Now()),
 			),
 			validateRes: func(g *WithT, pods *corev1.PodList, err error) {
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(pods.Items).To(HaveLen(1))
-				g.Expect(pods.Items[0].Name).To(Equal("new-pod"))
+				g.Expect(pods.Items[0].Name).To(Equal("chk-synthetic-new"))
 			},
 		},
 		{
 			name: "no pods to delete",
 			client: k8sfake.NewClientset(
-				podWithLabels("new-pod-1", checkerNamespace, checkerPodLabels, time.Now()),                      // pod too new
-				podWithLabels("new-pod-2", checkerNamespace, map[string]string{}, time.Now().Add(-2*time.Hour)), // old pod wrong labels
+				podWithLabels("chk-synthetic-too-new", syntheticPodNamespace, map[string]string{syntheticPodLabelKey: checkerName}, time.Now()), // pod too new
+				podWithLabels("chk-synthetic-no-labels", syntheticPodNamespace, map[string]string{}, time.Now().Add(-2*time.Hour)),              // old pod wrong labels
+				podWithLabels("no-name-prefix", syntheticPodNamespace, map[string]string{}, time.Now().Add(-2*time.Hour)),                       // pod missing name prefix
 			),
 			validateRes: func(g *WithT, pods *corev1.PodList, err error) {
 				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(pods.Items).To(HaveLen(2))
+				g.Expect(pods.Items).To(HaveLen(3))
 				actualNames := make([]string, len(pods.Items))
 				for i, pod := range pods.Items {
 					actualNames[i] = pod.Name
 				}
-				g.Expect(actualNames).To(ConsistOf([]string{"new-pod-1", "new-pod-2"}))
+				g.Expect(actualNames).To(ConsistOf([]string{"chk-synthetic-too-new", "chk-synthetic-no-labels", "no-name-prefix"}))
 			},
 		},
 		{
 			name: "only removes pod with checker labels",
 			client: k8sfake.NewClientset(
-				podWithLabels("checker-pod", checkerNamespace, checkerPodLabels, time.Now().Add(-2*time.Hour)),
-				podWithLabels("non-checker-pod", checkerNamespace, map[string]string{}, time.Now().Add(-2*time.Hour)),
+				podWithLabels("chk-synthetic-pod", syntheticPodNamespace, map[string]string{syntheticPodLabelKey: checkerName}, time.Now().Add(-2*time.Hour)),
+				podWithLabels("chk-synthetic-no-label-pod", syntheticPodNamespace, map[string]string{}, time.Now().Add(-2*time.Hour)),
 			),
 			validateRes: func(g *WithT, pods *corev1.PodList, err error) {
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(pods.Items).To(HaveLen(1))
-				g.Expect(pods.Items[0].Name).To(Equal("non-checker-pod"))
+				g.Expect(pods.Items[0].Name).To(Equal("chk-synthetic-no-label-pod"))
 			},
 		},
 		{
@@ -222,13 +224,13 @@ func TestPodStartupChecker_garbageCollect(t *testing.T) {
 			name: "error deleting pod",
 			client: func() *k8sfake.Clientset {
 				client := k8sfake.NewClientset(
-					podWithLabels("old-pod-1", checkerNamespace, checkerPodLabels, time.Now().Add(-2*time.Hour)),
-					podWithLabels("old-pod-2", checkerNamespace, checkerPodLabels, time.Now().Add(-2*time.Hour)),
+					podWithLabels("chk-synthetic-pod-1", syntheticPodNamespace, map[string]string{syntheticPodLabelKey: checkerName}, time.Now().Add(-2*time.Hour)),
+					podWithLabels("chk-synthetic-pod-2", syntheticPodNamespace, map[string]string{syntheticPodLabelKey: checkerName}, time.Now().Add(-2*time.Hour)),
 				)
 				// only fail the Delete call for old-pod-1
 				client.PrependReactor("delete", "pods", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 					deleteAction, ok := action.(k8stesting.DeleteAction)
-					if ok && deleteAction.GetName() == "old-pod-1" {
+					if ok && deleteAction.GetName() == "chk-synthetic-pod-1" {
 						return true, nil, errors.New("error bad things")
 					}
 					return false, nil, nil
@@ -249,18 +251,22 @@ func TestPodStartupChecker_garbageCollect(t *testing.T) {
 			g := NewWithT(t)
 
 			checker := &PodStartupChecker{
-				name:         checkerName,
+				name: checkerName,
+				config: &config.PodStartupConfig{
+					SyntheticPodNamespace:      syntheticPodNamespace,
+					SyntheticPodLabelKey:       syntheticPodLabelKey,
+					SyntheticPodStartupTimeout: 3 * time.Second,
+					MaxSyntheticPods:           5,
+				},
 				timeout:      checkerTimeout,
 				k8sClientset: tt.client,
-				namespace:    checkerNamespace,
-				podLabels:    checkerPodLabels,
 			}
 
 			// Run garbage collect
 			err := checker.garbageCollect(context.Background())
 
 			// Get pods for validation
-			pods, listErr := tt.client.CoreV1().Pods(checkerNamespace).List(context.Background(), metav1.ListOptions{})
+			pods, listErr := tt.client.CoreV1().Pods(syntheticPodNamespace).List(context.Background(), metav1.ListOptions{})
 			g.Expect(listErr).NotTo(HaveOccurred())
 
 			tt.validateRes(g, pods, err)
@@ -270,7 +276,7 @@ func TestPodStartupChecker_garbageCollect(t *testing.T) {
 
 func TestPodStartupChecker_pollPodCreationToContainerRunningDuration(t *testing.T) {
 	podName := "pod1"
-	checkerNamespace := "test"
+	syntheticPodNamespace := "test"
 	timestamp := time.Now()
 	tests := []struct {
 		name        string
@@ -282,7 +288,7 @@ func TestPodStartupChecker_pollPodCreationToContainerRunningDuration(t *testing.
 			pod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              podName,
-					Namespace:         checkerNamespace,
+					Namespace:         syntheticPodNamespace,
 					CreationTimestamp: metav1.NewTime(timestamp.Add(-10 * time.Second)),
 				},
 				Status: corev1.PodStatus{
@@ -303,7 +309,7 @@ func TestPodStartupChecker_pollPodCreationToContainerRunningDuration(t *testing.
 			pod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      podName,
-					Namespace: checkerNamespace,
+					Namespace: syntheticPodNamespace,
 				},
 				Status: corev1.PodStatus{
 					ContainerStatuses: []corev1.ContainerStatus{{
@@ -326,11 +332,16 @@ func TestPodStartupChecker_pollPodCreationToContainerRunningDuration(t *testing.
 
 			client := k8sfake.NewClientset()
 			if tt.pod != nil {
-				client.CoreV1().Pods(checkerNamespace).Create(context.Background(), tt.pod, metav1.CreateOptions{}) //nolint:errcheck // ignore error for test setup
+				client.CoreV1().Pods(syntheticPodNamespace).Create(context.Background(), tt.pod, metav1.CreateOptions{}) //nolint:errcheck // ignore error for test setup
 			}
 			checker := &PodStartupChecker{
 				k8sClientset: client,
-				namespace:    checkerNamespace,
+				config: &config.PodStartupConfig{
+					SyntheticPodNamespace:      syntheticPodNamespace,
+					SyntheticPodLabelKey:       "cluster-health-monitor/checker-name",
+					SyntheticPodStartupTimeout: 5 * time.Second,
+					MaxSyntheticPods:           3,
+				},
 			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
@@ -387,6 +398,7 @@ func TestPodStartupChecker_parseImagePullDuration(t *testing.T) {
 func TestPodStartupChecker_getImagePullDuration(t *testing.T) {
 	podName := "pod1"
 	namespace := "testns"
+
 	tests := []struct {
 		name        string
 		client      *k8sfake.Clientset
@@ -441,6 +453,9 @@ func TestPodStartupChecker_getImagePullDuration(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := NewWithT(t)
 			checker := &PodStartupChecker{
+				config: &config.PodStartupConfig{
+					SyntheticPodNamespace: namespace,
+				},
 				k8sClientset: tt.client,
 			}
 			dur, err := checker.getImagePullDuration(context.Background(), "test-pod")
@@ -470,9 +485,8 @@ func TestGenerateSyntheticPod(t *testing.T) {
 
 			checker := &PodStartupChecker{
 				name: tt.checkerName,
-				podLabels: map[string]string{
-					"cluster-health-monitor/checker-name": tt.checkerName,
-					"app":                                 "cluster-health-monitor-podstartup-synthetic",
+				config: &config.PodStartupConfig{
+					SyntheticPodLabelKey: "cluster-health-monitor/checker-name",
 				},
 			}
 
@@ -481,8 +495,10 @@ func TestGenerateSyntheticPod(t *testing.T) {
 
 			// Verify pod name is k8s compliant (DNS subdomain format)
 			g.Expect(validation.NameIsDNSSubdomain(pod.Name, false)).To(BeEmpty()) // this should not return any validation errors
+			// Verify pod name has expected prefix
+			g.Expect(pod.Name).To(HavePrefix(checker.syntheticPodNamePrefix()))
 			// Verify checker labels are applied
-			g.Expect(pod.Labels).To(Equal(checker.podLabels))
+			g.Expect(pod.Labels).To(Equal(checker.syntheticPodLabels()))
 		})
 	}
 }
