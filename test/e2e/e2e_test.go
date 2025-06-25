@@ -32,12 +32,23 @@ const (
 	remoteMetricsPort       = 9800  // remoteMetricsPort is the fixed port used by the service in the container.
 	baseLocalPort           = 10000 // baseLocalPort is the base local port for dynamic allocation.
 	checkerResultMetricName = "cluster_health_monitor_checker_result_total"
+	metricsCheckerTypeLabel = "checker_type"
+	metricsCheckerNameLabel = "checker_name"
+	metricsStatusLabel      = "status"
+	metricsHealthyStatus    = "healthy"
+
+	checkerTypeDNS = "dns"
 )
 
 var (
 	clientset          *kubernetes.Clientset
 	skipClusterSetup   = os.Getenv("E2E_SKIP_CLUSTER_SETUP") == "true"
 	skipClusterCleanup = os.Getenv("E2E_SKIP_CLUSTER_CLEANUP") == "true"
+
+	// Expected checkers.
+	// Note that these checkers must match with the configmap in manifests/overlays/test.
+	dnsCheckerNames = map[string]struct{}{"test-internal-dns-checker": {}, "test-external-dns-checker": {}}
+	// TODO: Add pod startup checker.
 )
 
 func beforeSuiteAllProcesses() []byte {
@@ -202,6 +213,80 @@ var _ = Describe("Cluster health monitor", func() {
 			Expect(metricsData).To(HaveKey(checkerResultMetricName), "Expected %s metric not found", checkerResultMetricName)
 		})
 
-		// TODO: Check if the metric has expected labels and values
+		Context("DNS checker", func() {
+			It("should include all configured DNS checkers", func() {
+				By("Waiting for all DNS checker metrics to appear")
+				Eventually(func() bool {
+					metricsData, err := getMetrics(localPort)
+					Expect(err).NotTo(HaveOccurred(), "Failed to get metrics")
+					metricFamily, found := metricsData[checkerResultMetricName]
+					if !found {
+						return false
+					}
+
+					// Check if all DNS checkers are present in the metrics.
+					foundDNSCheckers := make(map[string]bool)
+					for _, m := range metricFamily.Metric {
+						labels := make(map[string]string)
+						for _, label := range m.Label {
+							labels[label.GetName()] = label.GetValue()
+						}
+
+						if labels[metricsCheckerTypeLabel] == checkerTypeDNS {
+							checkerName := labels[metricsCheckerNameLabel]
+							if _, ok := dnsCheckerNames[checkerName]; ok {
+								foundDNSCheckers[checkerName] = true
+								GinkgoWriter.Printf("Found DNS checker metric for %s\n", checkerName)
+							}
+						}
+					}
+
+					if len(foundDNSCheckers) != len(dnsCheckerNames) {
+						GinkgoWriter.Printf("Expected %d DNS checkers, found %d: %v\n", len(dnsCheckerNames), len(foundDNSCheckers), foundDNSCheckers)
+						return false
+					}
+
+					return true
+				}, "30s", "5s").Should(BeTrue(), "DNS checker metrics were not found within the timeout period")
+			})
+
+			It("should report healthy status for all DNS checkers", func() {
+				By("Waiting for DNS checker metrics to report healthy status")
+				Eventually(func() bool {
+					metricsData, err := getMetrics(localPort)
+					Expect(err).NotTo(HaveOccurred(), "Failed to get metrics")
+					metricFamily, found := metricsData[checkerResultMetricName]
+					if !found {
+						return false
+					}
+
+					// Check if all DNS checkers report healthy status.
+					healthyDNSCheckers := make(map[string]bool)
+					for _, m := range metricFamily.Metric {
+						labels := make(map[string]string)
+						for _, label := range m.Label {
+							labels[label.GetName()] = label.GetValue()
+						}
+
+						if labels[metricsCheckerTypeLabel] == checkerTypeDNS &&
+							labels[metricsStatusLabel] == metricsHealthyStatus {
+							GinkgoWriter.Printf("Found healthy DNS checker metric for %s\n", labels[metricsCheckerNameLabel])
+							healthyDNSCheckers[labels[metricsCheckerNameLabel]] = true
+						}
+					}
+
+					if len(healthyDNSCheckers) != len(dnsCheckerNames) {
+						GinkgoWriter.Printf("Expected %d DNS checkers to be healthy, found %d: %v\n", len(dnsCheckerNames), len(healthyDNSCheckers), healthyDNSCheckers)
+						return false
+					}
+
+					return true
+				}, "30s", "5s").Should(BeTrue(), "DNS checker metrics did not report healthy status within the timeout period")
+			})
+
+			// TODO: Add case for DNS checker failure scenarios.
+		})
+
+		// TODO: Add pod startup checker tests.
 	})
 })
