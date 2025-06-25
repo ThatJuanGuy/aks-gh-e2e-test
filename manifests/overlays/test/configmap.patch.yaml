@@ -1,0 +1,19 @@
+- op: test
+  path: /metadata/name
+  value: cluster-health-monitor-config
+- op: replace
+  path: /data/config.yaml
+  value: |
+    checkers:
+      - name: "test-internal-dns-checker"
+        type: "dns"
+        interval: "5s"
+        timeout: "3s"
+        dnsConfig:
+          domain: "kubernetes.default.svc.cluster.local"
+      - name: "test-external-dns-checker"
+        type: "dns"
+        interval: "5s"
+        timeout: "3s"
+        dnsConfig:
+          domain: "mcr.microsoft.com"
