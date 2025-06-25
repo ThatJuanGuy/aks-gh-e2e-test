@@ -35,7 +35,10 @@ const (
 	metricsCheckerTypeLabel = "checker_type"
 	metricsCheckerNameLabel = "checker_name"
 	metricsStatusLabel      = "status"
+	metricsErrorCodeLabel   = "error_code"
+
 	metricsHealthyStatus    = "healthy"
+	metricsHealthyErrorCode = metricsHealthyStatus
 
 	checkerTypeDNS = "dns"
 )
@@ -269,7 +272,8 @@ var _ = Describe("Cluster health monitor", func() {
 						}
 
 						if labels[metricsCheckerTypeLabel] == checkerTypeDNS &&
-							labels[metricsStatusLabel] == metricsHealthyStatus {
+							labels[metricsStatusLabel] == metricsHealthyStatus &&
+							labels[metricsErrorCodeLabel] == metricsHealthyErrorCode {
 							GinkgoWriter.Printf("Found healthy DNS checker metric for %s\n", labels[metricsCheckerNameLabel])
 							healthyDNSCheckers[labels[metricsCheckerNameLabel]] = true
 						}
