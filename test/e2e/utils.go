@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
+	ginkgo "github.com/onsi/ginkgo/v2"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"k8s.io/client-go/kubernetes"
@@ -97,7 +97,7 @@ func getMetrics(port int) (map[string]*dto.MetricFamily, error) {
 
 // getUniquePort generates a port number that is likely to be unique for parallel tests.
 func getUniquePort(basePort int) (int, error) {
-	processID := GinkgoParallelProcess()
+	processID := ginkgo.GinkgoParallelProcess()
 	initialPort := basePort + (processID * 100)
 
 	// Try ports in range initialPort to initialPort+1000.
@@ -108,7 +108,10 @@ func getUniquePort(basePort int) (int, error) {
 			// Port is not available, try the next one.
 			continue
 		}
-		conn.Close()
+		err = conn.Close()
+		if err != nil {
+			return 0, fmt.Errorf("failed to close listener: %w", err)
+		}
 		return port, nil
 	}
 
