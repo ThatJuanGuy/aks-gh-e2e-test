@@ -2,10 +2,15 @@ package e2e
 
 import (
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
+	dto "github.com/prometheus/client_model/go"
+	"github.com/prometheus/common/expfmt"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -40,4 +45,50 @@ func getKubeClient(kubeConfigPath string) (*kubernetes.Clientset, error) {
 		return nil, fmt.Errorf("failed to create Kubernetes clientset: %w", err)
 	}
 	return clientset, nil
+}
+
+// getMetrics fetches and parses metrics from the metrics endpoint.
+func getMetrics(port int) (map[string]*dto.MetricFamily, error) {
+	var lastErr error
+
+	// Retry up to 3 times with a short delay between attempts
+	for attempts := 0; attempts < 3; attempts++ {
+		if attempts > 0 {
+			time.Sleep(500 * time.Millisecond)
+		}
+
+		res, err := http.Get(fmt.Sprintf("http://localhost:%d/metrics", port))
+		if err != nil {
+			lastErr = fmt.Errorf("failed to access metrics endpoint (attempt %d): %w", attempts+1, err)
+			continue
+		}
+
+		defer func() {
+			if err := res.Body.Close(); err != nil {
+				fmt.Printf("Failed to close response body: %v\n", err)
+			}
+		}()
+
+		if res.StatusCode != http.StatusOK {
+			lastErr = fmt.Errorf("metrics endpoint returned status code %d (attempt %d)", res.StatusCode, attempts+1)
+			continue
+		}
+
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			lastErr = fmt.Errorf("failed to read metrics response body (attempt %d): %w", attempts+1, err)
+			continue
+		}
+
+		var parser expfmt.TextParser
+		metrics, err := parser.TextToMetricFamilies(strings.NewReader(string(body)))
+		if err != nil {
+			lastErr = fmt.Errorf("failed to parse metrics (attempt %d): %w", attempts+1, err)
+			continue
+		}
+
+		return metrics, nil
+	}
+
+	return nil, fmt.Errorf("failed to get metrics after multiple attempts: %w", lastErr)
 }
