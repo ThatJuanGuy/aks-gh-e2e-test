@@ -3,12 +3,14 @@ package e2e
 import (
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
 
+	. "github.com/onsi/ginkgo/v2"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"k8s.io/client-go/kubernetes"
@@ -91,4 +93,24 @@ func getMetrics(port int) (map[string]*dto.MetricFamily, error) {
 	}
 
 	return nil, fmt.Errorf("failed to get metrics after multiple attempts: %w", lastErr)
+}
+
+// getUniquePort generates a port number that is likely to be unique for parallel tests.
+func getUniquePort(basePort int) (int, error) {
+	processID := GinkgoParallelProcess()
+	initialPort := basePort + (processID * 100)
+
+	// Try ports in range initialPort to initialPort+1000.
+	for port := initialPort; port < initialPort+1000; port++ {
+		addr := fmt.Sprintf("localhost:%d", port)
+		conn, err := net.Listen("tcp", addr)
+		if err != nil {
+			// Port is not available, try the next one.
+			continue
+		}
+		conn.Close()
+		return port, nil
+	}
+
+	return 0, fmt.Errorf("no available ports found between %d and %d", initialPort, initialPort+1000)
 }
