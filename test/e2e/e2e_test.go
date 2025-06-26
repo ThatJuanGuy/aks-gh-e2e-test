@@ -50,7 +50,7 @@ var (
 
 	// Expected checkers.
 	// Note that these checkers must match with the configmap in manifests/overlays/test.
-	dnsCheckerNames = map[string]struct{}{"test-internal-dns-checker": {}, "test-external-dns-checker": {}}
+	dnsCheckerNames = []string{"test-internal-dns-checker", "test-external-dns-checker"}
 	// TODO: Add pod startup checker.
 )
 
@@ -230,8 +230,8 @@ var _ = Describe("Cluster health monitor", func() {
 						return false
 					}
 
-					// Check if all DNS checkers report healthy status.
-					healthyDNSCheckers := make(map[string]bool)
+					// Get DNS checkers reporting healthy status.
+					foundDNSCheckers := make(map[string]struct{})
 					for _, m := range metricFamily.Metric {
 						labels := make(map[string]string)
 						for _, label := range m.Label {
@@ -242,13 +242,22 @@ var _ = Describe("Cluster health monitor", func() {
 							labels[metricsStatusLabel] == metricsHealthyStatus &&
 							labels[metricsErrorCodeLabel] == metricsHealthyErrorCode {
 							GinkgoWriter.Printf("Found healthy DNS checker metric for %s\n", labels[metricsCheckerNameLabel])
-							healthyDNSCheckers[labels[metricsCheckerNameLabel]] = true
+							foundDNSCheckers[labels[metricsCheckerNameLabel]] = struct{}{}
 						}
 					}
 
-					if len(healthyDNSCheckers) != len(dnsCheckerNames) {
-						GinkgoWriter.Printf("Expected %d DNS checkers to be healthy, found %d: %v\n", len(dnsCheckerNames), len(healthyDNSCheckers), healthyDNSCheckers)
+					// Check count of expected healthy DNS checkers.
+					if len(foundDNSCheckers) != len(dnsCheckerNames) {
+						GinkgoWriter.Printf("Expected %d DNS checkers to be healthy, found %d: %v\n", len(dnsCheckerNames), len(foundDNSCheckers), foundDNSCheckers)
 						return false
+					}
+
+					// Verify that all expected healthy DNS checkers are present.
+					for _, checkerName := range dnsCheckerNames {
+						if _, found := foundDNSCheckers[checkerName]; !found {
+							GinkgoWriter.Printf("Expected DNS checker %s not found in healthy metrics\n", checkerName)
+							return false
+						}
 					}
 
 					return true
