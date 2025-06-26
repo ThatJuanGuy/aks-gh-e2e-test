@@ -217,45 +217,6 @@ var _ = Describe("Cluster health monitor", func() {
 		})
 
 		Context("DNS checker", func() {
-			It("should include all configured DNS checkers", func() {
-				By("Waiting for all DNS checker metrics to appear")
-				Eventually(func() bool {
-					metricsData, err := getMetrics(localPort)
-					if err != nil {
-						GinkgoWriter.Printf("Failed to get metrics: %v\n", err)
-						return false
-					}
-					metricFamily, found := metricsData[checkerResultMetricName]
-					if !found {
-						return false
-					}
-
-					// Check if all DNS checkers are present in the metrics.
-					foundDNSCheckers := make(map[string]bool)
-					for _, m := range metricFamily.Metric {
-						labels := make(map[string]string)
-						for _, label := range m.Label {
-							labels[label.GetName()] = label.GetValue()
-						}
-
-						if labels[metricsCheckerTypeLabel] == checkerTypeDNS {
-							checkerName := labels[metricsCheckerNameLabel]
-							if _, ok := dnsCheckerNames[checkerName]; ok {
-								foundDNSCheckers[checkerName] = true
-								GinkgoWriter.Printf("Found DNS checker metric for %s\n", checkerName)
-							}
-						}
-					}
-
-					if len(foundDNSCheckers) != len(dnsCheckerNames) {
-						GinkgoWriter.Printf("Expected %d DNS checkers, found %d: %v\n", len(dnsCheckerNames), len(foundDNSCheckers), foundDNSCheckers)
-						return false
-					}
-
-					return true
-				}, "30s", "5s").Should(BeTrue(), "DNS checker metrics were not found within the timeout period")
-			})
-
 			It("should report healthy status for all DNS checkers", func() {
 				By("Waiting for DNS checker metrics to report healthy status")
 				Eventually(func() bool {
