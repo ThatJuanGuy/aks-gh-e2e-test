@@ -79,8 +79,8 @@ func getMetrics(port int) (map[string]*dto.MetricFamily, error) {
 	return metrics, nil
 }
 
-// getUniquePort generates a port number that is likely to be unique for parallel tests.
-func getUniquePort(basePort int) (int, error) {
+// getUnusedPort generates a port number that is likely to be unique for parallel tests.
+func getUnusedPort(basePort int) (int, error) {
 	processID := ginkgo.GinkgoParallelProcess()
 	portRangeSize := 1000
 	initialPort := basePort + (processID * portRangeSize)

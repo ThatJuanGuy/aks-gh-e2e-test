@@ -177,8 +177,8 @@ var _ = Describe("Cluster health monitor", func() {
 			pod := podList.Items[0]
 
 			By("Finding an available local port for metrics")
-			localPort, err = getUniquePort(baseLocalPort)
-			Expect(err).NotTo(HaveOccurred(), "Failed to get unique port")
+			localPort, err = getUnusedPort(baseLocalPort)
+			Expect(err).NotTo(HaveOccurred(), "Failed to get unused port")
 			GinkgoWriter.Printf("Using local port %d for metrics endpoint\n", localPort)
 
 			By("Port-forwarding to the cluster health monitor pod")
