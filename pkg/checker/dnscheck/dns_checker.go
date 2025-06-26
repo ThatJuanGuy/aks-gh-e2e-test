@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 
 	"github.com/Azure/cluster-health-monitor/pkg/checker"
 	"github.com/Azure/cluster-health-monitor/pkg/config"
@@ -19,6 +20,7 @@ import (
 
 func Register() {
 	checker.RegisterChecker(config.CheckTypeDNS, BuildDNSChecker)
+	klog.InfoS("Registered checker", "type", config.CheckTypeDNS)
 }
 
 const (
@@ -45,12 +47,17 @@ func BuildDNSChecker(config *config.CheckerConfig) (checker.Checker, error) {
 		return nil, fmt.Errorf("failed to create Kubernetes client: %w", err)
 	}
 
-	return &DNSChecker{
+	chk := &DNSChecker{
 		name:       config.Name,
 		config:     config.DNSConfig,
 		kubeClient: client,
 		resolver:   &defaultResolver{},
-	}, nil
+	}
+	klog.InfoS("Built DNSChecker",
+		"name", chk.name,
+		"config", chk.config,
+	)
+	return chk, nil
 }
 
 func (c DNSChecker) Name() string {

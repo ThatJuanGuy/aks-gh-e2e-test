@@ -21,7 +21,7 @@ type Server struct {
 func NewServer(port int) (*Server, error) {
 	reg := prometheus.NewRegistry()
 	if err := reg.Register(CheckerResultCounter); err != nil {
-		klog.Errorf("Failed to register checker counter: %v.", err)
+		klog.ErrorS(err, "Failed to register checker result counter")
 		return nil, err
 	}
 	return &Server{
@@ -41,17 +41,18 @@ func (m *Server) Run(ctx context.Context) error {
 	}
 	errCh := make(chan error, 1)
 	go func() {
-		klog.Infof("Starting Prometheus metrics server at %s/metrics.", addr)
 		errCh <- m.server.ListenAndServe()
 	}()
+	klog.InfoS("Started Prometheus metrics server",
+		"address", addr)
 	select {
 	case <-ctx.Done():
 		// Context canceled, initiate graceful shutdown.
-		klog.Infoln("Shutting down metrics server due to context cancel...")
 		shutdownErr := m.server.Shutdown(ctx)
 		if shutdownErr != nil {
 			return shutdownErr
 		}
+		klog.InfoS("Shut down metrics server due to context cancel")
 		return ctx.Err()
 	case err := <-errCh:
 		return err

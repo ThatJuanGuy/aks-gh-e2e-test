@@ -29,6 +29,7 @@ func main() {
 	flag.Parse()
 	defer klog.Flush()
 
+	klog.InfoS("Started Cluster Health Monitor")
 	registerCheckers()
 
 	// Wait for interrupt signal to gracefully shutdown.
@@ -54,6 +55,9 @@ func main() {
 		klog.ErrorS(err, "Failed to parse config")
 		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
+	klog.InfoS("Parsed configuration file",
+		"path", *configPath,
+		"numCheckers", len(cfg.Checkers))
 
 	// Build the checker schedule from the configuration.
 	cs, err := buildCheckerSchedule(cfg)
@@ -61,6 +65,7 @@ func main() {
 		klog.ErrorS(err, "Failed to build checker schedule")
 		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
+	klog.InfoS("Built checker schedule", "numSchedules", len(cs))
 
 	// Run the scheduler.
 	sched := scheduler.NewScheduler(cs)
@@ -70,8 +75,8 @@ func main() {
 			klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 		}
 	}()
+	klog.InfoS("Scheduler started")
 
-	klog.Infof("Cluster Health Monitor started, using config from %s", *configPath)
 	<-ctx.Done()
 }
 
