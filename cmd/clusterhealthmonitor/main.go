@@ -38,31 +38,36 @@ func main() {
 	// Run the prometheus metrics server.
 	m, err := metrics.NewServer(9800)
 	if err != nil {
-		klog.Fatalf("Failed to create metrics server:%s.", err)
+		klog.ErrorS(err, "Failed to create metrics server")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	go func() {
 		if err := m.Run(ctx); err != nil {
-			klog.Fatalf("Metrics server error: %v.", err)
+			klog.ErrorS(err, "Metrics server error")
+			klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 		}
 	}()
 
 	// Parse the configuration file.
 	cfg, err := config.ParseFromFile(*configPath)
 	if err != nil {
-		klog.Fatalf("Failed to parse config: %v", err)
+		klog.ErrorS(err, "Failed to parse config")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 
 	// Build the checker schedule from the configuration.
 	cs, err := buildCheckerSchedule(cfg)
 	if err != nil {
-		klog.Fatalf("Failed to build checker schedule: %s", err)
+		klog.ErrorS(err, "Failed to build checker schedule")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 
 	// Run the scheduler.
 	sched := scheduler.NewScheduler(cs)
 	go func() {
 		if err := sched.Start(ctx); err != nil {
-			klog.Fatalf("Scheduler error: %v", err)
+			klog.ErrorS(err, "Scheduler error")
+			klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 		}
 	}()
 
