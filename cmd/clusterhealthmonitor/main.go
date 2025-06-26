@@ -78,6 +78,7 @@ func main() {
 	klog.InfoS("Scheduler started")
 
 	<-ctx.Done()
+	klog.InfoS("Stopped Cluster Health Monitor due to context cancel")
 }
 
 func buildCheckerSchedule(cfg *config.Config) ([]scheduler.CheckerSchedule, error) {
