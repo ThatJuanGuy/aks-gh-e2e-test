@@ -221,7 +221,10 @@ var _ = Describe("Cluster health monitor", func() {
 				By("Waiting for all DNS checker metrics to appear")
 				Eventually(func() bool {
 					metricsData, err := getMetrics(localPort)
-					Expect(err).NotTo(HaveOccurred(), "Failed to get metrics")
+					if err != nil {
+						GinkgoWriter.Printf("Failed to get metrics: %v\n", err)
+						return false
+					}
 					metricFamily, found := metricsData[checkerResultMetricName]
 					if !found {
 						return false
@@ -257,7 +260,10 @@ var _ = Describe("Cluster health monitor", func() {
 				By("Waiting for DNS checker metrics to report healthy status")
 				Eventually(func() bool {
 					metricsData, err := getMetrics(localPort)
-					Expect(err).NotTo(HaveOccurred(), "Failed to get metrics")
+					if err != nil {
+						GinkgoWriter.Printf("Failed to get metrics: %v\n", err)
+						return false
+					}
 					metricFamily, found := metricsData[checkerResultMetricName]
 					if !found {
 						return false

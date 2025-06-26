@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"time"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 	dto "github.com/prometheus/client_model/go"
@@ -51,48 +50,33 @@ func getKubeClient(kubeConfigPath string) (*kubernetes.Clientset, error) {
 
 // getMetrics fetches and parses metrics from the metrics endpoint.
 func getMetrics(port int) (map[string]*dto.MetricFamily, error) {
-	var lastErr error
-
-	// Retry up to 3 times with a short delay between attempts
-	for attempts := 0; attempts < 3; attempts++ {
-		if attempts > 0 {
-			time.Sleep(500 * time.Millisecond)
-		}
-
-		res, err := http.Get(fmt.Sprintf("http://localhost:%d/metrics", port))
-		if err != nil {
-			lastErr = fmt.Errorf("failed to access metrics endpoint (attempt %d): %w", attempts+1, err)
-			continue
-		}
-
-		defer func() {
-			if err := res.Body.Close(); err != nil {
-				fmt.Printf("Failed to close response body: %v\n", err)
-			}
-		}()
-
-		if res.StatusCode != http.StatusOK {
-			lastErr = fmt.Errorf("metrics endpoint returned status code %d (attempt %d)", res.StatusCode, attempts+1)
-			continue
-		}
-
-		body, err := io.ReadAll(res.Body)
-		if err != nil {
-			lastErr = fmt.Errorf("failed to read metrics response body (attempt %d): %w", attempts+1, err)
-			continue
-		}
-
-		var parser expfmt.TextParser
-		metrics, err := parser.TextToMetricFamilies(strings.NewReader(string(body)))
-		if err != nil {
-			lastErr = fmt.Errorf("failed to parse metrics (attempt %d): %w", attempts+1, err)
-			continue
-		}
-
-		return metrics, nil
+	res, err := http.Get(fmt.Sprintf("http://localhost:%d/metrics", port))
+	if err != nil {
+		return nil, fmt.Errorf("failed to access metrics endpoint: %w", err)
 	}
 
-	return nil, fmt.Errorf("failed to get metrics after multiple attempts: %w", lastErr)
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			fmt.Printf("Failed to close response body: %v\n", err)
+		}
+	}()
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("metrics endpoint returned status code %d", res.StatusCode)
+	}
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read metrics response body: %w", err)
+	}
+
+	var parser expfmt.TextParser
+	metrics, err := parser.TextToMetricFamilies(strings.NewReader(string(body)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse metrics: %w", err)
+	}
+
+	return metrics, nil
 }
 
 // getUniquePort generates a port number that is likely to be unique for parallel tests.
