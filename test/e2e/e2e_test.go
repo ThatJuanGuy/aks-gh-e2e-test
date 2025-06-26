@@ -4,19 +4,15 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/onsi/gomega/gexec"
-	"github.com/prometheus/common/expfmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -27,16 +23,35 @@ func TestE2E(t *testing.T) {
 }
 
 const (
+	// Kubernetes resource names.
+	// Note that these names must match with the applied manifests/overlays/test.
 	namespace            = "kube-system"
 	deploymentName       = "cluster-health-monitor"
-	metricsPort          = 9800
 	checkerConfigMapName = "cluster-health-monitor-config"
+
+	remoteMetricsPort       = 9800  // remoteMetricsPort is the fixed port used by the service in the container.
+	baseLocalPort           = 10000 // baseLocalPort is the base local port for dynamic allocation.
+	checkerResultMetricName = "cluster_health_monitor_checker_result_total"
+	metricsCheckerTypeLabel = "checker_type"
+	metricsCheckerNameLabel = "checker_name"
+	metricsStatusLabel      = "status"
+	metricsErrorCodeLabel   = "error_code"
+
+	metricsHealthyStatus    = "healthy"
+	metricsHealthyErrorCode = metricsHealthyStatus
+
+	checkerTypeDNS = "dns"
 )
 
 var (
 	clientset          *kubernetes.Clientset
 	skipClusterSetup   = os.Getenv("E2E_SKIP_CLUSTER_SETUP") == "true"
 	skipClusterCleanup = os.Getenv("E2E_SKIP_CLUSTER_CLEANUP") == "true"
+
+	// Expected checkers.
+	// Note that these checkers must match with the configmap in manifests/overlays/test.
+	dnsCheckerNames = []string{"test-internal-dns-checker", "test-external-dns-checker"}
+	// TODO: Add pod startup checker.
 )
 
 func beforeSuiteAllProcesses() []byte {
@@ -124,71 +139,134 @@ func afterSuiteAllProcesses() {
 
 var _ = SynchronizedAfterSuite(func() {}, afterSuiteAllProcesses)
 
-var _ = Describe("Cluster health monitor deployment", func() {
-	It("should have the cluster health monitor pod running", func() {
-		By("Checking if the cluster health monitor deployment is available")
-		deployment, err := clientset.AppsV1().Deployments(namespace).Get(context.TODO(), deploymentName, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
-		Expect(deployment.Status.AvailableReplicas).To(Equal(*deployment.Spec.Replicas))
+var _ = Describe("Cluster health monitor", func() {
+	Context("deployment", func() {
+		It("should have the cluster health monitor pod running", func() {
+			By("Checking if the cluster health monitor deployment is available")
+			deployment, err := clientset.AppsV1().Deployments(namespace).Get(context.TODO(), deploymentName, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(deployment.Status.AvailableReplicas).To(Equal(*deployment.Spec.Replicas))
 
-		By("Checking if the cluster health monitor pod is running")
-		podList, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: "app=" + deploymentName,
+			By("Checking if the cluster health monitor pod is running")
+			podList, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
+				LabelSelector: "app=" + deploymentName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(podList.Items).NotTo(BeEmpty())
+			pod := podList.Items[0]
+			Expect(pod.Status.Phase).To(BeEquivalentTo("Running"), "Pod %s should be in Running state", pod.Name)
+			for _, containerStatus := range pod.Status.ContainerStatuses {
+				Expect(containerStatus.Ready).To(BeTrue(), "Container %s in pod %s should be ready", containerStatus.Name, pod.Name)
+			}
 		})
-		Expect(err).NotTo(HaveOccurred())
-		Expect(podList.Items).NotTo(BeEmpty())
-		pod := podList.Items[0]
-		Expect(pod.Status.Phase).To(BeEquivalentTo("Running"), "Pod %s should be in Running state", pod.Name)
-		for _, containerStatus := range pod.Status.ContainerStatuses {
-			Expect(containerStatus.Ready).To(BeTrue(), "Container %s in pod %s should be ready", containerStatus.Name, pod.Name)
-		}
 	})
 
-	It("should expose metrics endpoint", func() {
-		By("Port-forwarding to the cluster health monitor pod")
-		podList, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: "app=" + deploymentName,
+	Context("metrics endpoint", func() {
+		var (
+			session   *gexec.Session
+			localPort int
+		)
+
+		BeforeEach(func() {
+			By("Getting the cluster health monitor pod")
+			podList, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
+				LabelSelector: "app=" + deploymentName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(podList.Items).NotTo(BeEmpty())
+			pod := podList.Items[0]
+
+			By("Finding an available local port for metrics")
+			localPort, err = getUnusedPort(baseLocalPort)
+			Expect(err).NotTo(HaveOccurred(), "Failed to get unused port")
+			GinkgoWriter.Printf("Using local port %d for metrics endpoint\n", localPort)
+
+			By("Port-forwarding to the cluster health monitor pod")
+			cmd := exec.Command("kubectl", "port-forward",
+				fmt.Sprintf("pod/%s", pod.Name),
+				fmt.Sprintf("%d:%d", localPort, remoteMetricsPort),
+				"-n", namespace)
+			cmd.Env = os.Environ()
+			session, err = gexec.Start(cmd, GinkgoWriter, GinkgoWriter)
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Printf("Port-forwarding to pod %s in namespace %s on port %d:%d\n", pod.Name, namespace, localPort, remoteMetricsPort)
+			Eventually(session, "5s", "1s").Should(gbytes.Say("Forwarding from"), "Failed to establish port-forwarding")
 		})
-		Expect(err).NotTo(HaveOccurred())
-		Expect(podList.Items).NotTo(BeEmpty())
-		pod := podList.Items[0]
-		cmd := exec.Command("kubectl", "port-forward",
-			fmt.Sprintf("pod/%s", pod.Name),
-			fmt.Sprintf("%d:%d", metricsPort, metricsPort),
-			"-n", namespace)
-		cmd.Env = os.Environ()
-		session, err := gexec.Start(cmd, GinkgoWriter, GinkgoWriter)
-		Expect(err).NotTo(HaveOccurred())
-		defer session.Kill()
-		GinkgoWriter.Printf("Port-forwarding to pod %s in namespace %s on port %d\n", pod.Name, namespace, metricsPort)
-		Eventually(session, "5s", "1s").Should(gbytes.Say("Forwarding from"), "Failed to establish port-forwarding")
 
-		By("Waiting for metrics endpoint to contain data")
-		var body []byte
-		Eventually(func() bool {
-			By("Checking if metrics endpoint is accessible")
-			res, err := http.Get(fmt.Sprintf("http://localhost:%d/metrics", metricsPort))
-			Expect(err).NotTo(HaveOccurred(), "Failed to access metrics endpoint")
-			defer func() {
-				if err := res.Body.Close(); err != nil {
-					GinkgoWriter.Printf("Failed to close response body: %v\n", err)
+		AfterEach(func() {
+			if session != nil {
+				session.Kill()
+			}
+		})
+
+		It("should provide metrics data", func() {
+			By("Waiting for metrics endpoint to contain data")
+			Eventually(func() bool {
+				metricsData, err := getMetrics(localPort)
+				if err != nil {
+					GinkgoWriter.Printf("Error getting metrics: %v\n", err)
+					return false
 				}
-			}()
-			Expect(res.StatusCode).To(Equal(http.StatusOK), "Metrics endpoint did not return 200 OK")
+				return len(metricsData) > 0
+			}, "30s", "10s").Should(BeTrue(), "No metrics data found within timeout period")
 
-			By("Reading metrics response body")
-			body, err = io.ReadAll(res.Body)
-			Expect(err).NotTo(HaveOccurred(), "Failed to read metrics response body")
-			return len(body) > 0
-		}, "30s", "10s").Should(BeTrue(), "Metrics response body is empty")
+			By("Verifying metrics endpoint contains expected metrics")
+			metricsData, err := getMetrics(localPort)
+			Expect(err).NotTo(HaveOccurred(), "Failed to get metrics")
+			Expect(metricsData).To(HaveKey(checkerResultMetricName), "Expected %s metric not found", checkerResultMetricName)
+		})
 
-		By("Parsing metrics response body")
-		var parser expfmt.TextParser
-		metrics, err := parser.TextToMetricFamilies(strings.NewReader(string(body)))
-		Expect(err).NotTo(HaveOccurred(), "Failed to parse metrics")
-		metric := metrics["cluster_health_monitor_checker_result_total"]
-		Expect(metric).NotTo(BeNil(), "Expected cluster_health_monitor_checker_result_total metric not found", string(body))
+		Context("DNS checker", func() {
+			It("should report healthy status for all DNS checkers", func() {
+				By("Waiting for DNS checker metrics to report healthy status")
+				Eventually(func() bool {
+					metricsData, err := getMetrics(localPort)
+					if err != nil {
+						GinkgoWriter.Printf("Failed to get metrics: %v\n", err)
+						return false
+					}
+					metricFamily, found := metricsData[checkerResultMetricName]
+					if !found {
+						return false
+					}
 
-		// TODO: Check if the metric has expected labels and values
+					// Get DNS checkers reporting healthy status.
+					foundDNSCheckers := make(map[string]struct{})
+					for _, m := range metricFamily.Metric {
+						labels := make(map[string]string)
+						for _, label := range m.Label {
+							labels[label.GetName()] = label.GetValue()
+						}
+
+						if labels[metricsCheckerTypeLabel] == checkerTypeDNS &&
+							labels[metricsStatusLabel] == metricsHealthyStatus &&
+							labels[metricsErrorCodeLabel] == metricsHealthyErrorCode {
+							GinkgoWriter.Printf("Found healthy DNS checker metric for %s\n", labels[metricsCheckerNameLabel])
+							foundDNSCheckers[labels[metricsCheckerNameLabel]] = struct{}{}
+						}
+					}
+
+					// Check count of expected healthy DNS checkers.
+					if len(foundDNSCheckers) != len(dnsCheckerNames) {
+						GinkgoWriter.Printf("Expected %d DNS checkers to be healthy, found %d: %v\n", len(dnsCheckerNames), len(foundDNSCheckers), foundDNSCheckers)
+						return false
+					}
+
+					// Verify that all expected healthy DNS checkers are present.
+					for _, checkerName := range dnsCheckerNames {
+						if _, found := foundDNSCheckers[checkerName]; !found {
+							GinkgoWriter.Printf("Expected DNS checker %s not found in healthy metrics\n", checkerName)
+							return false
+						}
+					}
+
+					return true
+				}, "30s", "5s").Should(BeTrue(), "DNS checker metrics did not report healthy status within the timeout period")
+			})
+
+			// TODO: Add case for DNS checker failure scenarios.
+		})
+
+		// TODO: Add pod startup checker tests.
 	})
 })
