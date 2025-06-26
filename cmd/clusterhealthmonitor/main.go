@@ -24,6 +24,12 @@ func init() {
 	klog.InitFlags(nil)
 }
 
+// logErrorAndExit logs an error message and exits the program with exit code 1.
+func logErrorAndExit(err error, message string) {
+	klog.ErrorS(err, message)
+	klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+}
+
 func main() {
 	configPath := flag.String("config", defaultConfigPath, "Path to the configuration file")
 	flag.Parse()
@@ -39,21 +45,18 @@ func main() {
 	// Run the prometheus metrics server.
 	m, err := metrics.NewServer(9800)
 	if err != nil {
-		klog.ErrorS(err, "Failed to create metrics server")
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+		logErrorAndExit(err, "Failed to create metrics server")
 	}
 	go func() {
 		if err := m.Run(ctx); err != nil {
-			klog.ErrorS(err, "Metrics server error")
-			klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+			logErrorAndExit(err, "Metrics server error")
 		}
 	}()
 
 	// Parse the configuration file.
 	cfg, err := config.ParseFromFile(*configPath)
 	if err != nil {
-		klog.ErrorS(err, "Failed to parse config")
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+		logErrorAndExit(err, "Failed to parse config")
 	}
 	klog.InfoS("Parsed configuration file",
 		"path", *configPath,
@@ -62,8 +65,7 @@ func main() {
 	// Build the checker schedule from the configuration.
 	cs, err := buildCheckerSchedule(cfg)
 	if err != nil {
-		klog.ErrorS(err, "Failed to build checker schedule")
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+		logErrorAndExit(err, "Failed to build checker schedule")
 	}
 	klog.InfoS("Built checker schedule", "numSchedules", len(cs))
 
@@ -71,8 +73,7 @@ func main() {
 	sched := scheduler.NewScheduler(cs)
 	go func() {
 		if err := sched.Start(ctx); err != nil {
-			klog.ErrorS(err, "Scheduler error")
-			klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+			logErrorAndExit(err, "Scheduler error")
 		}
 	}()
 	klog.InfoS("Scheduler started")
