@@ -20,7 +20,6 @@ import (
 
 func Register() {
 	checker.RegisterChecker(config.CheckTypeDNS, BuildDNSChecker)
-	klog.InfoS("Registered checker", "type", config.CheckTypeDNS)
 }
 
 const (

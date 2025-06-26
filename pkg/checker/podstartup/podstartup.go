@@ -37,7 +37,6 @@ var imagePullDurationRegex = regexp.MustCompile(`\(([a-zA-Z0-9]+) including wait
 
 func Register() {
 	checker.RegisterChecker(config.CheckTypePodStartup, BuildPodStartupChecker)
-	klog.InfoS("Registered checker", "type", config.CheckTypePodStartup)
 }
 
 // BuildPodStartupChecker creates a new PodStartupChecker instance.
