@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	dto "github.com/prometheus/client_model/go"
@@ -118,6 +119,22 @@ func getCoreDNSPodList(clientset *kubernetes.Clientset) (*corev1.PodList, error)
 	return podList, nil
 }
 
+// restartCoreDNSPods restarts the CoreDNS pods by deleting them.
+func restartCoreDNSPods(clientset *kubernetes.Clientset) error {
+	podList, err := getCoreDNSPodList(clientset)
+	if err != nil {
+		return fmt.Errorf("failed to get CoreDNS pod list: %w", err)
+	}
+
+	for _, pod := range podList.Items {
+		err := clientset.CoreV1().Pods("kube-system").Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to delete CoreDNS pod %s: %w", pod.Name, err)
+		}
+	}
+	return nil
+}
+
 // getCoreDNSDeployment gets the CoreDNS deployment from the kube-system namespace.
 func getCoreDNSDeployment(clientset *kubernetes.Clientset) (*appsv1.Deployment, error) {
 	return clientset.AppsV1().Deployments("kube-system").Get(context.TODO(), "coredns", metav1.GetOptions{})
@@ -136,5 +153,46 @@ func updateCoreDNSDeploymentReplicas(clientset *kubernetes.Clientset, replicas i
 		return fmt.Errorf("failed to update CoreDNS deployment replicas: %w", err)
 	}
 
+	return nil
+}
+
+// getCoreDNSConfigMap gets the CoreDNS ConfigMap from the kube-system namespace.
+func getCoreDNSConfigMap(clientset *kubernetes.Clientset) (*corev1.ConfigMap, error) {
+	return clientset.CoreV1().ConfigMaps("kube-system").Get(context.TODO(), "coredns", metav1.GetOptions{})
+}
+
+// addGlobalDNSDelay adds a delay to all DNS queries by modifying the CoreDNS ConfigMap.
+// It returns the original Corefile content so it can be restored later.
+func addGlobalDNSDelay(clientset *kubernetes.Clientset, delayDuration time.Duration) (string, error) {
+	configMap, err := getCoreDNSConfigMap(clientset)
+	if err != nil {
+		return "", fmt.Errorf("failed to get CoreDNS ConfigMap: %w", err)
+	}
+	originalCorefile := configMap.Data["Corefile"]
+
+	// Add a delay for all domains.
+	delay := fmt.Sprintf("delay %s", delayDuration.String())
+	modifiedCorefile := strings.Replace(originalCorefile, "cache", delay+"\n    cache", 1)
+	configMap.Data["Corefile"] = modifiedCorefile
+
+	_, err = clientset.CoreV1().ConfigMaps("kube-system").Update(context.TODO(), configMap, metav1.UpdateOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to update CoreDNS ConfigMap: %w", err)
+	}
+	return originalCorefile, nil
+}
+
+// restoreCoreDNSConfigMap restores the original CoreDNS ConfigMap.
+func restoreCoreDNSConfigMap(clientset *kubernetes.Clientset, originalCorefile string) error {
+	configMap, err := getCoreDNSConfigMap(clientset)
+	if err != nil {
+		return fmt.Errorf("failed to get CoreDNS ConfigMap: %w", err)
+	}
+
+	configMap.Data["Corefile"] = originalCorefile
+	_, err = clientset.CoreV1().ConfigMaps("kube-system").Update(context.TODO(), configMap, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to restore CoreDNS ConfigMap: %w", err)
+	}
 	return nil
 }
