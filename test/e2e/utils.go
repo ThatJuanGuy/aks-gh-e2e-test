@@ -21,6 +21,14 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+const (
+	checkerResultMetricName = "cluster_health_monitor_checker_result_total"
+	metricsCheckerTypeLabel = "checker_type"
+	metricsCheckerNameLabel = "checker_name"
+	metricsStatusLabel      = "status"
+	metricsErrorCodeLabel   = "error_code"
+)
+
 // run executes the provided command in the Git root directory and returns its output.
 // It uses the current environment variables.
 func run(cmd *exec.Cmd) ([]byte, error) {
@@ -195,4 +203,42 @@ func restoreCoreDNSConfigMap(clientset *kubernetes.Clientset, originalCorefile s
 		return fmt.Errorf("failed to restore CoreDNS ConfigMap: %w", err)
 	}
 	return nil
+}
+
+// verifyCheckerResultMetrics checks if all the checker result metrics match the expected type, status, and error code.
+// It returns true if all checker names match the criteria, false otherwise.
+func verifyCheckerResultMetrics(metricsData map[string]*dto.MetricFamily, expectedChkNames []string, expectedType, expectedStatus, expectedErrorCode string) (bool, map[string]struct{}) {
+	metricFamily, found := metricsData[checkerResultMetricName]
+	if !found {
+		return false, nil
+	}
+
+	// Get checkers reporting the expected type, status, and error code.
+	foundCheckers := make(map[string]struct{})
+	for _, m := range metricFamily.Metric {
+		labels := make(map[string]string)
+		for _, label := range m.Label {
+			labels[label.GetName()] = label.GetValue()
+		}
+
+		if labels[metricsCheckerTypeLabel] == expectedType &&
+			labels[metricsStatusLabel] == expectedStatus &&
+			labels[metricsErrorCodeLabel] == expectedErrorCode {
+			foundCheckers[labels[metricsCheckerNameLabel]] = struct{}{}
+		}
+	}
+
+	// Check count of expected checkers matching the criteria.
+	if len(foundCheckers) != len(expectedChkNames) {
+		return false, foundCheckers
+	}
+
+	// Verify all expected checkers are present.
+	for _, checkerName := range expectedChkNames {
+		if _, found := foundCheckers[checkerName]; !found {
+			return false, foundCheckers
+		}
+	}
+
+	return true, foundCheckers
 }

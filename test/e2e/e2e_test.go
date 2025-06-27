@@ -30,13 +30,8 @@ const (
 	deploymentName       = "cluster-health-monitor"
 	checkerConfigMapName = "cluster-health-monitor-config"
 
-	remoteMetricsPort       = 9800  // remoteMetricsPort is the fixed port used by the service in the container.
-	baseLocalPort           = 10000 // baseLocalPort is the base local port for dynamic allocation.
-	checkerResultMetricName = "cluster_health_monitor_checker_result_total"
-	metricsCheckerTypeLabel = "checker_type"
-	metricsCheckerNameLabel = "checker_name"
-	metricsStatusLabel      = "status"
-	metricsErrorCodeLabel   = "error_code"
+	remoteMetricsPort = 9800  // remoteMetricsPort is the fixed port used by the service in the container.
+	baseLocalPort     = 10000 // baseLocalPort is the base local port for dynamic allocation.
 
 	metricsHealthyStatus    = "healthy"
 	metricsHealthyErrorCode = metricsHealthyStatus
@@ -228,41 +223,13 @@ var _ = Describe("Cluster health monitor", func() {
 						GinkgoWriter.Printf("Failed to get metrics: %v\n", err)
 						return false
 					}
-					metricFamily, found := metricsData[checkerResultMetricName]
-					if !found {
+
+					matched, foundCheckers := verifyCheckerResultMetrics(metricsData, dnsCheckerNames, checkerTypeDNS, metricsHealthyStatus, metricsHealthyErrorCode)
+					if !matched {
+						GinkgoWriter.Printf("Expected DNS checkers to be healthy: %v, found: %v\n", dnsCheckerNames, foundCheckers)
 						return false
 					}
-
-					// Get DNS checkers reporting healthy status.
-					foundDNSCheckers := make(map[string]struct{})
-					for _, m := range metricFamily.Metric {
-						labels := make(map[string]string)
-						for _, label := range m.Label {
-							labels[label.GetName()] = label.GetValue()
-						}
-
-						if labels[metricsCheckerTypeLabel] == checkerTypeDNS &&
-							labels[metricsStatusLabel] == metricsHealthyStatus &&
-							labels[metricsErrorCodeLabel] == metricsHealthyErrorCode {
-							GinkgoWriter.Printf("Found healthy DNS checker metric for %s\n", labels[metricsCheckerNameLabel])
-							foundDNSCheckers[labels[metricsCheckerNameLabel]] = struct{}{}
-						}
-					}
-
-					// Check count of expected healthy DNS checkers.
-					if len(foundDNSCheckers) != len(dnsCheckerNames) {
-						GinkgoWriter.Printf("Expected %d DNS checkers to be healthy, found %d: %v\n", len(dnsCheckerNames), len(foundDNSCheckers), foundDNSCheckers)
-						return false
-					}
-
-					// Verify that all expected healthy DNS checkers are present.
-					for _, checkerName := range dnsCheckerNames {
-						if _, found := foundDNSCheckers[checkerName]; !found {
-							GinkgoWriter.Printf("Expected DNS checker %s not found in healthy metrics\n", checkerName)
-							return false
-						}
-					}
-
+					GinkgoWriter.Printf("Found healthy DNS checker metric for %v\n", foundCheckers)
 					return true
 				}, "30s", "5s").Should(BeTrue(), "DNS checker metrics did not report healthy status within the timeout period")
 			})
@@ -308,41 +275,13 @@ var _ = Describe("Cluster health monitor", func() {
 						GinkgoWriter.Printf("Failed to get metrics: %v\n", err)
 						return false
 					}
-					metricFamily, found := metricsData[checkerResultMetricName]
-					if !found {
+
+					matched, foundCheckers := verifyCheckerResultMetrics(metricsData, dnsCheckerNames, checkerTypeDNS, metricsUnhealthyStatus, dnsPodsNotReadyErrorCode)
+					if !matched {
+						GinkgoWriter.Printf("Expected DNS checkers to be unhealthy and pods not ready: %v, found: %v\n", dnsCheckerNames, foundCheckers)
 						return false
 					}
-
-					// Get DNS checkers reporting unhealthy status and pods not ready.
-					foundDNSCheckers := make(map[string]struct{})
-					for _, m := range metricFamily.Metric {
-						labels := make(map[string]string)
-						for _, label := range m.Label {
-							labels[label.GetName()] = label.GetValue()
-						}
-
-						if labels[metricsCheckerTypeLabel] == checkerTypeDNS &&
-							labels[metricsStatusLabel] == metricsUnhealthyStatus &&
-							labels[metricsErrorCodeLabel] == dnsPodsNotReadyErrorCode {
-							GinkgoWriter.Printf("Found unhealthy and pods not ready DNS checker metric for %s\n", labels[metricsCheckerNameLabel])
-							foundDNSCheckers[labels[metricsCheckerNameLabel]] = struct{}{}
-						}
-					}
-
-					// Check count of expected unhealthy DNS checkers.
-					if len(foundDNSCheckers) != len(dnsCheckerNames) {
-						GinkgoWriter.Printf("Expected %d DNS checkers to be unhealthy and pods not ready, found %d: %v\n", len(dnsCheckerNames), len(foundDNSCheckers), foundDNSCheckers)
-						return false
-					}
-
-					// Verify that all expected unhealthy DNS checkers are present.
-					for _, checkerName := range dnsCheckerNames {
-						if _, found := foundDNSCheckers[checkerName]; !found {
-							GinkgoWriter.Printf("Expected DNS checker %s not found in unhealthy and pods not ready metrics\n", checkerName)
-							return false
-						}
-					}
-
+					GinkgoWriter.Printf("Found unhealthy and pods not ready DNS checker metric for %v\n", foundCheckers)
 					return true
 				}, "30s", "5s").Should(BeTrue(), "DNS checker metrics did not report unhealthy status and pods not ready within the timeout period")
 			})
@@ -366,48 +305,20 @@ var _ = Describe("Cluster health monitor", func() {
 					Expect(err).NotTo(HaveOccurred(), "Failed to restart CoreDNS pods with original configuration")
 				})
 
-				By("Waiting for DNS checker metrics to report report unhealthy status with service timeout")
+				By("Waiting for DNS checker metrics to report unhealthy status with service timeout")
 				Eventually(func() bool {
 					metricsData, err := getMetrics(localPort)
 					if err != nil {
 						GinkgoWriter.Printf("Failed to get metrics: %v\n", err)
 						return false
 					}
-					metricFamily, found := metricsData[checkerResultMetricName]
-					if !found {
+
+					matched, foundCheckers := verifyCheckerResultMetrics(metricsData, dnsCheckerNames, checkerTypeDNS, metricsUnhealthyStatus, dnsServiceTimeoutErrorCode)
+					if !matched {
+						GinkgoWriter.Printf("Expected DNS checkers to be unhealthy and service timeout: %v, found: %v\n", dnsCheckerNames, foundCheckers)
 						return false
 					}
-
-					// Get DNS checkers reporting unhealthy status and service timeout.
-					foundDNSCheckers := make(map[string]struct{})
-					for _, m := range metricFamily.Metric {
-						labels := make(map[string]string)
-						for _, label := range m.Label {
-							labels[label.GetName()] = label.GetValue()
-						}
-
-						if labels[metricsCheckerTypeLabel] == checkerTypeDNS &&
-							labels[metricsStatusLabel] == metricsUnhealthyStatus &&
-							labels[metricsErrorCodeLabel] == dnsServiceTimeoutErrorCode {
-							GinkgoWriter.Printf("Found unhealthy and service timeout DNS checker metric for %s\n", labels[metricsCheckerNameLabel])
-							foundDNSCheckers[labels[metricsCheckerNameLabel]] = struct{}{}
-						}
-					}
-
-					// Check count of expected unhealthy DNS checkers.
-					if len(foundDNSCheckers) != len(dnsCheckerNames) {
-						GinkgoWriter.Printf("Expected %d DNS checkers to be unhealthy and service timeout, found %d: %v\n", len(dnsCheckerNames), len(foundDNSCheckers), foundDNSCheckers)
-						return false
-					}
-
-					// Verify that all expected unhealthy DNS checkers are present.
-					for _, checkerName := range dnsCheckerNames {
-						if _, found := foundDNSCheckers[checkerName]; !found {
-							GinkgoWriter.Printf("Expected DNS checker %s not found in unhealthy and service timeout metrics\n", checkerName)
-							return false
-						}
-					}
-
+					GinkgoWriter.Printf("Found unhealthy and service timeout DNS checker metric for %v\n", foundCheckers)
 					return true
 				}, "60s", "5s").Should(BeTrue(), "DNS checker metrics did not report unhealthy status and service timeout within the timeout period")
 			})
