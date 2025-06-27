@@ -82,9 +82,7 @@ func beforeSuiteAllProcesses() []byte {
 
 	By("Waiting for CoreDNS pods to be running")
 	Eventually(func() bool {
-		podList, err := clientset.CoreV1().Pods("kube-system").List(context.TODO(), metav1.ListOptions{
-			LabelSelector: "k8s-app=kube-dns",
-		})
+		podList, err := getCoreDNSPodList(clientset)
 		if err != nil {
 			return false
 		}

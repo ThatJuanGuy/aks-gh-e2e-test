@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -9,9 +10,11 @@ import (
 	"os/exec"
 	"strings"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -101,4 +104,15 @@ func getUnusedPort(basePort int) (int, error) {
 	}
 
 	return 0, fmt.Errorf("no available ports found between %d and %d", initialPort, initialPort+portRangeSize)
+}
+
+// getCoreDNSPodList lists all CoreDNS pods in the kube-system namespace.
+func getCoreDNSPodList(clientset *kubernetes.Clientset) (*corev1.PodList, error) {
+	podList, err := clientset.CoreV1().Pods("kube-system").List(context.TODO(), metav1.ListOptions{
+		LabelSelector: "k8s-app=kube-dns",
+	})
+	if err != nil {
+		return nil, err
+	}
+	return podList, nil
 }
