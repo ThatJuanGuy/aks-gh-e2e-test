@@ -39,8 +39,10 @@ const (
 
 	metricsHealthyStatus    = "healthy"
 	metricsHealthyErrorCode = metricsHealthyStatus
+	metricsUnhealthyStatus  = "unhealthy"
 
-	checkerTypeDNS = "dns"
+	checkerTypeDNS           = "dns"
+	dnsPodsNotReadyErrorCode = "pods_not_ready"
 )
 
 var (
@@ -260,6 +262,86 @@ var _ = Describe("Cluster health monitor", func() {
 
 					return true
 				}, "30s", "5s").Should(BeTrue(), "DNS checker metrics did not report healthy status within the timeout period")
+			})
+
+			It("should report unhealthy status for all DNS checkers when CoreDNS pods are not ready", func() {
+				By("Getting the CoreDNS deployment")
+				deployment, err := getCoreDNSDeployment(clientset)
+				Expect(err).NotTo(HaveOccurred(), "Failed to get CoreDNS deployment")
+				originalReplicas := *deployment.Spec.Replicas
+
+				By("Scaling down CoreDNS deployment to 0 replicas to simulate unhealthy state")
+				err = updateCoreDNSDeploymentReplicas(clientset, 0)
+				Expect(err).NotTo(HaveOccurred(), "Failed to scale down CoreDNS deployment")
+
+				DeferCleanup(func() {
+					By("Restoring CoreDNS deployment to original replica count")
+					err := updateCoreDNSDeploymentReplicas(clientset, originalReplicas)
+					Expect(err).NotTo(HaveOccurred(), "Failed to restore CoreDNS deployment")
+
+					By("Waiting for CoreDNS pods to be ready again")
+					Eventually(func() bool {
+						deployment, err := getCoreDNSDeployment(clientset)
+						if err != nil {
+							return false
+						}
+						return deployment.Status.ReadyReplicas == originalReplicas
+					}, "60s", "5s").Should(BeTrue(), "CoreDNS pods did not return to ready state")
+				})
+
+				By("Waiting for all CoreDNS pods to terminate")
+				Eventually(func() bool {
+					podList, err := getCoreDNSPodList(clientset)
+					if err != nil {
+						return false
+					}
+					return len(podList.Items) == 0
+				}, "30s", "2s").Should(BeTrue(), "Not all CoreDNS pods terminated")
+
+				By("Waiting for DNS checker metrics to report unhealthy status")
+				Eventually(func() bool {
+					metricsData, err := getMetrics(localPort)
+					if err != nil {
+						GinkgoWriter.Printf("Failed to get metrics: %v\n", err)
+						return false
+					}
+					metricFamily, found := metricsData[checkerResultMetricName]
+					if !found {
+						return false
+					}
+
+					// Get DNS checkers reporting unhealthy status and pods not ready.
+					foundDNSCheckers := make(map[string]struct{})
+					for _, m := range metricFamily.Metric {
+						labels := make(map[string]string)
+						for _, label := range m.Label {
+							labels[label.GetName()] = label.GetValue()
+						}
+
+						if labels[metricsCheckerTypeLabel] == checkerTypeDNS &&
+							labels[metricsStatusLabel] == metricsUnhealthyStatus &&
+							labels[metricsErrorCodeLabel] == dnsPodsNotReadyErrorCode {
+							GinkgoWriter.Printf("Found unhealthy and pods not ready DNS checker metric for %s\n", labels[metricsCheckerNameLabel])
+							foundDNSCheckers[labels[metricsCheckerNameLabel]] = struct{}{}
+						}
+					}
+
+					// Check count of expected unhealthy DNS checkers.
+					if len(foundDNSCheckers) != len(dnsCheckerNames) {
+						GinkgoWriter.Printf("Expected %d DNS checkers to be unhealthy and pods not ready, found %d: %v\n", len(dnsCheckerNames), len(foundDNSCheckers), foundDNSCheckers)
+						return false
+					}
+
+					// Verify that all expected unhealthy DNS checkers are present.
+					for _, checkerName := range dnsCheckerNames {
+						if _, found := foundDNSCheckers[checkerName]; !found {
+							GinkgoWriter.Printf("Expected DNS checker %s not found in unhealthy and pods not ready metrics\n", checkerName)
+							return false
+						}
+					}
+
+					return true
+				}, "30s", "5s").Should(BeTrue(), "DNS checker metrics did not report unhealthy status and pods not ready within the timeout period")
 			})
 
 			// TODO: Add case for DNS checker failure scenarios.
