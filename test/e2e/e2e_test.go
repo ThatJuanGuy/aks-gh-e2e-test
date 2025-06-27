@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -41,8 +42,10 @@ const (
 	metricsHealthyErrorCode = metricsHealthyStatus
 	metricsUnhealthyStatus  = "unhealthy"
 
-	checkerTypeDNS           = "dns"
-	dnsPodsNotReadyErrorCode = "pods_not_ready"
+	checkerTypeDNS             = "dns"
+	dnsPodsNotReadyErrorCode   = "pods_not_ready"
+	dnsDelayDuration           = 5 * time.Second
+	dnsServiceTimeoutErrorCode = "service_timeout"
 )
 
 var (
@@ -298,7 +301,7 @@ var _ = Describe("Cluster health monitor", func() {
 					return len(podList.Items) == 0
 				}, "30s", "2s").Should(BeTrue(), "Not all CoreDNS pods terminated")
 
-				By("Waiting for DNS checker metrics to report unhealthy status")
+				By("Waiting for DNS checker metrics to report unhealthy status with pods not ready")
 				Eventually(func() bool {
 					metricsData, err := getMetrics(localPort)
 					if err != nil {
@@ -344,7 +347,70 @@ var _ = Describe("Cluster health monitor", func() {
 				}, "30s", "5s").Should(BeTrue(), "DNS checker metrics did not report unhealthy status and pods not ready within the timeout period")
 			})
 
-			// TODO: Add case for DNS checker failure scenarios.
+			It("should report unhealthy status for all DNS checkers when DNS service has high latency", func() {
+				By("Adding global delay to all DNS queries")
+				originalCorefile, err := addGlobalDNSDelay(clientset, dnsDelayDuration)
+				Expect(err).NotTo(HaveOccurred(), "Failed to add global DNS delay")
+
+				By("Restarting CoreDNS pods to apply the delay")
+				err = restartCoreDNSPods(clientset)
+				Expect(err).NotTo(HaveOccurred(), "Failed to restart CoreDNS pods with original configuration")
+
+				DeferCleanup(func() {
+					By("Restoring the original CoreDNS ConfigMap")
+					err := restoreCoreDNSConfigMap(clientset, originalCorefile)
+					Expect(err).NotTo(HaveOccurred(), "Failed to restore CoreDNS ConfigMap")
+
+					By("Restarting CoreDNS pods to apply the original configuration")
+					err = restartCoreDNSPods(clientset)
+					Expect(err).NotTo(HaveOccurred(), "Failed to restart CoreDNS pods with original configuration")
+				})
+
+				By("Waiting for DNS checker metrics to report report unhealthy status with service timeout")
+				Eventually(func() bool {
+					metricsData, err := getMetrics(localPort)
+					if err != nil {
+						GinkgoWriter.Printf("Failed to get metrics: %v\n", err)
+						return false
+					}
+					metricFamily, found := metricsData[checkerResultMetricName]
+					if !found {
+						return false
+					}
+
+					// Get DNS checkers reporting unhealthy status and service timeout.
+					foundDNSCheckers := make(map[string]struct{})
+					for _, m := range metricFamily.Metric {
+						labels := make(map[string]string)
+						for _, label := range m.Label {
+							labels[label.GetName()] = label.GetValue()
+						}
+
+						if labels[metricsCheckerTypeLabel] == checkerTypeDNS &&
+							labels[metricsStatusLabel] == metricsUnhealthyStatus &&
+							labels[metricsErrorCodeLabel] == dnsServiceTimeoutErrorCode {
+							GinkgoWriter.Printf("Found unhealthy and service timeout DNS checker metric for %s\n", labels[metricsCheckerNameLabel])
+							foundDNSCheckers[labels[metricsCheckerNameLabel]] = struct{}{}
+						}
+					}
+
+					// Check count of expected unhealthy DNS checkers.
+					if len(foundDNSCheckers) != len(dnsCheckerNames) {
+						GinkgoWriter.Printf("Expected %d DNS checkers to be unhealthy and service timeout, found %d: %v\n", len(dnsCheckerNames), len(foundDNSCheckers), foundDNSCheckers)
+						return false
+					}
+
+					// Verify that all expected unhealthy DNS checkers are present.
+					for _, checkerName := range dnsCheckerNames {
+						if _, found := foundDNSCheckers[checkerName]; !found {
+							GinkgoWriter.Printf("Expected DNS checker %s not found in unhealthy and service timeout metrics\n", checkerName)
+							return false
+						}
+					}
+
+					return true
+				}, "60s", "5s").Should(BeTrue(), "DNS checker metrics did not report unhealthy status and service timeout within the timeout period")
+			})
 		})
 
 		// TODO: Add pod startup checker tests.
