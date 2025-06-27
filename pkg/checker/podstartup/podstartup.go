@@ -50,12 +50,18 @@ func BuildPodStartupChecker(config *config.CheckerConfig) (checker.Checker, erro
 		return nil, fmt.Errorf("failed to create Kubernetes clientset: %w", err)
 	}
 
-	return &PodStartupChecker{
+	chk := &PodStartupChecker{
 		name:         config.Name,
 		config:       config.PodStartupConfig,
 		timeout:      config.Timeout,
 		k8sClientset: k8sClientset,
-	}, nil
+	}
+	klog.InfoS("Built PodStartupChecker",
+		"name", chk.name,
+		"config", chk.config,
+		"timeout", chk.timeout.String(),
+	)
+	return chk, nil
 }
 
 func (c *PodStartupChecker) Name() string {
@@ -74,7 +80,7 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 	// Garbage collect any leftover synthetic pods previously created by this checker.
 	if err := c.garbageCollect(ctx); err != nil {
 		// Logging instead of returning an error here to avoid failing the checker run.
-		klog.Warningf("failed to garbage collect old synthetic pods: %s", err.Error())
+		klog.InfoS("Failed to garbage collect old synthetic pods", "error", err.Error())
 	}
 
 	// List pods to check the current number of synthetic pods. Do not run the checker if the maximum number of synthetic pods has been reached.
@@ -101,7 +107,7 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 		err := c.k8sClientset.CoreV1().Pods(c.config.SyntheticPodNamespace).Delete(ctx, synthPod.Name, metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			// Logging instead of returning an error here to avoid failing the checker run.
-			klog.Warningf("failed to delete synthetic pod %s: %s", synthPod.Name, err.Error())
+			klog.InfoS("Failed to delete synthetic pod", "name", synthPod.Name, "error", err.Error())
 		}
 	}()
 
@@ -193,7 +199,7 @@ func (c *PodStartupChecker) getImagePullDuration(ctx context.Context, podName st
 			return 0, nil
 		}
 		// Logging instead of returning an error to avoid failing the checker run.
-		klog.Warningf("Unexpected event message format for pod %s: %s\n", podName, event.Message)
+		klog.InfoS("Unexpected event message format for pod", "name", podName, "message", event.Message)
 	}
 	return 0, fmt.Errorf("no image pull events found for pod %s", podName)
 }

@@ -24,11 +24,18 @@ func init() {
 	klog.InitFlags(nil)
 }
 
+// logErrorAndExit logs an error message and exits the program with exit code 1.
+func logErrorAndExit(err error, message string) {
+	klog.ErrorS(err, message)
+	klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+}
+
 func main() {
 	configPath := flag.String("config", defaultConfigPath, "Path to the configuration file")
 	flag.Parse()
 	defer klog.Flush()
 
+	klog.InfoS("Started Cluster Health Monitor")
 	registerCheckers()
 
 	// Wait for interrupt signal to gracefully shutdown.
@@ -38,36 +45,41 @@ func main() {
 	// Run the prometheus metrics server.
 	m, err := metrics.NewServer(9800)
 	if err != nil {
-		klog.Fatalf("Failed to create metrics server:%s.", err)
+		logErrorAndExit(err, "Failed to create metrics server")
 	}
 	go func() {
 		if err := m.Run(ctx); err != nil {
-			klog.Fatalf("Metrics server error: %v.", err)
+			logErrorAndExit(err, "Metrics server error")
 		}
 	}()
 
 	// Parse the configuration file.
 	cfg, err := config.ParseFromFile(*configPath)
 	if err != nil {
-		klog.Fatalf("Failed to parse config: %v", err)
+		logErrorAndExit(err, "Failed to parse config")
 	}
+	klog.InfoS("Parsed configuration file",
+		"path", *configPath,
+		"numCheckers", len(cfg.Checkers))
 
 	// Build the checker schedule from the configuration.
 	cs, err := buildCheckerSchedule(cfg)
 	if err != nil {
-		klog.Fatalf("Failed to build checker schedule: %s", err)
+		logErrorAndExit(err, "Failed to build checker schedule")
 	}
+	klog.InfoS("Built checker schedule", "numSchedules", len(cs))
 
 	// Run the scheduler.
 	sched := scheduler.NewScheduler(cs)
 	go func() {
 		if err := sched.Start(ctx); err != nil {
-			klog.Fatalf("Scheduler error: %v", err)
+			logErrorAndExit(err, "Scheduler error")
 		}
 	}()
+	klog.InfoS("Scheduler started")
 
-	klog.Infof("Cluster Health Monitor started, using config from %s", *configPath)
 	<-ctx.Done()
+	klog.InfoS("Stopped Cluster Health Monitor due to context cancel")
 }
 
 func buildCheckerSchedule(cfg *config.Config) ([]scheduler.CheckerSchedule, error) {

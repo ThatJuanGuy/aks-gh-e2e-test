@@ -40,7 +40,6 @@ func (r *Scheduler) Start(ctx context.Context) error {
 		g.Go(func() error {
 			return r.scheduleChecker(ctx, chkSch)
 		})
-
 	}
 	return g.Wait()
 }
@@ -49,6 +48,13 @@ func (r *Scheduler) scheduleChecker(ctx context.Context, chkSch CheckerSchedule)
 	ticker := time.NewTicker(chkSch.Interval)
 	defer ticker.Stop()
 
+	checkerName := chkSch.Checker.Name()
+	checkerType := string(chkSch.Checker.Type())
+	klog.InfoS("Started checker scheduler",
+		"name", checkerName,
+		"type", checkerType,
+		"interval", chkSch.Interval.String(),
+		"timeout", chkSch.Timeout.String())
 	for {
 		select {
 		case <-ticker.C:
@@ -57,11 +63,13 @@ func (r *Scheduler) scheduleChecker(ctx context.Context, chkSch CheckerSchedule)
 				defer cancel()
 				result, err := chkSch.Checker.Run(runCtx)
 
-				recordCheckerResult(string(chkSch.Checker.Type()), chkSch.Checker.Name(), result, err)
+				recordCheckerResult(checkerType, checkerName, result, err)
 			}()
-
+			klog.V(3).InfoS("Ran scheduled check",
+				"name", checkerName,
+				"type", checkerType)
 		case <-ctx.Done():
-			klog.Infoln("Scheduler stopping.")
+			klog.InfoS("Stopped checker scheduler", "name", checkerName, "type", checkerType)
 			return ctx.Err()
 		}
 	}
@@ -74,6 +82,8 @@ func recordCheckerResult(checkerType, checkerName string, result *types.Result, 
 	// If there's an error, record as unknown.
 	if err != nil {
 		metrics.CheckerResultCounter.WithLabelValues(checkerType, checkerName, metrics.UnknownStatus, metrics.UnknownCode).Inc()
+		klog.V(3).InfoS("Recorded checker result", "name", checkerName, "type", checkerType, "status", metrics.UnknownStatus)
+		klog.ErrorS(err, "Failed checker run", "name", checkerName, "type", checkerType)
 		return
 	}
 
@@ -90,4 +100,5 @@ func recordCheckerResult(checkerType, checkerName string, result *types.Result, 
 	}
 
 	metrics.CheckerResultCounter.WithLabelValues(checkerType, checkerName, status, errorCode).Inc()
+	klog.V(3).InfoS("Recorded checker result", "name", checkerName, "type", checkerType, "status", status, "errorCode", errorCode, "message", result.Detail.Message)
 }

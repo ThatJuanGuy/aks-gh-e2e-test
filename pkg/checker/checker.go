@@ -6,6 +6,7 @@ import (
 
 	"github.com/Azure/cluster-health-monitor/pkg/config"
 	"github.com/Azure/cluster-health-monitor/pkg/types"
+	"k8s.io/klog/v2"
 )
 
 type Checker interface {
@@ -25,6 +26,7 @@ var checkerRegistry = make(map[config.CheckerType]Builder)
 
 func RegisterChecker(t config.CheckerType, builder Builder) {
 	checkerRegistry[t] = builder
+	klog.InfoS("Registered checker", "type", t)
 }
 
 // Build creates checkers from a list of checker configs
