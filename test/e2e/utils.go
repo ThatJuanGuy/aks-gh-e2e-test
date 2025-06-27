@@ -13,6 +13,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -115,4 +116,25 @@ func getCoreDNSPodList(clientset *kubernetes.Clientset) (*corev1.PodList, error)
 		return nil, err
 	}
 	return podList, nil
+}
+
+// getCoreDNSDeployment gets the CoreDNS deployment from the kube-system namespace.
+func getCoreDNSDeployment(clientset *kubernetes.Clientset) (*appsv1.Deployment, error) {
+	return clientset.AppsV1().Deployments("kube-system").Get(context.TODO(), "coredns", metav1.GetOptions{})
+}
+
+// updateCoreDNSDeploymentReplicas updates the replica count of the CoreDNS deployment.
+func updateCoreDNSDeploymentReplicas(clientset *kubernetes.Clientset, replicas int32) error {
+	deployment, err := getCoreDNSDeployment(clientset)
+	if err != nil {
+		return fmt.Errorf("failed to get CoreDNS deployment: %w", err)
+	}
+
+	deployment.Spec.Replicas = &replicas
+	_, err = clientset.AppsV1().Deployments("kube-system").Update(context.TODO(), deployment, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to update CoreDNS deployment replicas: %w", err)
+	}
+
+	return nil
 }
