@@ -11,7 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
+	"github.com/onsi/gomega/gexec"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	appsv1 "k8s.io/api/apps/v1"
@@ -27,6 +30,9 @@ const (
 	namespace            = "kube-system"
 	deploymentName       = "cluster-health-monitor"
 	checkerConfigMapName = "cluster-health-monitor-config"
+
+	remoteMetricsPort = 9800  // remoteMetricsPort is the fixed port used by the service in the container.
+	baseLocalPort     = 10000 // baseLocalPort is the base local port for dynamic allocation.
 
 	checkerResultMetricName = "cluster_health_monitor_checker_result_total"
 	metricsCheckerTypeLabel = "checker_type"
@@ -88,6 +94,30 @@ func getClusterHealthMonitorPod(clientset *kubernetes.Clientset) (*corev1.Pod, e
 	return &podList.Items[0], nil
 }
 
+func setupMetricsPortforwarding(clientset *kubernetes.Clientset) (*gexec.Session, int) {
+	By("Getting the cluster health monitor pod")
+	pod, err := getClusterHealthMonitorPod(clientset)
+	Expect(err).NotTo(HaveOccurred())
+
+	By("Finding an available local port for metrics")
+	localPort, err := getUnusedPort(baseLocalPort)
+	Expect(err).NotTo(HaveOccurred(), "Failed to get unused port")
+	GinkgoWriter.Printf("Using local port %d for metrics endpoint\n", localPort)
+
+	By("Port-forwarding to the cluster health monitor pod")
+	cmd := exec.Command("kubectl", "port-forward",
+		fmt.Sprintf("pod/%s", pod.Name),
+		fmt.Sprintf("%d:%d", localPort, remoteMetricsPort),
+		"-n", namespace)
+	cmd.Env = os.Environ()
+	session, err := gexec.Start(cmd, GinkgoWriter, GinkgoWriter)
+	Expect(err).NotTo(HaveOccurred())
+	GinkgoWriter.Printf("Port-forwarding to pod %s in namespace %s on port %d:%d\n", pod.Name, namespace, localPort, remoteMetricsPort)
+	Eventually(session, "5s", "1s").Should(gbytes.Say("Forwarding from"), "Failed to establish port-forwarding")
+
+	return session, localPort
+}
+
 // getMetrics fetches and parses metrics from the metrics endpoint.
 func getMetrics(port int) (map[string]*dto.MetricFamily, error) {
 	res, err := http.Get(fmt.Sprintf("http://localhost:%d/metrics", port))
@@ -121,7 +151,7 @@ func getMetrics(port int) (map[string]*dto.MetricFamily, error) {
 
 // getUnusedPort generates a port number that is likely to be unique for parallel tests.
 func getUnusedPort(basePort int) (int, error) {
-	processID := ginkgo.GinkgoParallelProcess()
+	processID := GinkgoParallelProcess()
 	portRangeSize := 1000
 	initialPort := basePort + (processID * portRangeSize)
 
