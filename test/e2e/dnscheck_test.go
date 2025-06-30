@@ -19,17 +19,17 @@ var (
 	dnsCheckerNames = []string{"test-internal-dns-checker", "test-external-dns-checker"}
 )
 
-var _ = Describe("DNS checker metrics", Ordered, func() {
+var _ = Describe("DNS checker metrics", Ordered, ContinueOnFailure, func() {
 	var (
 		session   *gexec.Session
 		localPort int
 	)
 
-	BeforeEach(func() {
+	BeforeAll(func() {
 		session, localPort = setupMetricsPortforwarding(clientset)
 	})
 
-	AfterEach(func() {
+	AfterAll(func() {
 		if session != nil {
 			session.Kill()
 		}
