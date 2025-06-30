@@ -261,11 +261,11 @@ var _ = Describe("Cluster health monitor", func() {
 
 				By("Waiting for all CoreDNS pods to terminate")
 				Eventually(func() bool {
-					podList, err := getCoreDNSPodList(clientset)
+					deployment, err := getCoreDNSDeployment(clientset)
 					if err != nil {
 						return false
 					}
-					return len(podList.Items) == 0
+					return deployment.Status.AvailableReplicas == 0
 				}, "30s", "2s").Should(BeTrue(), "Not all CoreDNS pods terminated")
 
 				By("Waiting for DNS checker metrics to report unhealthy status with pods not ready")
