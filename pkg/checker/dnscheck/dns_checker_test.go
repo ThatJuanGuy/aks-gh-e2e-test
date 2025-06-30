@@ -113,8 +113,8 @@ func TestDNSChecker_Timeout(t *testing.T) {
 func makeCoreDNSService(ip string) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: CoreDNSNamespace,
-			Name:      CoreDNSServiceName,
+			Namespace: coreDNSNamespace,
+			Name:      coreDNSServiceName,
 		},
 		Spec: corev1.ServiceSpec{
 			ClusterIP: ip,
@@ -135,9 +135,9 @@ func makeCoreDNSEndpointSlice(ips []string) *discoveryv1.EndpointSlice {
 	}
 	return &discoveryv1.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: CoreDNSNamespace,
+			Namespace: coreDNSNamespace,
 			Labels: map[string]string{
-				discoveryv1.LabelServiceName: CoreDNSServiceName,
+				discoveryv1.LabelServiceName: coreDNSServiceName,
 			},
 		},
 		Endpoints: endpoints,

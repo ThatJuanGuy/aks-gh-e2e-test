@@ -23,8 +23,8 @@ func Register() {
 }
 
 const (
-	CoreDNSNamespace   = "kube-system"
-	CoreDNSServiceName = "kube-dns"
+	coreDNSNamespace   = "kube-system"
+	coreDNSServiceName = "kube-dns"
 )
 
 // DNSChecker implements the Checker interface for DNS checks.
@@ -109,7 +109,7 @@ func (c DNSChecker) Run(ctx context.Context) (*types.Result, error) {
 
 // getCoreDNSSvcIP returns the ClusterIP of the CoreDNS service in the cluster as a DNSTarget.
 func getCoreDNSSvcIP(ctx context.Context, kubeClient kubernetes.Interface) (string, error) {
-	svc, err := kubeClient.CoreV1().Services(CoreDNSNamespace).Get(ctx, CoreDNSServiceName, metav1.GetOptions{})
+	svc, err := kubeClient.CoreV1().Services(coreDNSNamespace).Get(ctx, coreDNSServiceName, metav1.GetOptions{})
 
 	if err != nil && apierrors.IsNotFound(err) {
 		return "", errServiceNotReady
@@ -127,8 +127,8 @@ func getCoreDNSSvcIP(ctx context.Context, kubeClient kubernetes.Interface) (stri
 
 // getCoreDNSPodIPs returns the IPs of all CoreDNS pods in the cluster as DNSTargets.
 func getCoreDNSPodIPs(ctx context.Context, kubeClient kubernetes.Interface) ([]string, error) {
-	endpointSliceList, err := kubeClient.DiscoveryV1().EndpointSlices(CoreDNSNamespace).List(ctx, metav1.ListOptions{
-		LabelSelector: discoveryv1.LabelServiceName + "=" + CoreDNSServiceName,
+	endpointSliceList, err := kubeClient.DiscoveryV1().EndpointSlices(coreDNSNamespace).List(ctx, metav1.ListOptions{
+		LabelSelector: discoveryv1.LabelServiceName + "=" + coreDNSServiceName,
 	})
 	if err != nil && apierrors.IsNotFound(err) {
 		return nil, errPodsNotReady
