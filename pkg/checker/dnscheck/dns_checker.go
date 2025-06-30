@@ -2,9 +2,12 @@
 package dnscheck
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"strings"
 
 	discoveryv1 "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -25,7 +28,13 @@ func Register() {
 const (
 	coreDNSNamespace   = "kube-system"
 	coreDNSServiceName = "kube-dns"
+	resolvConfPath     = "/etc/resolv.conf"
 )
+
+var localDNSIPSet = map[string]struct{}{
+	"169.254.10.10": {},
+	"169.254.10.11": {},
+}
 
 // DNSChecker implements the Checker interface for DNS checks.
 type DNSChecker struct {
@@ -102,7 +111,22 @@ func (c DNSChecker) Run(ctx context.Context) (*types.Result, error) {
 		}
 	}
 
-	// TODO: Get LocalDNS IP.
+	// Check LocalDNS if available.
+	localDNSIPs, err := getLocalDNSIPs()
+	if err != nil {
+		// Log the error but continue the check even if we can't get LocalDNS IPs.
+		klog.ErrorS(err, "Failed to get LocalDNS IPs")
+	} else if len(localDNSIPs) > 0 {
+		klog.V(3).InfoS("Found LocalDNS IPs", "ips", localDNSIPs)
+		for _, ip := range localDNSIPs {
+			if _, err := c.resolver.lookupHost(ctx, ip, domain); err != nil {
+				if errors.Is(err, context.DeadlineExceeded) {
+					return types.Unhealthy(errCodeLocalDNSTimeout, "LocalDNS query timed out"), nil
+				}
+				return types.Unhealthy(errCodeLocalDNSError, fmt.Sprintf("LocalDNS query error: %s", err)), nil
+			}
+		}
+	}
 
 	return types.Healthy(), nil
 }
@@ -154,4 +178,34 @@ func getCoreDNSPodIPs(ctx context.Context, kubeClient kubernetes.Interface) ([]s
 	}
 
 	return podIPs, nil
+}
+
+// getLocalDNSIPs reads /etc/resolv.conf and returns any nameserver entries that match LocalDNS IPs.
+func getLocalDNSIPs() ([]string, error) {
+	file, err := os.Open(resolvConfPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open %s: %w", resolvConfPath, err)
+	}
+	defer file.Close()
+
+	var localDNSIPs []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "nameserver") {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 {
+				ip := fields[1]
+				if _, isLocalDNS := localDNSIPSet[ip]; isLocalDNS {
+					localDNSIPs = append(localDNSIPs, ip)
+				}
+			}
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading %s: %w", resolvConfPath, err)
+	}
+
+	return localDNSIPs, nil
 }
