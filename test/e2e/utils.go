@@ -93,6 +93,8 @@ func getClusterHealthMonitorPod(clientset *kubernetes.Clientset) (*corev1.Pod, e
 	return &podList.Items[0], nil
 }
 
+// setupMetricsPortforwarding sets up port-forwarding to the cluster health monitor pod's metrics endpoint.
+// It returns the session and the local port used for port-forwarding.
 func setupMetricsPortforwarding(clientset *kubernetes.Clientset) (*gexec.Session, int) {
 	By("Getting the cluster health monitor pod")
 	pod, err := getClusterHealthMonitorPod(clientset)
