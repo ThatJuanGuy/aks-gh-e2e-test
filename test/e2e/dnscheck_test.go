@@ -22,7 +22,7 @@ var (
 	dnsCheckerNames = []string{"test-internal-dns-checker", "test-external-dns-checker"}
 )
 
-var _ = Describe("DNS checker metrics", func() {
+var _ = Describe("DNS checker metrics", Ordered, func() {
 	var (
 		session   *gexec.Session
 		localPort int
