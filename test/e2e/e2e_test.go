@@ -21,11 +21,6 @@ var (
 	clientset          *kubernetes.Clientset
 	skipClusterSetup   = os.Getenv("E2E_SKIP_CLUSTER_SETUP") == "true"
 	skipClusterCleanup = os.Getenv("E2E_SKIP_CLUSTER_CLEANUP") == "true"
-
-	// Expected checkers.
-	// Note that these checkers must match with the configmap in manifests/overlays/test.
-	dnsCheckerNames = []string{"test-internal-dns-checker", "test-external-dns-checker"}
-	// TODO: Add pod startup checker.
 )
 
 func beforeSuiteAllProcesses() []byte {
