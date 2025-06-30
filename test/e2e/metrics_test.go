@@ -2,7 +2,6 @@
 package e2e
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,7 +11,6 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/onsi/gomega/gexec"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -37,12 +35,8 @@ var _ = Describe("Metrics endpoint", func() {
 
 	BeforeEach(func() {
 		By("Getting the cluster health monitor pod")
-		podList, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: "app=" + deploymentName,
-		})
+		pod, err := getClusterHealthMonitorPod(clientset)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(podList.Items).NotTo(BeEmpty())
-		pod := podList.Items[0]
 
 		By("Finding an available local port for metrics")
 		localPort, err = getUnusedPort(baseLocalPort)

@@ -22,6 +22,12 @@ import (
 )
 
 const (
+	// Kubernetes resource names.
+	// Note that these names must match with the applied manifests/overlays/test.
+	namespace            = "kube-system"
+	deploymentName       = "cluster-health-monitor"
+	checkerConfigMapName = "cluster-health-monitor-config"
+
 	checkerResultMetricName = "cluster_health_monitor_checker_result_total"
 	metricsCheckerTypeLabel = "checker_type"
 	metricsCheckerNameLabel = "checker_name"
@@ -59,6 +65,27 @@ func getKubeClient(kubeConfigPath string) (*kubernetes.Clientset, error) {
 		return nil, fmt.Errorf("failed to create Kubernetes clientset: %w", err)
 	}
 	return clientset, nil
+}
+
+func getClusterHealthMonitorDeployment(clientset *kubernetes.Clientset) (*appsv1.Deployment, error) {
+	deployment, err := clientset.AppsV1().Deployments(namespace).Get(context.TODO(), deploymentName, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster health monitor deployment: %w", err)
+	}
+	return deployment, nil
+}
+
+func getClusterHealthMonitorPod(clientset *kubernetes.Clientset) (*corev1.Pod, error) {
+	podList, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: "app=" + deploymentName,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster health monitor pod: %w", err)
+	}
+	if len(podList.Items) == 0 {
+		return nil, fmt.Errorf("no cluster health monitor pod found")
+	}
+	return &podList.Items[0], nil
 }
 
 // getMetrics fetches and parses metrics from the metrics endpoint.

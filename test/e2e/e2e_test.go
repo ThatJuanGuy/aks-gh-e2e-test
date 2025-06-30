@@ -2,7 +2,6 @@
 package e2e
 
 import (
-	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,7 +9,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -18,14 +16,6 @@ func TestE2E(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "E2E Suite")
 }
-
-const (
-	// Kubernetes resource names.
-	// Note that these names must match with the applied manifests/overlays/test.
-	namespace            = "kube-system"
-	deploymentName       = "cluster-health-monitor"
-	checkerConfigMapName = "cluster-health-monitor-config"
-)
 
 var (
 	clientset          *kubernetes.Clientset
@@ -80,7 +70,7 @@ func beforeSuiteAllProcesses() []byte {
 
 	By("Waiting for cluster health monitor deployment to become ready")
 	Eventually(func() bool {
-		deployment, err := clientset.AppsV1().Deployments(namespace).Get(context.TODO(), deploymentName, metav1.GetOptions{})
+		deployment, err := getClusterHealthMonitorDeployment(clientset)
 		if err != nil {
 			return false
 		}
@@ -125,17 +115,13 @@ var _ = Describe("Cluster health monitor", func() {
 	Context("deployment", func() {
 		It("should have the cluster health monitor pod running", func() {
 			By("Checking if the cluster health monitor deployment is available")
-			deployment, err := clientset.AppsV1().Deployments(namespace).Get(context.TODO(), deploymentName, metav1.GetOptions{})
+			deployment, err := getClusterHealthMonitorDeployment(clientset)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(deployment.Status.AvailableReplicas).To(Equal(*deployment.Spec.Replicas))
 
 			By("Checking if the cluster health monitor pod is running")
-			podList, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
-				LabelSelector: "app=" + deploymentName,
-			})
+			pod, err := getClusterHealthMonitorPod(clientset)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(podList.Items).NotTo(BeEmpty())
-			pod := podList.Items[0]
 			Expect(pod.Status.Phase).To(BeEquivalentTo("Running"), "Pod %s should be in Running state", pod.Name)
 			for _, containerStatus := range pod.Status.ContainerStatuses {
 				Expect(containerStatus.Ready).To(BeTrue(), "Container %s in pod %s should be ready", containerStatus.Name, pod.Name)
