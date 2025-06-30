@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -184,8 +183,8 @@ func getCoreDNSPodList(clientset *kubernetes.Clientset) (*corev1.PodList, error)
 	return podList, nil
 }
 
-// restartCoreDNSPods restarts the CoreDNS pods by deleting them.
-func restartCoreDNSPods(clientset *kubernetes.Clientset) error {
+// deleteCoreDNSPods deletes the CoreDNS pods.
+func deleteCoreDNSPods(clientset *kubernetes.Clientset) error {
 	podList, err := getCoreDNSPodList(clientset)
 	if err != nil {
 		return fmt.Errorf("failed to get CoreDNS pod list: %w", err)
@@ -226,18 +225,19 @@ func getCoreDNSConfigMap(clientset *kubernetes.Clientset) (*corev1.ConfigMap, er
 	return clientset.CoreV1().ConfigMaps("kube-system").Get(context.TODO(), "coredns", metav1.GetOptions{})
 }
 
-// addGlobalDNSDelay adds a delay to all DNS queries by modifying the CoreDNS ConfigMap.
+// simulateCoreDNSHighLatency simulates high latency in DNS responses by modifying the CoreDNS ConfigMap.
+// It adds an invalid plugin directive to the Corefile to crash new CoreDNS pods, simulating high latency for the DNS service.
+// This is a workaround for testing purposes and should not be used in production.
+// The existing CoreDNS pods must be deleted to apply the changes.
 // It returns the original Corefile content so it can be restored later.
-func addGlobalDNSDelay(clientset *kubernetes.Clientset, delayDuration time.Duration) (string, error) {
+func simulateCoreDNSHighLatency(clientset *kubernetes.Clientset) (string, error) {
 	configMap, err := getCoreDNSConfigMap(clientset)
 	if err != nil {
 		return "", fmt.Errorf("failed to get CoreDNS ConfigMap: %w", err)
 	}
-	originalCorefile := configMap.Data["Corefile"]
 
-	// Add a delay for all domains.
-	delay := fmt.Sprintf("delay %s", delayDuration.String())
-	modifiedCorefile := strings.Replace(originalCorefile, "cache", delay+"\n    cache", 1)
+	originalCorefile := configMap.Data["Corefile"]
+	modifiedCorefile := strings.Replace(originalCorefile, "cache", "invalidplugin\n    cache", 1)
 	configMap.Data["Corefile"] = modifiedCorefile
 
 	_, err = clientset.CoreV1().ConfigMaps("kube-system").Update(context.TODO(), configMap, metav1.UpdateOptions{})

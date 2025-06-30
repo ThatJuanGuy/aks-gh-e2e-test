@@ -2,8 +2,6 @@
 package e2e
 
 import (
-	"time"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"
@@ -12,7 +10,6 @@ import (
 const (
 	checkerTypeDNS             = "dns"
 	dnsPodsNotReadyErrorCode   = "pods_not_ready"
-	dnsDelayDuration           = 5 * time.Second
 	dnsServiceTimeoutErrorCode = "service_timeout"
 )
 
@@ -110,22 +107,22 @@ var _ = Describe("DNS checker metrics", Ordered, func() {
 	})
 
 	It("should report unhealthy status for all DNS checkers when DNS service has high latency", func() {
-		By("Adding global delay to all DNS queries")
-		originalCorefile, err := addGlobalDNSDelay(clientset, dnsDelayDuration)
-		Expect(err).NotTo(HaveOccurred(), "Failed to add global DNS delay")
+		By("Simulating high latency in DNS responses")
+		originalCorefile, err := simulateCoreDNSHighLatency(clientset)
+		Expect(err).NotTo(HaveOccurred(), "Failed to simulate high latency in DNS responses")
 
-		By("Restarting CoreDNS pods to apply the delay")
-		err = restartCoreDNSPods(clientset)
-		Expect(err).NotTo(HaveOccurred(), "Failed to restart CoreDNS pods with original configuration")
+		By("Deleting CoreDNS pods to apply the changes")
+		err = deleteCoreDNSPods(clientset)
+		Expect(err).NotTo(HaveOccurred(), "Failed to delete CoreDNS pods to apply high latency changes")
 
 		DeferCleanup(func() {
 			By("Restoring the original CoreDNS ConfigMap")
 			err := restoreCoreDNSConfigMap(clientset, originalCorefile)
 			Expect(err).NotTo(HaveOccurred(), "Failed to restore CoreDNS ConfigMap")
 
-			By("Restarting CoreDNS pods to apply the original configuration")
-			err = restartCoreDNSPods(clientset)
-			Expect(err).NotTo(HaveOccurred(), "Failed to restart CoreDNS pods with original configuration")
+			By("Deleting CoreDNS pods to apply the original configuration")
+			err = deleteCoreDNSPods(clientset)
+			Expect(err).NotTo(HaveOccurred(), "Failed to delete CoreDNS pods with original configuration")
 		})
 
 		By("Waiting for DNS checker metrics to report unhealthy status with service timeout")
