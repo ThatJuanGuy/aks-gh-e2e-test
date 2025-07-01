@@ -23,210 +23,188 @@ func (f *fakeResolver) lookupHost(ctx context.Context, ip, domain string) ([]str
 	return f.lookupHostFunc(ctx, ip, domain)
 }
 
-func TestDNSChecker_Healthy(t *testing.T) {
+func TestDNSChecker_Run(t *testing.T) {
 	t.Parallel()
-	g := NewWithT(t)
-
-	mockFs := afero.NewMemMapFs()
-	resolveConfContent := `
-nameserver 169.254.10.10
-`
-	err := afero.WriteFile(mockFs, resolvConfPath, []byte(resolveConfContent), 0644)
-	g.Expect(err).ToNot(HaveOccurred())
-
-	client := k8sfake.NewClientset(
-		makeCoreDNSService("10.0.0.10"),
-		makeCoreDNSEndpointSlice([]string{"10.0.0.11", "10.0.0.12"}),
-	)
-	chk := &DNSChecker{
-		name:       "dns-test",
-		config:     &config.DNSConfig{Domain: "example.com"},
-		kubeClient: client,
-		resolver: &fakeResolver{
-			lookupHostFunc: func(ctx context.Context, ip, domain string) ([]string, error) {
-				return []string{"1.2.3.4"}, nil
+	testCases := []struct {
+		name          string
+		client        *k8sfake.Clientset
+		mockResolver  resolver
+		checkLocalDNS bool
+		mockFs        func() afero.Fs
+		validateRes   func(g *WithT, res *types.Result, err error)
+	}{
+		{
+			name: "CoreDNS Healthy",
+			client: k8sfake.NewClientset(
+				makeCoreDNSService("10.0.0.10"),
+				makeCoreDNSEndpointSlice([]string{"10.0.0.11", "10.0.0.12"}),
+			),
+			mockResolver: &fakeResolver{
+				lookupHostFunc: func(ctx context.Context, ip, domain string) ([]string, error) {
+					return []string{"1.2.3.4"}, nil
+				},
+			},
+			mockFs: afero.NewMemMapFs,
+			validateRes: func(g *WithT, res *types.Result, err error) {
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(res.Status).To(Equal(types.StatusHealthy))
 			},
 		},
-		fs: mockFs,
-	}
-	res, err := chk.Run(context.Background())
-	g.Expect(err).ToNot(HaveOccurred())
-	g.Expect(res.Status).To(Equal(types.StatusHealthy))
-}
-
-func TestDNSChecker_ServiceNotReady(t *testing.T) {
-	t.Parallel()
-	g := NewWithT(t)
-	client := k8sfake.NewClientset() // no service
-	chk := &DNSChecker{
-		name:       "dns-test",
-		config:     &config.DNSConfig{Domain: "example.com"},
-		kubeClient: client,
-		resolver: &fakeResolver{
-			lookupHostFunc: func(ctx context.Context, ip, domain string) ([]string, error) {
-				return []string{"1.2.3.4"}, nil
+		{
+			name:   "CoreDNS Service Not Ready",
+			client: k8sfake.NewClientset(), // No service.
+			mockResolver: &fakeResolver{
+				lookupHostFunc: func(ctx context.Context, ip, domain string) ([]string, error) {
+					return []string{"1.2.3.4"}, nil
+				},
+			},
+			mockFs: afero.NewMemMapFs,
+			validateRes: func(g *WithT, res *types.Result, err error) {
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
+				g.Expect(res.Detail.Code).To(Equal(errCodeServiceNotReady))
 			},
 		},
-		fs: afero.NewMemMapFs(),
-	}
-	res, err := chk.Run(context.Background())
-	g.Expect(err).ToNot(HaveOccurred())
-	g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
-	g.Expect(res.Detail.Code).To(Equal(errCodeServiceNotReady))
-}
-
-func TestDNSChecker_PodsNotReady(t *testing.T) {
-	t.Parallel()
-	g := NewWithT(t)
-	client := k8sfake.NewClientset(
-		makeCoreDNSService("10.0.0.10"),
-	)
-	chk := &DNSChecker{
-		name:       "dns-test",
-		config:     &config.DNSConfig{Domain: "example.com"},
-		kubeClient: client,
-		resolver: &fakeResolver{
-			lookupHostFunc: func(ctx context.Context, ip, domain string) ([]string, error) {
-				return []string{"1.2.3.4"}, nil
+		{
+			name: "CoreDNS Pods Not Ready",
+			client: k8sfake.NewClientset(
+				makeCoreDNSService("10.0.0.10"),
+			),
+			mockResolver: &fakeResolver{
+				lookupHostFunc: func(ctx context.Context, ip, domain string) ([]string, error) {
+					return []string{"1.2.3.4"}, nil
+				},
+			},
+			mockFs: afero.NewMemMapFs,
+			validateRes: func(g *WithT, res *types.Result, err error) {
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
+				g.Expect(res.Detail.Code).To(Equal(errCodePodsNotReady))
 			},
 		},
-		fs: afero.NewMemMapFs(),
-	}
-	res, err := chk.Run(context.Background())
-	g.Expect(err).ToNot(HaveOccurred())
-	g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
-	g.Expect(res.Detail.Code).To(Equal(errCodePodsNotReady))
-}
-
-func TestDNSChecker_Timeout(t *testing.T) {
-	t.Parallel()
-	g := NewWithT(t)
-	client := k8sfake.NewClientset(
-		makeCoreDNSService("10.0.0.10"),
-		makeCoreDNSEndpointSlice([]string{"10.0.0.11"}),
-	)
-	chk := &DNSChecker{
-		name:       "dns-test",
-		config:     &config.DNSConfig{Domain: "example.com"},
-		kubeClient: client,
-		resolver: &fakeResolver{
-			lookupHostFunc: func(ctx context.Context, ip, domain string) ([]string, error) {
-				return nil, context.DeadlineExceeded
-			},
-		},
-		fs: afero.NewMemMapFs(),
-	}
-	res, err := chk.Run(context.Background())
-	g.Expect(err).ToNot(HaveOccurred())
-	g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
-	g.Expect(res.Detail.Code).To(Equal(errCodeServiceTimeout))
-}
-
-func TestDNSChecker_LocalDNSError(t *testing.T) {
-	t.Parallel()
-	g := NewWithT(t)
-
-	mockFs := afero.NewMemMapFs()
-	resolveConfContent := `
-nameserver 169.254.10.10
-`
-	err := afero.WriteFile(mockFs, resolvConfPath, []byte(resolveConfContent), 0644)
-	g.Expect(err).ToNot(HaveOccurred())
-
-	client := k8sfake.NewClientset(
-		makeCoreDNSService("10.0.0.10"),
-		makeCoreDNSEndpointSlice([]string{"10.0.0.11", "10.0.0.12"}),
-	)
-	chk := &DNSChecker{
-		name:       "dns-test",
-		config:     &config.DNSConfig{Domain: "example.com"},
-		kubeClient: client,
-		resolver: &fakeResolver{
-			lookupHostFunc: func(ctx context.Context, ip, domain string) ([]string, error) {
-				if ip == "169.254.10.10" {
-					return nil, fmt.Errorf("connection refused")
-				}
-				return []string{"1.2.3.4"}, nil
-			},
-		},
-		fs: mockFs,
-	}
-	res, err := chk.Run(context.Background())
-	g.Expect(err).ToNot(HaveOccurred())
-	g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
-	g.Expect(res.Detail.Code).To(Equal(errCodeLocalDNSError))
-}
-
-func TestDNSChecker_LocalDNSTimeout(t *testing.T) {
-	t.Parallel()
-	g := NewWithT(t)
-
-	mockFs := afero.NewMemMapFs()
-	resolveConfContent := `
-nameserver 169.254.10.11
-`
-	err := afero.WriteFile(mockFs, resolvConfPath, []byte(resolveConfContent), 0644)
-	g.Expect(err).ToNot(HaveOccurred())
-
-	client := k8sfake.NewClientset(
-		makeCoreDNSService("10.0.0.10"),
-		makeCoreDNSEndpointSlice([]string{"10.0.0.11", "10.0.0.12"}),
-	)
-	chk := &DNSChecker{
-		name:       "dns-test",
-		config:     &config.DNSConfig{Domain: "example.com"},
-		kubeClient: client,
-		resolver: &fakeResolver{
-			lookupHostFunc: func(ctx context.Context, ip, domain string) ([]string, error) {
-				if ip == "169.254.10.11" {
+		{
+			name: "CoreDNS Service Timeout",
+			client: k8sfake.NewClientset(
+				makeCoreDNSService("10.0.0.10"),
+				makeCoreDNSEndpointSlice([]string{"10.0.0.11"}),
+			),
+			mockResolver: &fakeResolver{
+				lookupHostFunc: func(ctx context.Context, ip, domain string) ([]string, error) {
 					return nil, context.DeadlineExceeded
-				}
-				return []string{"1.2.3.4"}, nil
+				},
+			},
+			mockFs: afero.NewMemMapFs,
+			validateRes: func(g *WithT, res *types.Result, err error) {
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
+				g.Expect(res.Detail.Code).To(Equal(errCodeServiceTimeout))
 			},
 		},
-		fs: mockFs,
-	}
-	res, err := chk.Run(context.Background())
-	g.Expect(err).ToNot(HaveOccurred())
-	g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
-	g.Expect(res.Detail.Code).To(Equal(errCodeLocalDNSTimeout))
-}
-
-func TestDNSChecker_NoLocalDNS(t *testing.T) {
-	t.Parallel()
-	g := NewWithT(t)
-
-	mockFs := afero.NewMemMapFs()
-	resolveConfContent := `
-nameserver 8.8.8.8
-`
-	err := afero.WriteFile(mockFs, resolvConfPath, []byte(resolveConfContent), 0644)
-	g.Expect(err).ToNot(HaveOccurred())
-
-	client := k8sfake.NewClientset(
-		makeCoreDNSService("10.0.0.10"),
-		makeCoreDNSEndpointSlice([]string{"10.0.0.11", "10.0.0.12"}),
-	)
-
-	chk := &DNSChecker{
-		name:       "dns-test",
-		config:     &config.DNSConfig{Domain: "example.com"},
-		kubeClient: client,
-		resolver: &fakeResolver{
-			lookupHostFunc: func(ctx context.Context, ip, domain string) ([]string, error) {
-				// Check if 8.8.8.8 is being queried.
-				if ip == "8.8.8.8" {
-					return nil, fmt.Errorf("connection refused")
-				}
-				return []string{"1.2.3.4"}, nil
+		{
+			name:   "LocalDNS Healthy",
+			client: k8sfake.NewClientset(),
+			mockResolver: &fakeResolver{
+				lookupHostFunc: func(ctx context.Context, ip, domain string) ([]string, error) {
+					return []string{"1.2.3.4"}, nil
+				},
+			},
+			checkLocalDNS: true,
+			mockFs: func() afero.Fs {
+				fs := afero.NewMemMapFs()
+				resolveConfContent := "nameserver 169.254.10.10\n"
+				_ = afero.WriteFile(fs, resolvConfPath, []byte(resolveConfContent), 0644)
+				return fs
+			},
+			validateRes: func(g *WithT, res *types.Result, err error) {
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(res.Status).To(Equal(types.StatusHealthy))
 			},
 		},
-		fs: mockFs,
+		{
+			name:   "LocalDNS Error",
+			client: k8sfake.NewClientset(),
+			mockResolver: &fakeResolver{
+				lookupHostFunc: func(ctx context.Context, ip, domain string) ([]string, error) {
+					return nil, fmt.Errorf("local dns error")
+				},
+			},
+			checkLocalDNS: true,
+			mockFs: func() afero.Fs {
+				fs := afero.NewMemMapFs()
+				resolveConfContent := "nameserver 169.254.10.10\n"
+				_ = afero.WriteFile(fs, resolvConfPath, []byte(resolveConfContent), 0644)
+				return fs
+			},
+			validateRes: func(g *WithT, res *types.Result, err error) {
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
+				g.Expect(res.Detail.Code).To(Equal(errCodeLocalDNSError))
+			},
+		},
+		{
+			name:   "LocalDNS Timeout",
+			client: k8sfake.NewClientset(),
+			mockResolver: &fakeResolver{
+				lookupHostFunc: func(ctx context.Context, ip, domain string) ([]string, error) {
+					return nil, context.DeadlineExceeded
+				},
+			},
+			checkLocalDNS: true,
+			mockFs: func() afero.Fs {
+				fs := afero.NewMemMapFs()
+				resolveConfContent := "nameserver 169.254.10.10\n"
+				_ = afero.WriteFile(fs, resolvConfPath, []byte(resolveConfContent), 0644)
+				return fs
+			},
+			validateRes: func(g *WithT, res *types.Result, err error) {
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
+				g.Expect(res.Detail.Code).To(Equal(errCodeLocalDNSTimeout))
+			},
+		},
+		{
+			name:   "LocalDNS No IPs Found",
+			client: k8sfake.NewClientset(),
+			mockResolver: &fakeResolver{
+				lookupHostFunc: func(ctx context.Context, ip, domain string) ([]string, error) {
+					return []string{"1.2.3.4"}, nil
+				},
+			},
+			checkLocalDNS: true,
+			mockFs: func() afero.Fs {
+				fs := afero.NewMemMapFs()
+				resolveConfContent := "nameserver 8.8.8.8\n"
+				_ = afero.WriteFile(fs, resolvConfPath, []byte(resolveConfContent), 0644)
+				return fs
+			},
+			validateRes: func(g *WithT, res *types.Result, err error) {
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
+				g.Expect(res.Detail.Code).To(Equal(errCodeLocalDNSNoIPs))
+			},
+		},
 	}
 
-	res, err := chk.Run(context.Background())
-	g.Expect(err).ToNot(HaveOccurred())
-	g.Expect(res.Status).To(Equal(types.StatusHealthy))
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			g := NewWithT(t)
+
+			chk := &DNSChecker{
+				name: "dns-test",
+				config: &config.DNSConfig{
+					Domain:        "example.com",
+					CheckLocalDNS: tc.checkLocalDNS,
+				},
+				kubeClient: tc.client,
+				resolver:   tc.mockResolver,
+				fs:         tc.mockFs(),
+			}
+
+			res, err := chk.Run(context.Background())
+			tc.validateRes(g, res, err)
+		})
+	}
 }
 
 // --- helpers ---
