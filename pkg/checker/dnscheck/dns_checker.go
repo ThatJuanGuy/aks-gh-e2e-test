@@ -29,12 +29,8 @@ const (
 	coreDNSNamespace   = "kube-system"
 	coreDNSServiceName = "kube-dns"
 	resolvConfPath     = "/etc/resolv.conf"
+	localDNSIP         = "169.254.10.11"
 )
-
-var localDNSIPSet = map[string]struct{}{
-	"169.254.10.10": {},
-	"169.254.10.11": {},
-}
 
 // DNSChecker implements the Checker interface for DNS checks.
 type DNSChecker struct {
@@ -46,7 +42,7 @@ type DNSChecker struct {
 }
 
 // BuildDNSChecker creates a new DNSChecker instance.
-// If the DNSType is LocalDNS, it checks if LocalDNS IPs are available before creating the checker.
+// If the DNSType is LocalDNS, it checks if LocalDNS IP is enabled before creating the checker.
 func BuildDNSChecker(config *config.CheckerConfig) (checker.Checker, error) {
 	k8sConfig, err := rest.InClusterConfig()
 	if err != nil {
@@ -57,19 +53,18 @@ func BuildDNSChecker(config *config.CheckerConfig) (checker.Checker, error) {
 		return nil, fmt.Errorf("failed to create Kubernetes client: %w", err)
 	}
 
-	// If this is a LocalDNS checker, check if LocalDNS IPs are available.
+	// If this is a LocalDNS checker, check if LocalDNS IP is enabled.
 	if config.DNSConfig.CheckLocalDNS {
 		tempChecker := &DNSChecker{
 			fs: afero.NewOsFs(),
 		}
-		localDNSIPs, err := tempChecker.getLocalDNSIPs()
+		localDNSIP, err := tempChecker.getLocalDNSIP()
 		if err != nil {
-			klog.ErrorS(err, "Failed to get LocalDNS IPs")
+			klog.ErrorS(err, "Failed to check LocalDNS IP")
 			return nil, fmt.Errorf("failed to create LocalDNS checker: %w", err)
 		}
-
-		if len(localDNSIPs) == 0 {
-			klog.InfoS("Found no LocalDNS IPs", "name", config.Name)
+		if localDNSIP == "" {
+			klog.InfoS("LocalDNS IP not found", "name", config.Name)
 			return nil, checker.ErrSkipChecker
 		}
 	}
@@ -145,26 +140,23 @@ func (c DNSChecker) checkCoreDNS(ctx context.Context) (*types.Result, error) {
 	return types.Healthy(), nil
 }
 
-// checkLocalDNS queries the LocalDNS servers.
-// If all queries succeed, the check is considered healthy.
+// checkLocalDNS queries the LocalDNS server.
+// If the query succeeds, the check is considered healthy.
 func (c DNSChecker) checkLocalDNS(ctx context.Context) (*types.Result, error) {
-	localDNSIPs, err := c.getLocalDNSIPs()
+	ip, err := c.getLocalDNSIP()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get LocalDNS IPs: %w", err)
+		return nil, fmt.Errorf("failed to get LocalDNS IP: %w", err)
 	}
 
-	if len(localDNSIPs) == 0 {
-		return types.Unhealthy(errCodeLocalDNSNoIPs, "No LocalDNS IPs found"), nil
+	if ip == "" {
+		return types.Unhealthy(errCodeLocalDNSNoIPs, "LocalDNS IP not found"), nil
 	}
 
-	klog.V(3).InfoS("Found LocalDNS IPs", "ips", localDNSIPs)
-	for _, ip := range localDNSIPs {
-		if _, err := c.resolver.lookupHost(ctx, ip, c.config.Domain); err != nil {
-			if errors.Is(err, context.DeadlineExceeded) {
-				return types.Unhealthy(errCodeLocalDNSTimeout, "LocalDNS query timed out"), nil
-			}
-			return types.Unhealthy(errCodeLocalDNSError, fmt.Sprintf("LocalDNS query error: %s", err)), nil
+	if _, err := c.resolver.lookupHost(ctx, ip, c.config.Domain); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return types.Unhealthy(errCodeLocalDNSTimeout, "LocalDNS query timed out"), nil
 		}
+		return types.Unhealthy(errCodeLocalDNSError, fmt.Sprintf("LocalDNS query error: %s", err)), nil
 	}
 
 	return types.Healthy(), nil
@@ -219,37 +211,33 @@ func getCoreDNSPodIPs(ctx context.Context, kubeClient kubernetes.Interface) ([]s
 	return podIPs, nil
 }
 
-// getLocalDNSIPs reads /etc/resolv.conf and returns any nameserver entries that match LocalDNS IPs.
-func (c DNSChecker) getLocalDNSIPs() ([]string, error) {
+// getLocalDNSIP reads /etc/resolv.conf and checks if the LocalDNS IP exists.
+// Returns the localDNSIP if found, or an empty string if not found.
+func (c DNSChecker) getLocalDNSIP() (string, error) {
 	file, err := c.fs.Open(resolvConfPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open %s: %w", resolvConfPath, err)
+		return "", fmt.Errorf("failed to open %s: %w", resolvConfPath, err)
 	}
-
 	defer func() {
 		if err := file.Close(); err != nil {
 			klog.ErrorS(err, "Failed to close file", "path", resolvConfPath)
 		}
 	}()
 
-	var localDNSIPs []string
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if strings.HasPrefix(line, "nameserver") {
 			fields := strings.Fields(line)
-			if len(fields) >= 2 {
-				ip := fields[1]
-				if _, isLocalDNS := localDNSIPSet[ip]; isLocalDNS {
-					localDNSIPs = append(localDNSIPs, ip)
-				}
+			if len(fields) >= 2 && fields[1] == localDNSIP {
+				return localDNSIP, nil
 			}
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("error reading %s: %w", resolvConfPath, err)
+		return "", fmt.Errorf("error reading %s: %w", resolvConfPath, err)
 	}
 
-	return localDNSIPs, nil
+	return "", nil
 }
