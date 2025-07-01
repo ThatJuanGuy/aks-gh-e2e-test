@@ -118,7 +118,7 @@ func TestDNSChecker_Run(t *testing.T) {
 			},
 			checkLocalDNS: true,
 			mockFs: func(g *WithT) afero.Fs {
-				return makeResolveConf(g, "nameserver 169.254.10.10\n")
+				return makeResolveConf(g, "nameserver 169.254.10.11\n")
 			},
 			validateRes: func(g *WithT, res *types.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
@@ -135,7 +135,7 @@ func TestDNSChecker_Run(t *testing.T) {
 			},
 			checkLocalDNS: true,
 			mockFs: func(g *WithT) afero.Fs {
-				return makeResolveConf(g, "nameserver 169.254.10.10\n")
+				return makeResolveConf(g, "nameserver 169.254.10.11\n")
 			},
 			validateRes: func(g *WithT, res *types.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
