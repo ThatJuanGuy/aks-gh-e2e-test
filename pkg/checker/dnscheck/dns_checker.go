@@ -74,7 +74,6 @@ func BuildDNSChecker(config *config.CheckerConfig) (checker.Checker, error) {
 		}
 	}
 
-	// Create the checker
 	chk := &DNSChecker{
 		name:       config.Name,
 		config:     config.DNSConfig,
