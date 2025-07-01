@@ -10,6 +10,7 @@ const (
 	errCodePodTimeout      = "pod_timeout"
 	errCodeServiceError    = "service_error"
 	errCodePodError        = "pod_error"
+	errCodeLocalDNSNoIPs   = "local_dns_no_ips"
 	errCodeLocalDNSTimeout = "local_dns_timeout"
 	errCodeLocalDNSError   = "local_dns_error"
 )

@@ -52,6 +52,11 @@ type DNSConfig struct {
 	// Required.
 	// The domain to check, used to determine the DNS records to query.
 	Domain string `yaml:"domain"`
+	// Optional.
+	// Whether to check LocalDNS instead of CoreDNS.
+	// If not specified or set to false, CoreDNS will be checked.
+	// If set to true, LocalDNS will be checked. Note that LocalDNS checks require LocalDNS to be enabled.
+	CheckLocalDNS bool `yaml:"checkLocalDNS,omitempty"`
 }
 
 type PodStartupConfig struct {

@@ -46,6 +46,7 @@ type DNSChecker struct {
 }
 
 // BuildDNSChecker creates a new DNSChecker instance.
+// If the DNSType is LocalDNS, it checks if LocalDNS IPs are available before creating the checker.
 func BuildDNSChecker(config *config.CheckerConfig) (checker.Checker, error) {
 	k8sConfig, err := rest.InClusterConfig()
 	if err != nil {
@@ -56,6 +57,24 @@ func BuildDNSChecker(config *config.CheckerConfig) (checker.Checker, error) {
 		return nil, fmt.Errorf("failed to create Kubernetes client: %w", err)
 	}
 
+	// If this is a LocalDNS checker, check if LocalDNS IPs are available.
+	if config.DNSConfig.CheckLocalDNS {
+		tempChecker := &DNSChecker{
+			fs: afero.NewOsFs(),
+		}
+		localDNSIPs, err := tempChecker.getLocalDNSIPs()
+		if err != nil {
+			klog.ErrorS(err, "Failed to get LocalDNS IPs")
+			return nil, fmt.Errorf("failed to create LocalDNS checker: %w", err)
+		}
+
+		if len(localDNSIPs) == 0 {
+			klog.InfoS("Found no LocalDNS IPs", "name", config.Name)
+			return nil, checker.ErrSkipChecker
+		}
+	}
+
+	// Create the checker
 	chk := &DNSChecker{
 		name:       config.Name,
 		config:     config.DNSConfig,
@@ -79,12 +98,19 @@ func (c DNSChecker) Type() config.CheckerType {
 }
 
 // Run executes the DNS check.
-// It queries the CoreDNS service and pods for the configured domain.
-// If LocalDNS is configured, it should also query that.
-// If all queries succeed, the check is considered healthy.
+// It will check either CoreDNS or LocalDNS for the configured domain.
 func (c DNSChecker) Run(ctx context.Context) (*types.Result, error) {
-	domain := c.config.Domain
+	if c.config.CheckLocalDNS {
+		return c.checkLocalDNS(ctx)
+	} else {
+		return c.checkCoreDNS(ctx)
+	}
+}
 
+// checkCoreDNS queries CoreDNS service and pods.
+// If all queries succeed, the check is considered healthy.
+func (c DNSChecker) checkCoreDNS(ctx context.Context) (*types.Result, error) {
+	// Check CoreDNS service.
 	svcIP, err := getCoreDNSSvcIP(ctx, c.kubeClient)
 	if errors.Is(err, errServiceNotReady) {
 		return types.Unhealthy(errCodeServiceNotReady, "CoreDNS service is not ready"), nil
@@ -92,20 +118,24 @@ func (c DNSChecker) Run(ctx context.Context) (*types.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := c.resolver.lookupHost(ctx, svcIP, domain); err != nil {
+	if _, err := c.resolver.lookupHost(ctx, svcIP, c.config.Domain); err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			return types.Unhealthy(errCodeServiceTimeout, "CoreDNS service query timed out"), nil
 		}
 		return types.Unhealthy(errCodeServiceError, fmt.Sprintf("CoreDNS service query error: %s", err)), nil
 	}
 
+	// Check CoreDNS pods.
 	podIPs, err := getCoreDNSPodIPs(ctx, c.kubeClient)
 	if errors.Is(err, errPodsNotReady) {
 		return types.Unhealthy(errCodePodsNotReady, "CoreDNS Pods are not ready"), nil
 	}
+	if err != nil {
+		return nil, err
+	}
 
 	for _, ip := range podIPs {
-		if _, err := c.resolver.lookupHost(ctx, ip, domain); err != nil {
+		if _, err := c.resolver.lookupHost(ctx, ip, c.config.Domain); err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
 				return types.Unhealthy(errCodePodTimeout, "CoreDNS pod query timed out"), nil
 			}
@@ -113,20 +143,28 @@ func (c DNSChecker) Run(ctx context.Context) (*types.Result, error) {
 		}
 	}
 
-	// Check LocalDNS if available.
+	return types.Healthy(), nil
+}
+
+// checkLocalDNS queries the LocalDNS servers.
+// If all queries succeed, the check is considered healthy.
+func (c DNSChecker) checkLocalDNS(ctx context.Context) (*types.Result, error) {
 	localDNSIPs, err := c.getLocalDNSIPs()
 	if err != nil {
-		// Log the error but continue the check even if we can't get LocalDNS IPs.
-		klog.ErrorS(err, "Failed to get LocalDNS IPs")
-	} else if len(localDNSIPs) > 0 {
-		klog.V(3).InfoS("Found LocalDNS IPs", "ips", localDNSIPs)
-		for _, ip := range localDNSIPs {
-			if _, err := c.resolver.lookupHost(ctx, ip, domain); err != nil {
-				if errors.Is(err, context.DeadlineExceeded) {
-					return types.Unhealthy(errCodeLocalDNSTimeout, "LocalDNS query timed out"), nil
-				}
-				return types.Unhealthy(errCodeLocalDNSError, fmt.Sprintf("LocalDNS query error: %s", err)), nil
+		return nil, fmt.Errorf("failed to get LocalDNS IPs: %w", err)
+	}
+
+	if len(localDNSIPs) == 0 {
+		return types.Unhealthy(errCodeLocalDNSNoIPs, "No LocalDNS IPs found"), nil
+	}
+
+	klog.V(3).InfoS("Found LocalDNS IPs", "ips", localDNSIPs)
+	for _, ip := range localDNSIPs {
+		if _, err := c.resolver.lookupHost(ctx, ip, c.config.Domain); err != nil {
+			if errors.Is(err, context.DeadlineExceeded) {
+				return types.Unhealthy(errCodeLocalDNSTimeout, "LocalDNS query timed out"), nil
 			}
+			return types.Unhealthy(errCodeLocalDNSError, fmt.Sprintf("LocalDNS query error: %s", err)), nil
 		}
 	}
 
