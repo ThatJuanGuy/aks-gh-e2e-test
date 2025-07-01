@@ -30,7 +30,7 @@ func TestDNSChecker_Run(t *testing.T) {
 		client        *k8sfake.Clientset
 		mockResolver  resolver
 		checkLocalDNS bool
-		mockFs        func() afero.Fs
+		mockFs        func(g *WithT) afero.Fs
 		validateRes   func(g *WithT, res *types.Result, err error)
 	}{
 		{
@@ -44,7 +44,9 @@ func TestDNSChecker_Run(t *testing.T) {
 					return []string{"1.2.3.4"}, nil
 				},
 			},
-			mockFs: afero.NewMemMapFs,
+			mockFs: func(g *WithT) afero.Fs {
+				return makeResolveConf(g, "")
+			},
 			validateRes: func(g *WithT, res *types.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(res.Status).To(Equal(types.StatusHealthy))
@@ -58,7 +60,9 @@ func TestDNSChecker_Run(t *testing.T) {
 					return []string{"1.2.3.4"}, nil
 				},
 			},
-			mockFs: afero.NewMemMapFs,
+			mockFs: func(g *WithT) afero.Fs {
+				return makeResolveConf(g, "")
+			},
 			validateRes: func(g *WithT, res *types.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
@@ -75,7 +79,9 @@ func TestDNSChecker_Run(t *testing.T) {
 					return []string{"1.2.3.4"}, nil
 				},
 			},
-			mockFs: afero.NewMemMapFs,
+			mockFs: func(g *WithT) afero.Fs {
+				return makeResolveConf(g, "")
+			},
 			validateRes: func(g *WithT, res *types.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
@@ -93,7 +99,9 @@ func TestDNSChecker_Run(t *testing.T) {
 					return nil, context.DeadlineExceeded
 				},
 			},
-			mockFs: afero.NewMemMapFs,
+			mockFs: func(g *WithT) afero.Fs {
+				return makeResolveConf(g, "")
+			},
 			validateRes: func(g *WithT, res *types.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
@@ -109,11 +117,8 @@ func TestDNSChecker_Run(t *testing.T) {
 				},
 			},
 			checkLocalDNS: true,
-			mockFs: func() afero.Fs {
-				fs := afero.NewMemMapFs()
-				resolveConfContent := "nameserver 169.254.10.10\n"
-				_ = afero.WriteFile(fs, resolvConfPath, []byte(resolveConfContent), 0644)
-				return fs
+			mockFs: func(g *WithT) afero.Fs {
+				return makeResolveConf(g, "nameserver 169.254.10.10\n")
 			},
 			validateRes: func(g *WithT, res *types.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
@@ -129,11 +134,8 @@ func TestDNSChecker_Run(t *testing.T) {
 				},
 			},
 			checkLocalDNS: true,
-			mockFs: func() afero.Fs {
-				fs := afero.NewMemMapFs()
-				resolveConfContent := "nameserver 169.254.10.10\n"
-				_ = afero.WriteFile(fs, resolvConfPath, []byte(resolveConfContent), 0644)
-				return fs
+			mockFs: func(g *WithT) afero.Fs {
+				return makeResolveConf(g, "nameserver 169.254.10.10\n")
 			},
 			validateRes: func(g *WithT, res *types.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
@@ -150,11 +152,8 @@ func TestDNSChecker_Run(t *testing.T) {
 				},
 			},
 			checkLocalDNS: true,
-			mockFs: func() afero.Fs {
-				fs := afero.NewMemMapFs()
-				resolveConfContent := "nameserver 169.254.10.10\n"
-				_ = afero.WriteFile(fs, resolvConfPath, []byte(resolveConfContent), 0644)
-				return fs
+			mockFs: func(g *WithT) afero.Fs {
+				return makeResolveConf(g, "nameserver 169.254.10.11\n")
 			},
 			validateRes: func(g *WithT, res *types.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
@@ -171,11 +170,8 @@ func TestDNSChecker_Run(t *testing.T) {
 				},
 			},
 			checkLocalDNS: true,
-			mockFs: func() afero.Fs {
-				fs := afero.NewMemMapFs()
-				resolveConfContent := "nameserver 8.8.8.8\n"
-				_ = afero.WriteFile(fs, resolvConfPath, []byte(resolveConfContent), 0644)
-				return fs
+			mockFs: func(g *WithT) afero.Fs {
+				return makeResolveConf(g, "nameserver 8.8.8.8\n")
 			},
 			validateRes: func(g *WithT, res *types.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
@@ -198,7 +194,7 @@ func TestDNSChecker_Run(t *testing.T) {
 				},
 				kubeClient: tc.client,
 				resolver:   tc.mockResolver,
-				fs:         tc.mockFs(),
+				fs:         tc.mockFs(g),
 			}
 
 			res, err := chk.Run(context.Background())
@@ -241,4 +237,11 @@ func makeCoreDNSEndpointSlice(ips []string) *discoveryv1.EndpointSlice {
 		},
 		Endpoints: endpoints,
 	}
+}
+
+func makeResolveConf(g *WithT, content string) afero.Fs {
+	fs := afero.NewMemMapFs()
+	err := afero.WriteFile(fs, resolvConfPath, []byte(content), 0644)
+	g.Expect(err).ToNot(HaveOccurred())
+	return fs
 }
