@@ -2,12 +2,11 @@
 package dnscheck
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
+	"github.com/miekg/dns"
 	"github.com/spf13/afero"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -224,19 +223,15 @@ func (c DNSChecker) getLocalDNSIP() (string, error) {
 		}
 	}()
 
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, "nameserver") {
-			fields := strings.Fields(line)
-			if len(fields) >= 2 && fields[1] == localDNSIP {
-				return localDNSIP, nil
-			}
-		}
+	config, err := dns.ClientConfigFromReader(file)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse %s: %w", resolvConfPath, err)
 	}
 
-	if err := scanner.Err(); err != nil {
-		return "", fmt.Errorf("error reading %s: %w", resolvConfPath, err)
+	for _, server := range config.Servers {
+		if server == localDNSIP {
+			return localDNSIP, nil
+		}
 	}
 
 	return "", nil
