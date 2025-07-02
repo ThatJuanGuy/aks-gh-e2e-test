@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/Azure/cluster-health-monitor/pkg/checker"
+	"github.com/Azure/cluster-health-monitor/pkg/checker/apiserver"
 	"github.com/Azure/cluster-health-monitor/pkg/checker/dnscheck"
 	"github.com/Azure/cluster-health-monitor/pkg/checker/podstartup"
 	"github.com/Azure/cluster-health-monitor/pkg/config"
@@ -101,4 +102,5 @@ func buildCheckerSchedule(cfg *config.Config) ([]scheduler.CheckerSchedule, erro
 func registerCheckers() {
 	dnscheck.Register()
 	podstartup.Register()
+	apiserver.Register()
 }
