@@ -54,15 +54,12 @@ func BuildDNSChecker(config *config.CheckerConfig) (checker.Checker, error) {
 
 	// If this is a LocalDNS checker, check if LocalDNS IP is enabled.
 	if config.DNSConfig.CheckLocalDNS {
-		tempChecker := &DNSChecker{
-			fs: afero.NewOsFs(),
-		}
-		localDNSIP, err := tempChecker.getLocalDNSIP()
+		ip, err := getLocalDNSIP(afero.NewOsFs())
 		if err != nil {
 			klog.ErrorS(err, "Failed to check LocalDNS IP")
 			return nil, fmt.Errorf("failed to create LocalDNS checker: %w", err)
 		}
-		if localDNSIP == "" {
+		if ip == "" {
 			klog.InfoS("LocalDNS IP not found", "name", config.Name)
 			return nil, checker.ErrSkipChecker
 		}
@@ -142,7 +139,7 @@ func (c DNSChecker) checkCoreDNS(ctx context.Context) (*types.Result, error) {
 // checkLocalDNS queries the LocalDNS server.
 // If the query succeeds, the check is considered healthy.
 func (c DNSChecker) checkLocalDNS(ctx context.Context) (*types.Result, error) {
-	ip, err := c.getLocalDNSIP()
+	ip, err := getLocalDNSIP(c.fs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get LocalDNS IP: %w", err)
 	}
@@ -212,8 +209,8 @@ func getCoreDNSPodIPs(ctx context.Context, kubeClient kubernetes.Interface) ([]s
 
 // getLocalDNSIP reads /etc/resolv.conf and checks if the LocalDNS IP exists.
 // Returns the localDNSIP if found, or an empty string if not found.
-func (c DNSChecker) getLocalDNSIP() (string, error) {
-	file, err := c.fs.Open(resolvConfPath)
+func getLocalDNSIP(fs afero.Fs) (string, error) {
+	file, err := fs.Open(resolvConfPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to open %s: %w", resolvConfPath, err)
 	}
