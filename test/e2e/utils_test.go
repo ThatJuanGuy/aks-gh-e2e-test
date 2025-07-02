@@ -40,6 +40,13 @@ const (
 	metricsErrorCodeLabel   = "error_code"
 )
 
+// safeSessionKill is shorthand to kill the provided gexec.Session if it is not nil.
+func safeSessionKill(session *gexec.Session) {
+	if session != nil {
+		session.Kill()
+	}
+}
+
 // run executes the provided command in the Git root directory and returns its output.
 // It uses the current environment variables.
 func run(cmd *exec.Cmd) ([]byte, error) {
@@ -266,7 +273,13 @@ func restoreCoreDNSConfigMap(clientset *kubernetes.Clientset, originalCorefile s
 
 // verifyCheckerResultMetrics checks if all the checker result metrics match the expected type, status, and error code.
 // It returns true if all checker names match the criteria, false otherwise.
-func verifyCheckerResultMetrics(metricsData map[string]*dto.MetricFamily, expectedChkNames []string, expectedType, expectedStatus, expectedErrorCode string) (bool, map[string]struct{}) {
+func verifyCheckerResultMetrics(localPort int, expectedChkNames []string, expectedType, expectedStatus, expectedErrorCode string) (bool, map[string]struct{}) {
+	metricsData, err := getMetrics(localPort)
+	if err != nil {
+		GinkgoWriter.Printf("Failed to get metrics: %v\n", err)
+		return false, nil
+	}
+
 	metricFamily, found := metricsData[checkerResultMetricName]
 	if !found {
 		return false, nil
@@ -300,4 +313,40 @@ func verifyCheckerResultMetrics(metricsData map[string]*dto.MetricFamily, expect
 	}
 
 	return true, foundCheckers
+}
+
+func removeLabelsFromAllNodes(clientset kubernetes.Interface, labels map[string]string) {
+	nodeList, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	Expect(err).NotTo(HaveOccurred(), "Failed to list nodes")
+
+	// Remove labels from all nodes
+	for _, node := range nodeList.Items {
+		for key := range labels {
+			if _, exists := node.Labels[key]; exists {
+				delete(node.Labels, key)
+				GinkgoWriter.Printf("Removed label %s from node %s\n", key, node.Name)
+			}
+		}
+		_, err := clientset.CoreV1().Nodes().Update(context.TODO(), &node, metav1.UpdateOptions{})
+		Expect(err).NotTo(HaveOccurred(), "Failed to remove labels from node %s", node.Name)
+	}
+}
+
+// addLabelsToAllNodes applies the given labels to all nodes in the cluster
+func addLabelsToAllNodes(clientset kubernetes.Interface, labels map[string]string) {
+	nodeList, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	Expect(err).NotTo(HaveOccurred(), "Failed to list nodes")
+
+	// Add labels to all nodes
+	for _, node := range nodeList.Items {
+		if node.Labels == nil {
+			node.Labels = make(map[string]string)
+		}
+		for key, value := range labels {
+			node.Labels[key] = value
+		}
+		_, err := clientset.CoreV1().Nodes().Update(context.TODO(), &node, metav1.UpdateOptions{})
+		Expect(err).NotTo(HaveOccurred(), "Failed to add labels to node %s", node.Name)
+		GinkgoWriter.Printf("Node %s: Added labels %v\n", node.Name, labels)
+	}
 }
