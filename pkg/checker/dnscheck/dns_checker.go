@@ -139,16 +139,7 @@ func (c DNSChecker) checkCoreDNS(ctx context.Context) (*types.Result, error) {
 // checkLocalDNS queries the LocalDNS server.
 // If the query succeeds, the check is considered healthy.
 func (c DNSChecker) checkLocalDNS(ctx context.Context) (*types.Result, error) {
-	ip, err := getLocalDNSIP(c.fs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get LocalDNS IP: %w", err)
-	}
-
-	if ip == "" {
-		return types.Unhealthy(errCodeLocalDNSNoIPs, "LocalDNS IP not found"), nil
-	}
-
-	if _, err := c.resolver.lookupHost(ctx, ip, c.config.Domain); err != nil {
+	if _, err := c.resolver.lookupHost(ctx, localDNSIP, c.config.Domain); err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			return types.Unhealthy(errCodeLocalDNSTimeout, "LocalDNS query timed out"), nil
 		}

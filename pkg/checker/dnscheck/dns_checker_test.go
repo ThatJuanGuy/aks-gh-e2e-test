@@ -113,6 +113,9 @@ func TestDNSChecker_Run(t *testing.T) {
 			client: k8sfake.NewClientset(),
 			mockResolver: &fakeResolver{
 				lookupHostFunc: func(ctx context.Context, ip, domain string) ([]string, error) {
+					if ip != "169.254.10.11" {
+						return nil, fmt.Errorf("unexpected IP: %s", ip)
+					}
 					return []string{"1.2.3.4"}, nil
 				},
 			},
@@ -130,6 +133,9 @@ func TestDNSChecker_Run(t *testing.T) {
 			client: k8sfake.NewClientset(),
 			mockResolver: &fakeResolver{
 				lookupHostFunc: func(ctx context.Context, ip, domain string) ([]string, error) {
+					if ip != "169.254.10.11" {
+						return []string{"1.2.3.4"}, nil
+					}
 					return nil, fmt.Errorf("local dns error")
 				},
 			},
@@ -148,6 +154,9 @@ func TestDNSChecker_Run(t *testing.T) {
 			client: k8sfake.NewClientset(),
 			mockResolver: &fakeResolver{
 				lookupHostFunc: func(ctx context.Context, ip, domain string) ([]string, error) {
+					if ip != "169.254.10.11" {
+						return []string{"1.2.3.4"}, nil
+					}
 					return nil, context.DeadlineExceeded
 				},
 			},
@@ -159,24 +168,6 @@ func TestDNSChecker_Run(t *testing.T) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
 				g.Expect(res.Detail.Code).To(Equal(errCodeLocalDNSTimeout))
-			},
-		},
-		{
-			name:   "LocalDNS No IPs Found",
-			client: k8sfake.NewClientset(),
-			mockResolver: &fakeResolver{
-				lookupHostFunc: func(ctx context.Context, ip, domain string) ([]string, error) {
-					return []string{"1.2.3.4"}, nil
-				},
-			},
-			checkLocalDNS: true,
-			mockFs: func(g *WithT) afero.Fs {
-				return makeResolveConf(g, "nameserver 8.8.8.8\n")
-			},
-			validateRes: func(g *WithT, res *types.Result, err error) {
-				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
-				g.Expect(res.Detail.Code).To(Equal(errCodeLocalDNSNoIPs))
 			},
 		},
 	}
