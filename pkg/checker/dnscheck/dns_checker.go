@@ -52,13 +52,13 @@ func BuildDNSChecker(config *config.CheckerConfig) (checker.Checker, error) {
 
 	// If this is a LocalDNS checker, check if LocalDNS IP is enabled.
 	if config.DNSConfig.CheckLocalDNS {
-		ip, err := getLocalDNSIP()
+		enabled, err := isLocalDNSEnabled()
 		if err != nil {
 			klog.ErrorS(err, "Failed to check LocalDNS IP")
 			return nil, fmt.Errorf("failed to create LocalDNS checker: %w", err)
 		}
-		if ip == "" {
-			klog.InfoS("LocalDNS IP not found", "name", config.Name)
+		if !enabled {
+			klog.InfoS("LocalDNS is not enabled", "name", config.Name)
 			return nil, checker.ErrSkipChecker
 		}
 	}
@@ -195,19 +195,18 @@ func getCoreDNSPodIPs(ctx context.Context, kubeClient kubernetes.Interface) ([]s
 	return podIPs, nil
 }
 
-// getLocalDNSIP reads /etc/resolv.conf and checks if the LocalDNS IP exists.
-// Returns the localDNSIP if found, or an empty string if not found.
-func getLocalDNSIP() (string, error) {
+// isLocalDNSEnabled reads /etc/resolv.conf and checks if the localDNSIP exists.
+func isLocalDNSEnabled() (bool, error) {
 	config, err := dns.ClientConfigFromFile(resolvConfPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse %s: %w", resolvConfPath, err)
+		return false, fmt.Errorf("failed to parse %s: %w", resolvConfPath, err)
 	}
 
 	for _, server := range config.Servers {
 		if server == localDNSIP {
-			return localDNSIP, nil
+			return true, nil
 		}
 	}
 
-	return "", nil
+	return false, nil
 }
