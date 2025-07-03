@@ -8,7 +8,6 @@ import (
 	"github.com/Azure/cluster-health-monitor/pkg/config"
 	"github.com/Azure/cluster-health-monitor/pkg/types"
 	. "github.com/onsi/gomega"
-	"github.com/spf13/afero"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +29,6 @@ func TestDNSChecker_Run(t *testing.T) {
 		client        *k8sfake.Clientset
 		mockResolver  resolver
 		checkLocalDNS bool
-		mockFs        func(g *WithT) afero.Fs
 		validateRes   func(g *WithT, res *types.Result, err error)
 	}{
 		{
@@ -44,9 +42,6 @@ func TestDNSChecker_Run(t *testing.T) {
 					return []string{"1.2.3.4"}, nil
 				},
 			},
-			mockFs: func(g *WithT) afero.Fs {
-				return makeResolveConf(g, "")
-			},
 			validateRes: func(g *WithT, res *types.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(res.Status).To(Equal(types.StatusHealthy))
@@ -59,9 +54,6 @@ func TestDNSChecker_Run(t *testing.T) {
 				lookupHostFunc: func(ctx context.Context, ip, domain string) ([]string, error) {
 					return []string{"1.2.3.4"}, nil
 				},
-			},
-			mockFs: func(g *WithT) afero.Fs {
-				return makeResolveConf(g, "")
 			},
 			validateRes: func(g *WithT, res *types.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
@@ -79,9 +71,6 @@ func TestDNSChecker_Run(t *testing.T) {
 					return []string{"1.2.3.4"}, nil
 				},
 			},
-			mockFs: func(g *WithT) afero.Fs {
-				return makeResolveConf(g, "")
-			},
 			validateRes: func(g *WithT, res *types.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
@@ -98,9 +87,6 @@ func TestDNSChecker_Run(t *testing.T) {
 				lookupHostFunc: func(ctx context.Context, ip, domain string) ([]string, error) {
 					return nil, context.DeadlineExceeded
 				},
-			},
-			mockFs: func(g *WithT) afero.Fs {
-				return makeResolveConf(g, "")
 			},
 			validateRes: func(g *WithT, res *types.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
@@ -120,9 +106,6 @@ func TestDNSChecker_Run(t *testing.T) {
 				},
 			},
 			checkLocalDNS: true,
-			mockFs: func(g *WithT) afero.Fs {
-				return makeResolveConf(g, "nameserver 169.254.10.11\n")
-			},
 			validateRes: func(g *WithT, res *types.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(res.Status).To(Equal(types.StatusHealthy))
@@ -140,9 +123,6 @@ func TestDNSChecker_Run(t *testing.T) {
 				},
 			},
 			checkLocalDNS: true,
-			mockFs: func(g *WithT) afero.Fs {
-				return makeResolveConf(g, "nameserver 169.254.10.11\n")
-			},
 			validateRes: func(g *WithT, res *types.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
@@ -161,9 +141,6 @@ func TestDNSChecker_Run(t *testing.T) {
 				},
 			},
 			checkLocalDNS: true,
-			mockFs: func(g *WithT) afero.Fs {
-				return makeResolveConf(g, "nameserver 169.254.10.11\n")
-			},
 			validateRes: func(g *WithT, res *types.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
@@ -185,7 +162,6 @@ func TestDNSChecker_Run(t *testing.T) {
 				},
 				kubeClient: tc.client,
 				resolver:   tc.mockResolver,
-				fs:         tc.mockFs(g),
 			}
 
 			res, err := chk.Run(context.Background())
@@ -228,11 +204,4 @@ func makeCoreDNSEndpointSlice(ips []string) *discoveryv1.EndpointSlice {
 		},
 		Endpoints: endpoints,
 	}
-}
-
-func makeResolveConf(g *WithT, content string) afero.Fs {
-	fs := afero.NewMemMapFs()
-	err := afero.WriteFile(fs, resolvConfPath, []byte(content), 0644)
-	g.Expect(err).ToNot(HaveOccurred())
-	return fs
 }

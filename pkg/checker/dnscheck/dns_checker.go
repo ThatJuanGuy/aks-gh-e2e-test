@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/miekg/dns"
-	"github.com/spf13/afero"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,7 +36,6 @@ type DNSChecker struct {
 	config     *config.DNSConfig
 	kubeClient kubernetes.Interface
 	resolver   resolver
-	fs         afero.Fs
 }
 
 // BuildDNSChecker creates a new DNSChecker instance.
@@ -54,7 +52,7 @@ func BuildDNSChecker(config *config.CheckerConfig) (checker.Checker, error) {
 
 	// If this is a LocalDNS checker, check if LocalDNS IP is enabled.
 	if config.DNSConfig.CheckLocalDNS {
-		ip, err := getLocalDNSIP(afero.NewOsFs())
+		ip, err := getLocalDNSIP()
 		if err != nil {
 			klog.ErrorS(err, "Failed to check LocalDNS IP")
 			return nil, fmt.Errorf("failed to create LocalDNS checker: %w", err)
@@ -70,7 +68,6 @@ func BuildDNSChecker(config *config.CheckerConfig) (checker.Checker, error) {
 		config:     config.DNSConfig,
 		kubeClient: client,
 		resolver:   &defaultResolver{},
-		fs:         afero.NewOsFs(),
 	}
 	klog.InfoS("Built DNSChecker",
 		"name", chk.name,
@@ -200,18 +197,8 @@ func getCoreDNSPodIPs(ctx context.Context, kubeClient kubernetes.Interface) ([]s
 
 // getLocalDNSIP reads /etc/resolv.conf and checks if the LocalDNS IP exists.
 // Returns the localDNSIP if found, or an empty string if not found.
-func getLocalDNSIP(fs afero.Fs) (string, error) {
-	file, err := fs.Open(resolvConfPath)
-	if err != nil {
-		return "", fmt.Errorf("failed to open %s: %w", resolvConfPath, err)
-	}
-	defer func() {
-		if err := file.Close(); err != nil {
-			klog.ErrorS(err, "Failed to close file", "path", resolvConfPath)
-		}
-	}()
-
-	config, err := dns.ClientConfigFromReader(file)
+func getLocalDNSIP() (string, error) {
+	config, err := dns.ClientConfigFromFile(resolvConfPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse %s: %w", resolvConfPath, err)
 	}
