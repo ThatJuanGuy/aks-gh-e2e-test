@@ -159,10 +159,6 @@ func (c APIServerChecker) garbageCollect(ctx context.Context) error {
 
 	var errs []error
 	for _, cm := range configMapList.Items {
-		if !strings.HasPrefix(cm.Name, c.configMapNamePrefix()) {
-			// This ConfigMap is not created by this checker, skip it.
-			continue
-		}
 		if time.Since(cm.CreationTimestamp.Time) > c.timeout {
 			err := c.kubeClient.CoreV1().ConfigMaps(cm.Namespace).Delete(ctx, cm.Name, metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {

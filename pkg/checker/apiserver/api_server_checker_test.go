@@ -192,7 +192,7 @@ func TestAPIServerChecker_garbageCollect(t *testing.T) {
 			client: k8sfake.NewSimpleClientset(
 				configMapWithLabels(checkerName+"-empty-configmap-new", configMapNamespace, map[string]string{configMapLabelKey: checkerName}, time.Now()), // configmap too new
 				configMapWithLabels(checkerName+"-empty-configmap-no-labels", configMapNamespace, map[string]string{}, time.Now().Add(-2*checkerTimeout)),  // old configmap wrong labels
-				configMapWithLabels("no-prefix", configMapNamespace, map[string]string{configMapLabelKey: checkerName}, time.Now().Add(-2*checkerTimeout)), // configmap missing name prefix
+				configMapWithLabels("no-prefix-no-label", configMapNamespace, map[string]string{}, time.Now().Add(-2*checkerTimeout)),                      // configmap missing name prefix
 			),
 			validateRes: func(g *WithT, configMaps *corev1.ConfigMapList, err error) {
 				g.Expect(err).NotTo(HaveOccurred())
@@ -204,7 +204,7 @@ func TestAPIServerChecker_garbageCollect(t *testing.T) {
 				g.Expect(actualNames).To(ConsistOf([]string{
 					checkerName + "-empty-configmap-new",
 					checkerName + "-empty-configmap-no-labels",
-					"no-prefix",
+					"no-prefix-no-label",
 				}))
 			},
 		},

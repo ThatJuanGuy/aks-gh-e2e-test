@@ -142,10 +142,6 @@ func (c *PodStartupChecker) garbageCollect(ctx context.Context) error {
 	}
 	var errs []error
 	for _, pod := range podList.Items {
-		if !strings.HasPrefix(pod.Name, c.syntheticPodNamePrefix()) {
-			// This pod is not a synthetic pod created by this checker, skip it.
-			continue
-		}
 		if time.Since(pod.CreationTimestamp.Time) > c.timeout {
 			err := c.k8sClientset.CoreV1().Pods(c.config.SyntheticPodNamespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
