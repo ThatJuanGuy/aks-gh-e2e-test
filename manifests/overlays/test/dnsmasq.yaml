@@ -1,4 +1,4 @@
-# This runs a dnsmasq server that resolves all DNS queries to 1.2.3.4.
+# This runs a mock LocalDNS server using dnsmasq.
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
