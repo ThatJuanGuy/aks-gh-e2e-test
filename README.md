@@ -100,6 +100,20 @@ Once your test environment is set up, you can use the following commands:
   make kind-export-kubeconfig
   ```
 
+- **Mock LocalDNS**:
+
+  - Enable:
+
+    ```bash
+    make kind-enable-local-dns-mock
+    ```
+
+  - Disable:
+
+    ```bash
+    make kind-disable-local-dns-mock
+    ```
+
 - **Redeploy after changes**:
 
   ```bash
