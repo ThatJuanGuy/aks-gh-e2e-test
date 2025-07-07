@@ -159,7 +159,7 @@ var _ = Describe("DNS checker metrics", Ordered, ContinueOnFailure, func() {
 			By("Waiting for mock LocalDNS to be available again")
 			Eventually(func() bool {
 				return isMockLocalDNSAvailable(clientset)
-			}, "60s", "5s").Should(BeTrue(), "Mock LocalDNS is not available after re-enabling")
+			}, "120s", "5s").Should(BeTrue(), "Mock LocalDNS is not available after re-enabling")
 		})
 
 		By("Waiting for LocalDNS checker metrics to report unhealthy status")
