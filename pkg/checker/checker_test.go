@@ -8,6 +8,7 @@ import (
 	"github.com/Azure/cluster-health-monitor/pkg/config"
 	"github.com/Azure/cluster-health-monitor/pkg/types"
 	. "github.com/onsi/gomega"
+	"k8s.io/client-go/kubernetes"
 )
 
 type fakeChecker struct{ name string }
@@ -16,7 +17,7 @@ func (f *fakeChecker) Name() string                                   { return f
 func (f *fakeChecker) Run(ctx context.Context) (*types.Result, error) { return nil, nil }
 func (f *fakeChecker) Type() config.CheckerType                       { return config.CheckerType("fake") }
 
-func fakeBuilder(cfg *config.CheckerConfig) (Checker, error) {
+func fakeBuilder(cfg *config.CheckerConfig, kubeClient kubernetes.Interface) (Checker, error) {
 	if cfg.Name == "fail" {
 		return nil, errors.New("forced error")
 	}
@@ -28,7 +29,7 @@ func TestRegisterCheckerAndBuildChecker(t *testing.T) {
 	testType := config.CheckerType("fake")
 	RegisterChecker(testType, fakeBuilder)
 	cfg := &config.CheckerConfig{Name: "foo", Type: testType}
-	c, err := Build(cfg)
+	c, err := Build(cfg, nil)
 	g.Expect(err).ToNot(HaveOccurred())
 	g.Expect(c).ToNot(BeNil())
 	g.Expect(c.Name()).To(Equal("foo"))
@@ -37,7 +38,7 @@ func TestRegisterCheckerAndBuildChecker(t *testing.T) {
 func TestBuildCheckerUnknownType(t *testing.T) {
 	g := NewWithT(t)
 	cfg := &config.CheckerConfig{Name: "bar", Type: "unknown"}
-	c, err := Build(cfg)
+	c, err := Build(cfg, nil)
 	g.Expect(err).To(HaveOccurred())
 	g.Expect(c).To(BeNil())
 }
@@ -47,7 +48,7 @@ func TestBuildCheckerBuilderError(t *testing.T) {
 	testType := config.CheckerType("fakeerr")
 	RegisterChecker(testType, fakeBuilder)
 	cfg := &config.CheckerConfig{Name: "fail", Type: testType}
-	c, err := Build(cfg)
+	c, err := Build(cfg, nil)
 	g.Expect(err).To(HaveOccurred())
 	g.Expect(c).To(BeNil())
 }
