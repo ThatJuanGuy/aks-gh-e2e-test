@@ -271,6 +271,23 @@ func restoreCoreDNSConfigMap(clientset *kubernetes.Clientset, originalCorefile s
 	return nil
 }
 
+// isMockLocalDNSAvailable checks if the mock LocalDNS server is available.
+// It checks the resources deployed from the manifests/overlays/test/dnsmasq.yaml file.
+func isMockLocalDNSAvailable(clientset *kubernetes.Clientset) bool {
+	mockLocalDNS, err := clientset.AppsV1().DaemonSets("kube-system").Get(context.TODO(), "mock-localdns", metav1.GetOptions{})
+	if err != nil {
+		GinkgoWriter.Printf("Error getting mock-dns daemonset: %v\n", err)
+		return false
+	}
+	bindLocalDNS, err := clientset.AppsV1().DaemonSets("kube-system").Get(context.TODO(), "bind-localdns-ip", metav1.GetOptions{})
+	if err != nil {
+		GinkgoWriter.Printf("Error getting bind-localdns-ip daemonset: %v\n", err)
+		return false
+	}
+	return mockLocalDNS.Status.NumberAvailable == mockLocalDNS.Status.DesiredNumberScheduled &&
+		bindLocalDNS.Status.NumberAvailable == bindLocalDNS.Status.DesiredNumberScheduled
+}
+
 // verifyCheckerResultMetrics checks if all the checker result metrics match the expected type, status, and error code.
 // It returns true if all checker names match the criteria, false otherwise.
 func verifyCheckerResultMetrics(localPort int, expectedChkNames []string, expectedType, expectedStatus, expectedErrorCode string) (bool, map[string]struct{}) {

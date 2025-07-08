@@ -1,0 +1,19 @@
+# This modifies the pod's resolv.conf file to use LocalDNS IP address.
+- op: test
+  path: /spec/template/spec/containers/0/name
+  value: cluster-health-monitor
+- op: add
+  path: /spec/template/spec/dnsPolicy
+  value: "None"
+- op: add
+  path: /spec/template/spec/dnsConfig
+  value:
+    nameservers:
+      - "169.254.10.11"
+    searches:
+      - "default.svc.cluster.local"
+      - "svc.cluster.local"
+      - "cluster.local"
+    options:
+      - name: ndots
+        value: "5"

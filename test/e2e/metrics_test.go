@@ -43,6 +43,4 @@ var _ = Describe("Metrics endpoint", func() {
 		Expect(err).NotTo(HaveOccurred(), "Failed to get metrics")
 		Expect(metricsData).To(HaveKey(checkerResultMetricName), "Expected %s metric not found", checkerResultMetricName)
 	})
-
-	// TODO: Add pod startup checker tests.
 })
