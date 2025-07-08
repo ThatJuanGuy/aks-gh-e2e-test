@@ -32,6 +32,10 @@ func RegisterChecker(t config.CheckerType, builder Builder) {
 
 // Build creates checkers from a list of checker configs
 func Build(cfg *config.CheckerConfig, kubeClient kubernetes.Interface) (Checker, error) {
+	if kubeClient == nil {
+		return nil, fmt.Errorf("kubernetes client cannot be nil")
+	}
+
 	builder, ok := checkerRegistry[cfg.Type]
 	if !ok {
 		return nil, fmt.Errorf("unrecognized checker type: %q", cfg.Type)
