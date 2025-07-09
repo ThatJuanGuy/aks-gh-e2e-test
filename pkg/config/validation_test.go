@@ -267,6 +267,17 @@ func TestAPIServerConfig_Validate(t *testing.T) {
 				g.Expect(err.Error()).To(ContainSubstring("checker timeout must be greater than config map read timeout"))
 			},
 		},
+		{
+			name: "max config maps is zero",
+			mutateConfig: func(cfg *CheckerConfig) *CheckerConfig {
+				cfg.APIServerConfig.MaxConfigMaps = 0
+				return cfg
+			},
+			validateRes: func(g *WithT, err error) {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("invalid max config maps"))
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -284,6 +295,7 @@ func TestAPIServerConfig_Validate(t *testing.T) {
 					ConfigMapLabelKey:      "cluster-health-monitor/checker-name",
 					ConfigMapMutateTimeout: 5 * time.Second,
 					ConfigMapReadTimeout:   1 * time.Second,
+					MaxConfigMaps:          3,
 				},
 			}
 

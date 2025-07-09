@@ -127,5 +127,9 @@ func (c *APIServerConfig) validate(checkerConfigTimeout time.Duration) error {
 			checkerConfigTimeout, c.ConfigMapReadTimeout))
 	}
 
+	if c.MaxConfigMaps <= 0 {
+		errs = append(errs, fmt.Errorf("invalid max config maps: value=%d, must be greater than 0", c.MaxConfigMaps))
+	}
+
 	return errors.Join(errs...)
 }

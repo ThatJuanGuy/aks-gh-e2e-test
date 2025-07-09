@@ -51,3 +51,4 @@ data:
           configMapLabelKey: "kubernetes.azure.com/cluster-health-monitor-checker-synthetic"
           configMapMutateTimeout: "1s"
           configMapReadTimeout: "1s"
+          maxConfigMaps: 10

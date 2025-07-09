@@ -3,6 +3,7 @@ package apiserver
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -23,6 +24,7 @@ func TestAPIServerChecker_Run(t *testing.T) {
 	checkerName := "test-api-server-checker"
 	configMapNamespace := "test-namespace"
 	configMapLabelKey := "cluster-health-monitor/checker-name"
+	maxConfigMaps := 3
 
 	tests := []struct {
 		name           string
@@ -136,6 +138,27 @@ func TestAPIServerChecker_Run(t *testing.T) {
 				g.Expect(result.Detail.Code).To(Equal(errCodeConfigMapDeleteTimeout))
 			},
 		},
+		{
+			name: "error - max configmaps reached",
+			client: func() *k8sfake.Clientset {
+				client := k8sfake.NewClientset()
+				// Preload client with the maximum number of ConfigMaps.
+				for i := range maxConfigMaps {
+					configMapName := fmt.Sprintf("configmap%d", i)
+					client.CoreV1().ConfigMaps(configMapNamespace).Create(context.Background(), //nolint:errcheck // ignore error for test setup
+						configMapWithLabels(configMapName, configMapNamespace, map[string]string{configMapLabelKey: checkerName}, time.Now()), metav1.CreateOptions{})
+				}
+				// Prevent ConfigMaps deletion from succeeding.
+				client.PrependReactor("delete", "configmaps", func(action k8stesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("error occurred")
+				})
+				return client
+			}(),
+			validateResult: func(g *WithT, result *types.Result, err error) {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("maximum number of ConfigMaps reached"))
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -150,6 +173,7 @@ func TestAPIServerChecker_Run(t *testing.T) {
 					ConfigMapLabelKey:      configMapLabelKey,
 					ConfigMapMutateTimeout: 1 * time.Second,
 					ConfigMapReadTimeout:   1 * time.Second,
+					MaxConfigMaps:          maxConfigMaps,
 				},
 				timeout:    5 * time.Second,
 				kubeClient: tt.client,
@@ -298,6 +322,7 @@ func TestAPIServerChecker_garbageCollect(t *testing.T) {
 					ConfigMapLabelKey:      configMapLabelKey,
 					ConfigMapMutateTimeout: 1 * time.Second,
 					ConfigMapReadTimeout:   1 * time.Second,
+					MaxConfigMaps:          5,
 				},
 				timeout:    checkerTimeout,
 				kubeClient: tt.client,

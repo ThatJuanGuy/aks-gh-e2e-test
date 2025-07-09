@@ -66,6 +66,19 @@ func (c APIServerChecker) Run(ctx context.Context) (*types.Result, error) {
 		klog.InfoS("Failed to garbage collect old ConfigMaps", "error", err.Error())
 	}
 
+	// Check if the ConfigMap limit has been reached.
+	// Do not run the checker if the maximum number been reached.
+	configMapList, err := c.kubeClient.CoreV1().ConfigMaps(c.config.ConfigMapNamespace).List(ctx, metav1.ListOptions{
+		LabelSelector: labels.SelectorFromSet(labels.Set(c.configMapLabels())).String(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list ConfigMaps: %w", err)
+	}
+	if len(configMapList.Items) >= c.config.MaxConfigMaps {
+		return nil, fmt.Errorf("maximum number of ConfigMaps reached, current: %d, max allowed: %d, delete some ConfigMaps before running the checker again",
+			len(configMapList.Items), c.config.MaxConfigMaps)
+	}
+
 	// Create ConfigMap.
 	createCtx, createCancel := context.WithTimeout(ctx, c.config.ConfigMapMutateTimeout)
 	defer createCancel()

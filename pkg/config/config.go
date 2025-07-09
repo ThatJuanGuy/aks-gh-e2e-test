@@ -96,4 +96,9 @@ type APIServerConfig struct {
 	// Required.
 	// The maximum duration for which the checker will wait return healthy status for read-only API calls.
 	ConfigMapReadTimeout time.Duration `yaml:"configMapReadTimeout"`
+	// Required.
+	// The maximum number of ConfigMaps created by the checker that can exist at any one time. If the limit has been reached, the checker
+	// will not create any more ConfigMaps until some of the existing ones are deleted. Instead, it will fail the run with an error.
+	// Reaching this limit effectively disables the checker.
+	MaxConfigMaps int `yaml:"maxConfigMaps,omitempty"`
 }
