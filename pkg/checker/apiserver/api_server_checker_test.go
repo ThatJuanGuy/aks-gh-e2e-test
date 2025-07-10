@@ -169,11 +169,11 @@ func TestAPIServerChecker_Run(t *testing.T) {
 			apiServerChecker := &APIServerChecker{
 				name: checkerName,
 				config: &config.APIServerConfig{
-					ConfigMapNamespace:     configMapNamespace,
-					ConfigMapLabelKey:      configMapLabelKey,
-					ConfigMapMutateTimeout: 1 * time.Second,
-					ConfigMapReadTimeout:   1 * time.Second,
-					MaxConfigMaps:          maxConfigMaps,
+					Namespace:     configMapNamespace,
+					LabelKey:      configMapLabelKey,
+					MutateTimeout: 1 * time.Second,
+					ReadTimeout:   1 * time.Second,
+					MaxObjects:    maxConfigMaps,
 				},
 				timeout:    5 * time.Second,
 				kubeClient: tt.client,
@@ -318,11 +318,11 @@ func TestAPIServerChecker_garbageCollect(t *testing.T) {
 			checker := &APIServerChecker{
 				name: checkerName,
 				config: &config.APIServerConfig{
-					ConfigMapNamespace:     configMapNamespace,
-					ConfigMapLabelKey:      configMapLabelKey,
-					ConfigMapMutateTimeout: 1 * time.Second,
-					ConfigMapReadTimeout:   1 * time.Second,
-					MaxConfigMaps:          5,
+					Namespace:     configMapNamespace,
+					LabelKey:      configMapLabelKey,
+					MutateTimeout: 1 * time.Second,
+					ReadTimeout:   1 * time.Second,
+					MaxObjects:    5,
 				},
 				timeout:    checkerTimeout,
 				kubeClient: tt.client,
@@ -361,7 +361,7 @@ func TestAPIServerChecker_generateConfigMap(t *testing.T) {
 			checker := &APIServerChecker{
 				name: tt.checkerName,
 				config: &config.APIServerConfig{
-					ConfigMapLabelKey: "cluster-health-monitor/checker-name",
+					LabelKey: "cluster-health-monitor/checker-name",
 				},
 			}
 

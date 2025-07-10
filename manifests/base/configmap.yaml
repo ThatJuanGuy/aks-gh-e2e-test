@@ -47,8 +47,8 @@ data:
         interval: "30s"
         timeout: "5s"
         apiServerConfig:
-          configMapNamespace: "kube-system"
-          configMapLabelKey: "kubernetes.azure.com/cluster-health-monitor-checker-synthetic"
-          configMapMutateTimeout: "1s"
-          configMapReadTimeout: "1s"
-          maxConfigMaps: 10
+          namespace: "kube-system"
+          labelKey: "kubernetes.azure.com/cluster-health-monitor-checker-synthetic"
+          mutateTimeout: "1s"
+          readTimeout: "1s"
+          maxObjects: 10
