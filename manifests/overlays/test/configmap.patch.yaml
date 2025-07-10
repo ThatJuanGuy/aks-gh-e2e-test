@@ -44,3 +44,13 @@
           syntheticPodLabelKey: "kubernetes.azure.com/cluster-health-monitor-checker-synthetic"
           syntheticPodStartupTimeout: "5s"
           maxSyntheticPods: 10
+      - name: "test-api-server"
+        type: "apiServer"
+        interval: "5s"
+        timeout: "5s"
+        apiServerConfig:
+          namespace: "kube-system"
+          labelKey: "kubernetes.azure.com/cluster-health-monitor-checker-apiserver"
+          mutateTimeout: "1s"
+          readTimeout: "1s"
+          maxObjects: 10
