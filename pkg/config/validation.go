@@ -110,21 +110,25 @@ func (c *APIServerConfig) validate(checkerConfigTimeout time.Duration) error {
 	}
 
 	var errs []error
-	for _, nsErr := range apivalidation.ValidateNamespaceName(c.ConfigMapNamespace, false) {
-		errs = append(errs, fmt.Errorf("invalid config map namespace: value='%s', error='%s'", c.ConfigMapNamespace, nsErr))
+	for _, nsErr := range apivalidation.ValidateNamespaceName(c.Namespace, false) {
+		errs = append(errs, fmt.Errorf("invalid namespace: value='%s', error='%s'", c.Namespace, nsErr))
 	}
-	for _, labelErr := range utilvalidation.IsQualifiedName(c.ConfigMapLabelKey) {
-		errs = append(errs, fmt.Errorf("invalid config map label key: value='%s', error='%s'", c.ConfigMapLabelKey, labelErr))
-	}
-
-	if checkerConfigTimeout <= c.ConfigMapMutateTimeout {
-		errs = append(errs, fmt.Errorf("checker timeout must be greater than config map mutate timeout: checker timeout='%s', config map mutate timeout='%s'",
-			checkerConfigTimeout, c.ConfigMapMutateTimeout))
+	for _, labelErr := range utilvalidation.IsQualifiedName(c.LabelKey) {
+		errs = append(errs, fmt.Errorf("invalid label key: value='%s', error='%s'", c.LabelKey, labelErr))
 	}
 
-	if checkerConfigTimeout <= c.ConfigMapReadTimeout {
-		errs = append(errs, fmt.Errorf("checker timeout must be greater than config map read timeout: checker timeout='%s', config map read timeout='%s'",
-			checkerConfigTimeout, c.ConfigMapReadTimeout))
+	if checkerConfigTimeout <= c.MutateTimeout {
+		errs = append(errs, fmt.Errorf("checker timeout must be greater than mutate timeout: checker timeout='%s', mutate timeout='%s'",
+			checkerConfigTimeout, c.MutateTimeout))
+	}
+
+	if checkerConfigTimeout <= c.ReadTimeout {
+		errs = append(errs, fmt.Errorf("checker timeout must be greater than read timeout: checker timeout='%s', read timeout='%s'",
+			checkerConfigTimeout, c.ReadTimeout))
+	}
+
+	if c.MaxObjects <= 0 {
+		errs = append(errs, fmt.Errorf("invalid max objects: value=%d, must be greater than 0", c.MaxObjects))
 	}
 
 	return errors.Join(errs...)

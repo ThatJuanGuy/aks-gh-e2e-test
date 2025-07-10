@@ -198,73 +198,84 @@ func TestAPIServerConfig_Validate(t *testing.T) {
 			},
 		},
 		{
-			name: "invalid config map namespace",
+			name: "invalid namespace",
 			mutateConfig: func(cfg *CheckerConfig) *CheckerConfig {
-				cfg.APIServerConfig.ConfigMapNamespace = ""
+				cfg.APIServerConfig.Namespace = ""
 				return cfg
 			},
 			validateRes: func(g *WithT, err error) {
 				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("invalid config map namespace"))
+				g.Expect(err.Error()).To(ContainSubstring("invalid namespace"))
 			},
 		},
 		{
-			name: "invalid config map label key",
+			name: "invalid label key",
 			mutateConfig: func(cfg *CheckerConfig) *CheckerConfig {
-				cfg.APIServerConfig.ConfigMapLabelKey = ""
+				cfg.APIServerConfig.LabelKey = ""
 				return cfg
 			},
 			validateRes: func(g *WithT, err error) {
 				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("invalid config map label key"))
+				g.Expect(err.Error()).To(ContainSubstring("invalid label key"))
 			},
 		},
 		{
-			name: "timeout less than config map mutate timeout",
+			name: "timeout less than mutate timeout",
 			mutateConfig: func(cfg *CheckerConfig) *CheckerConfig {
 				cfg.Timeout = 3 * time.Second
-				cfg.APIServerConfig.ConfigMapMutateTimeout = 5 * time.Second
+				cfg.APIServerConfig.MutateTimeout = 5 * time.Second
 				return cfg
 			},
 			validateRes: func(g *WithT, err error) {
 				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("checker timeout must be greater than config map mutate timeout"))
+				g.Expect(err.Error()).To(ContainSubstring("checker timeout must be greater than mutate timeout"))
 			},
 		},
 		{
-			name: "timeout equal to config map mutate timeout",
+			name: "timeout equal to mutate timeout",
 			mutateConfig: func(cfg *CheckerConfig) *CheckerConfig {
 				cfg.Timeout = 5 * time.Second
-				cfg.APIServerConfig.ConfigMapMutateTimeout = 5 * time.Second
+				cfg.APIServerConfig.MutateTimeout = 5 * time.Second
 				return cfg
 			},
 			validateRes: func(g *WithT, err error) {
 				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("checker timeout must be greater than config map mutate timeout"))
+				g.Expect(err.Error()).To(ContainSubstring("checker timeout must be greater than mutate timeout"))
 			},
 		},
 		{
-			name: "timeout less than config map read timeout",
+			name: "timeout less than read timeout",
 			mutateConfig: func(cfg *CheckerConfig) *CheckerConfig {
 				cfg.Timeout = 3 * time.Second
-				cfg.APIServerConfig.ConfigMapReadTimeout = 5 * time.Second
+				cfg.APIServerConfig.ReadTimeout = 5 * time.Second
 				return cfg
 			},
 			validateRes: func(g *WithT, err error) {
 				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("checker timeout must be greater than config map read timeout"))
+				g.Expect(err.Error()).To(ContainSubstring("checker timeout must be greater than read timeout"))
 			},
 		},
 		{
-			name: "timeout equal to config map read timeout",
+			name: "timeout equal to read timeout",
 			mutateConfig: func(cfg *CheckerConfig) *CheckerConfig {
 				cfg.Timeout = 5 * time.Second
-				cfg.APIServerConfig.ConfigMapReadTimeout = 5 * time.Second
+				cfg.APIServerConfig.ReadTimeout = 5 * time.Second
 				return cfg
 			},
 			validateRes: func(g *WithT, err error) {
 				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("checker timeout must be greater than config map read timeout"))
+				g.Expect(err.Error()).To(ContainSubstring("checker timeout must be greater than read timeout"))
+			},
+		},
+		{
+			name: "max objects is zero",
+			mutateConfig: func(cfg *CheckerConfig) *CheckerConfig {
+				cfg.APIServerConfig.MaxObjects = 0
+				return cfg
+			},
+			validateRes: func(g *WithT, err error) {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("invalid max objects"))
 			},
 		},
 	}
@@ -280,10 +291,11 @@ func TestAPIServerConfig_Validate(t *testing.T) {
 				Timeout:  10 * time.Second,
 				Interval: 30 * time.Second,
 				APIServerConfig: &APIServerConfig{
-					ConfigMapNamespace:     "config-map-namespace",
-					ConfigMapLabelKey:      "cluster-health-monitor/checker-name",
-					ConfigMapMutateTimeout: 5 * time.Second,
-					ConfigMapReadTimeout:   1 * time.Second,
+					Namespace:     "config-map-namespace",
+					LabelKey:      "cluster-health-monitor/checker-name",
+					MutateTimeout: 5 * time.Second,
+					ReadTimeout:   1 * time.Second,
+					MaxObjects:    3,
 				},
 			}
 

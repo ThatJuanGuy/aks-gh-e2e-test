@@ -85,15 +85,20 @@ type PodStartupConfig struct {
 
 type APIServerConfig struct {
 	// Required.
-	// The namespace in which the empty ConfigMap is created for checking API server operations.
-	ConfigMapNamespace string `yaml:"configMapNamespace"`
+	// The namespace in which the object is created for checking API server operations.
+	Namespace string `yaml:"namespace"`
 	// Required.
-	// The Kubernetes label key used to identify the empty ConfigMap created by the checker.
-	ConfigMapLabelKey string `yaml:"configMapLabelKey"`
+	// The Kubernetes label key used to identify the objects created by the checker.
+	LabelKey string `yaml:"labelKey"`
 	// Required.
 	// The maximum duration for which the checker will wait return healthy status for mutating API calls.
-	ConfigMapMutateTimeout time.Duration `yaml:"configMapMutateTimeout"`
+	MutateTimeout time.Duration `yaml:"mutateTimeout"`
 	// Required.
 	// The maximum duration for which the checker will wait return healthy status for read-only API calls.
-	ConfigMapReadTimeout time.Duration `yaml:"configMapReadTimeout"`
+	ReadTimeout time.Duration `yaml:"readTimeout"`
+	// Required.
+	// The maximum number of objects created by the checker that can exist at any one time. If the limit has been reached, the checker
+	// will not create any more objects until some of the existing ones are deleted. Instead, it will fail the run with an error.
+	// Reaching this limit effectively disables the checker.
+	MaxObjects int `yaml:"maxObjects,omitempty"`
 }
