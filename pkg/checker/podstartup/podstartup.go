@@ -70,7 +70,7 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 	// Garbage collect any leftover synthetic pods previously created by this checker.
 	if err := c.garbageCollect(ctx); err != nil {
 		// Logging instead of returning an error here to avoid failing the checker run.
-		klog.InfoS("Failed to garbage collect old synthetic pods", "error", err.Error())
+		klog.ErrorS(err, "Failed to garbage collect old synthetic pods")
 	}
 
 	// List pods to check the current number of synthetic pods. Do not run the checker if the maximum number of synthetic pods has been reached.
@@ -97,7 +97,7 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 		err := c.k8sClientset.CoreV1().Pods(c.config.SyntheticPodNamespace).Delete(ctx, synthPod.Name, metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			// Logging instead of returning an error here to avoid failing the checker run.
-			klog.InfoS("Failed to delete synthetic pod", "name", synthPod.Name, "error", err.Error())
+			klog.ErrorS(err, "Failed to delete synthetic pod", "name", synthPod.Name)
 		}
 	}()
 

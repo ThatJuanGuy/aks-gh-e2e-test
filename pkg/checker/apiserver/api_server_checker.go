@@ -63,7 +63,7 @@ func (c APIServerChecker) Run(ctx context.Context) (*types.Result, error) {
 	// Garbage collect any leftover ConfigMaps previously created by this checker.
 	if err := c.garbageCollect(ctx); err != nil {
 		// Logging instead of returning an error to avoid failing the checker run.
-		klog.InfoS("Failed to garbage collect old ConfigMaps", "error", err.Error())
+		klog.ErrorS(err, "Failed to garbage collect old ConfigMaps")
 	}
 
 	// Check if the ConfigMap limit has been reached.
@@ -94,7 +94,7 @@ func (c APIServerChecker) Run(ctx context.Context) (*types.Result, error) {
 		err := c.kubeClient.CoreV1().ConfigMaps(c.config.ConfigMapNamespace).Delete(ctx, createdConfigMap.Name, metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			// Logging instead of returning an error here to avoid failing the checker run.
-			klog.InfoS("Failed to delete ConfigMap", "name", createdConfigMap.Name, "error", err.Error())
+			klog.ErrorS(err, "Failed to delete ConfigMap", "name", createdConfigMap.Name)
 		}
 	}()
 
