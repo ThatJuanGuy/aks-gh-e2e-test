@@ -85,9 +85,9 @@ func (c APIServerChecker) Run(ctx context.Context) (*types.Result, error) {
 	createdConfigMap, err := c.kubeClient.CoreV1().ConfigMaps(c.config.Namespace).Create(createCtx, c.generateConfigMap(), metav1.CreateOptions{})
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return types.Unhealthy(errCodeConfigMapCreateTimeout, "timed out while creating ConfigMap"), nil
+			return types.Unhealthy(errCodeAPIServerCreateTimeout, "timed out while creating ConfigMap"), nil
 		}
-		return types.Unhealthy(errCodeConfigMapCreateError, fmt.Sprintf("failed to create ConfigMap: %v", err)), nil
+		return types.Unhealthy(errCodeAPIServerCreateError, fmt.Sprintf("failed to create ConfigMap: %v", err)), nil
 	}
 	// Defer deletion of the created ConfigMap in case of failure later in the function.
 	defer func() {
@@ -104,9 +104,9 @@ func (c APIServerChecker) Run(ctx context.Context) (*types.Result, error) {
 	_, err = c.kubeClient.CoreV1().ConfigMaps(c.config.Namespace).Get(getCtx, createdConfigMap.Name, metav1.GetOptions{})
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return types.Unhealthy(errCodeConfigMapGetTimeout, "timed out while getting ConfigMap"), nil
+			return types.Unhealthy(errCodeAPIServerGetTimeout, "timed out while getting ConfigMap"), nil
 		}
-		return types.Unhealthy(errCodeConfigMapGetError, fmt.Sprintf("failed to get ConfigMap: %v", err)), nil
+		return types.Unhealthy(errCodeAPIServerGetError, fmt.Sprintf("failed to get ConfigMap: %v", err)), nil
 	}
 
 	// Delete ConfigMap.
@@ -115,9 +115,9 @@ func (c APIServerChecker) Run(ctx context.Context) (*types.Result, error) {
 	err = c.kubeClient.CoreV1().ConfigMaps(c.config.Namespace).Delete(deleteCtx, createdConfigMap.Name, metav1.DeleteOptions{})
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return types.Unhealthy(errCodeConfigMapDeleteTimeout, "timed out while deleting ConfigMap"), nil
+			return types.Unhealthy(errCodeAPIServerDeleteTimeout, "timed out while deleting ConfigMap"), nil
 		}
-		return types.Unhealthy(errCodeConfigMapDeleteError, fmt.Sprintf("failed to delete ConfigMap: %v", err)), nil
+		return types.Unhealthy(errCodeAPIServerDeleteError, fmt.Sprintf("failed to delete ConfigMap: %v", err)), nil
 	}
 
 	return types.Healthy(), nil
