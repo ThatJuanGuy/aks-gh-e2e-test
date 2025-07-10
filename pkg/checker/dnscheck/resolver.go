@@ -6,20 +6,16 @@ import (
 	"time"
 )
 
-const (
-	queryTimeout = 2 * time.Second
-)
-
 // resolver is an interface for DNS resolution.
 type resolver interface {
-	lookupHost(ctx context.Context, dnsIP, domain string) ([]string, error)
+	lookupHost(ctx context.Context, dnsIP, domain string, queryTimeout time.Duration) ([]string, error)
 }
 
 // defaultResolver implements the resolver interface using net.Resolver.
 type defaultResolver struct {
 }
 
-func (r *defaultResolver) lookupHost(ctx context.Context, dnsIP, domain string) ([]string, error) {
+func (r *defaultResolver) lookupHost(ctx context.Context, dnsIP, domain string, queryTimeout time.Duration) ([]string, error) {
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
 	resolver := &net.Resolver{

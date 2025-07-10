@@ -15,8 +15,8 @@ func TestConfigValidate_Valid(t *testing.T) {
 				Name:      "dns1",
 				Type:      CheckTypeDNS,
 				Interval:  10 * time.Second,
-				Timeout:   2 * time.Second,
-				DNSConfig: &DNSConfig{Domain: "example.com"},
+				Timeout:   5 * time.Second,
+				DNSConfig: &DNSConfig{Domain: "example.com", QueryTimeout: 2 * time.Second},
 			},
 			{
 				Name:     "podStartup1",
@@ -48,8 +48,8 @@ func TestConfigValidate_DuplicateNames(t *testing.T) {
 	g := NewWithT(t)
 	cfg := &Config{
 		Checkers: []CheckerConfig{
-			{Name: "foo", Type: CheckTypeDNS, Interval: 1, Timeout: 1, DNSConfig: &DNSConfig{Domain: "a"}},
-			{Name: "foo", Type: CheckTypeDNS, Interval: 1, Timeout: 1, DNSConfig: &DNSConfig{Domain: "b"}},
+			{Name: "foo", Type: CheckTypeDNS, Interval: 1, Timeout: 2 * time.Second, DNSConfig: &DNSConfig{Domain: "a", QueryTimeout: 1 * time.Second}},
+			{Name: "foo", Type: CheckTypeDNS, Interval: 1, Timeout: 2 * time.Second, DNSConfig: &DNSConfig{Domain: "b", QueryTimeout: 1 * time.Second}},
 		},
 	}
 	err := cfg.validate()
@@ -296,6 +296,114 @@ func TestAPIServerConfig_Validate(t *testing.T) {
 					MutateTimeout: 5 * time.Second,
 					ReadTimeout:   1 * time.Second,
 					MaxObjects:    3,
+				},
+			}
+
+			if tt.mutateConfig != nil {
+				chkCfg = tt.mutateConfig(chkCfg)
+			}
+
+			err := chkCfg.validate()
+			tt.validateRes(g, err)
+		})
+	}
+}
+
+func TestDNSConfig_Validate(t *testing.T) {
+	tests := []struct {
+		name         string
+		mutateConfig func(cfg *CheckerConfig) *CheckerConfig
+		validateRes  func(g *WithT, err error)
+	}{
+		{
+			name: "valid config",
+			validateRes: func(g *WithT, err error) {
+				g.Expect(err).ToNot(HaveOccurred())
+			},
+		},
+		{
+			name: "nil dns config",
+			mutateConfig: func(cfg *CheckerConfig) *CheckerConfig {
+				cfg.DNSConfig = nil
+				return cfg
+			},
+			validateRes: func(g *WithT, err error) {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("dnsConfig is required for DNSChecker"))
+			},
+		},
+		{
+			name: "missing domain",
+			mutateConfig: func(cfg *CheckerConfig) *CheckerConfig {
+				cfg.DNSConfig.Domain = ""
+				return cfg
+			},
+			validateRes: func(g *WithT, err error) {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("domain is required for DNSChecker"))
+			},
+		},
+		{
+			name: "zero queryTimeout",
+			mutateConfig: func(cfg *CheckerConfig) *CheckerConfig {
+				cfg.DNSConfig.QueryTimeout = 0
+				return cfg
+			},
+			validateRes: func(g *WithT, err error) {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("queryTimeout must be greater than 0"))
+			},
+		},
+		{
+			name: "negative queryTimeout",
+			mutateConfig: func(cfg *CheckerConfig) *CheckerConfig {
+				cfg.DNSConfig.QueryTimeout = -1 * time.Second
+				return cfg
+			},
+			validateRes: func(g *WithT, err error) {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("queryTimeout must be greater than 0"))
+			},
+		},
+		{
+			name: "checker timeout less than query timeout",
+			mutateConfig: func(cfg *CheckerConfig) *CheckerConfig {
+				cfg.Timeout = 3 * time.Second
+				cfg.DNSConfig.QueryTimeout = 5 * time.Second
+				return cfg
+			},
+			validateRes: func(g *WithT, err error) {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("checker timeout must be greater than DNS query timeout"))
+			},
+		},
+		{
+			name: "checker timeout equal to query timeout",
+			mutateConfig: func(cfg *CheckerConfig) *CheckerConfig {
+				cfg.Timeout = 5 * time.Second
+				cfg.DNSConfig.QueryTimeout = 5 * time.Second
+				return cfg
+			},
+			validateRes: func(g *WithT, err error) {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("checker timeout must be greater than DNS query timeout"))
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			g := NewWithT(t)
+
+			chkCfg := &CheckerConfig{
+				Name:     "test-checker",
+				Type:     CheckTypeDNS,
+				Timeout:  10 * time.Second,
+				Interval: 30 * time.Second,
+				DNSConfig: &DNSConfig{
+					Domain:       "example.com",
+					QueryTimeout: 2 * time.Second,
 				},
 			}
 
