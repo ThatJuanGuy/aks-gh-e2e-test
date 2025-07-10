@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -371,7 +372,7 @@ func TestAPIServerChecker_generateConfigMap(t *testing.T) {
 			// Verify configmap name is k8s compliant (DNS subdomain format).
 			g.Expect(validation.NameIsDNSSubdomain(configMap.Name, false)).To(BeEmpty())
 			// Verify configmap name has expected prefix.
-			g.Expect(configMap.Name).To(HavePrefix(checker.configMapNamePrefix()))
+			g.Expect(configMap.Name).To(HavePrefix(strings.ToLower(checker.Name()) + "-empty-configmap-"))
 			// Verify checker labels are applied.
 			g.Expect(configMap.Labels).To(Equal(checker.configMapLabels()))
 		})

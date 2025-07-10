@@ -131,23 +131,15 @@ func (c APIServerChecker) configMapLabels() map[string]string {
 	}
 }
 
-// configMapNamePrefix returns the prefix for ConfigMap names created specifically by this checker.
-// This is used to ensure that ConfigMaps created by this checker can be easily identified and cleaned up.
-func (c APIServerChecker) configMapNamePrefix() string {
-	return strings.ToLower(fmt.Sprintf("%s-empty-configmap-", c.name))
-}
-
 // generateConfigMap creates a ConfigMap object for this checker.
 func (c APIServerChecker) generateConfigMap() *corev1.ConfigMap {
-	configMapName := fmt.Sprintf("%s%d", c.configMapNamePrefix(), time.Now().UnixNano())
-	configMap := &corev1.ConfigMap{
+	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      configMapName,
+			Name:      fmt.Sprintf("%s-empty-configmap-%d", strings.ToLower(c.name), time.Now().UnixNano()),
 			Namespace: c.config.Namespace,
 			Labels:    c.configMapLabels(),
 		},
 	}
-	return configMap
 }
 
 // garbageCollect attempts to delete any leftover ConfigMaps created by this checker
