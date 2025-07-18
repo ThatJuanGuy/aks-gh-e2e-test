@@ -87,7 +87,7 @@ type PodStartupConfig struct {
 	MaxSyntheticPods int `yaml:"maxSyntheticPods,omitempty"`
 	// Required.
 	// The container image to use for synthetic pods.
-	SyntheticPodImage string `yaml:"image"`
+	SyntheticPodImage string `yaml:"syntheticPodImage"`
 }
 
 type APIServerConfig struct {

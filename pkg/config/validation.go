@@ -113,7 +113,7 @@ func (c *PodStartupConfig) validate(checkerConfigTimeout time.Duration) error {
 	}
 
 	if c.SyntheticPodImage == "" {
-		errs = append(errs, fmt.Errorf("image is required for PodStartupChecker"))
+		errs = append(errs, fmt.Errorf("synthetic pod image is required for PodStartupChecker"))
 	}
 
 	return errors.Join(errs...)
