@@ -266,9 +266,8 @@ func (c *PodStartupChecker) generateSyntheticPod() *corev1.Pod {
 			},
 			Containers: []corev1.Container{
 				{
-					// TODO? Maybe use a different image
 					Name:  "pause",
-					Image: "mcr.microsoft.com/oss/v2/kubernetes/pause:3.9",
+					Image: c.config.SyntheticPodImage,
 				},
 			},
 			// TODO: Add pod cpu/memory requests and/or limits.

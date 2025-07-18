@@ -73,7 +73,7 @@ func (c *DNSConfig) validate(checkerConfigTimeout time.Duration) error {
 	if c == nil {
 		return fmt.Errorf("dnsConfig is required for DNSChecker")
 	}
-	
+
 	var errs []error
 	if c.Domain == "" {
 		errs = append(errs, fmt.Errorf("domain is required for DNSChecker"))
@@ -81,12 +81,12 @@ func (c *DNSConfig) validate(checkerConfigTimeout time.Duration) error {
 	if c.QueryTimeout <= 0 {
 		errs = append(errs, fmt.Errorf("queryTimeout must be greater than 0"))
 	}
-	
+
 	if checkerConfigTimeout <= c.QueryTimeout {
 		errs = append(errs, fmt.Errorf("checker timeout must be greater than DNS query timeout: checker timeout='%s', DNS query timeout='%s'",
 			checkerConfigTimeout, c.QueryTimeout))
 	}
-	
+
 	return errors.Join(errs...)
 }
 
@@ -110,6 +110,10 @@ func (c *PodStartupConfig) validate(checkerConfigTimeout time.Duration) error {
 
 	if c.MaxSyntheticPods <= 0 {
 		errs = append(errs, fmt.Errorf("invalid max synthetic pods: value=%d, must be greater than 0", c.MaxSyntheticPods))
+	}
+
+	if c.SyntheticPodImage == "" {
+		errs = append(errs, fmt.Errorf("image is required for PodStartupChecker"))
 	}
 
 	return errors.Join(errs...)
