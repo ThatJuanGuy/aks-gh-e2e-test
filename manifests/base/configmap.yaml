@@ -5,7 +5,7 @@ metadata:
   name: cluster-health-monitor-config
   namespace: kube-system
 data:
-  config.yaml: |+
+  config.yaml: |
     checkers:
       - name: "internal-coredns"
         type: "dns"
@@ -46,6 +46,7 @@ data:
           syntheticPodLabelKey: "kubernetes.azure.com/cluster-health-monitor-checker-synthetic"
           syntheticPodStartupTimeout: "5s"
           maxSyntheticPods: 10
+          syntheticPodImage: "mcr.microsoft.com/oss/v2/kubernetes/pause:3.9"
       - name: "api-server"
         type: "apiServer"
         interval: "30s"

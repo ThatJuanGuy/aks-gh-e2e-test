@@ -28,6 +28,7 @@ func TestConfigValidate_Valid(t *testing.T) {
 					SyntheticPodLabelKey:       "cluster-health-monitor/checker-name",
 					SyntheticPodStartupTimeout: 5 * time.Second,
 					MaxSyntheticPods:           10,
+					SyntheticPodImage:          "mcr.microsoft.com/oss/v2/kubernetes/pause:3.9",
 				},
 			},
 		},
@@ -144,6 +145,17 @@ func TestPodStartupConfig_Validate(t *testing.T) {
 				g.Expect(err.Error()).To(ContainSubstring("invalid max synthetic pods"))
 			},
 		},
+		{
+			name: "missing image",
+			mutateConfig: func(cfg *CheckerConfig) *CheckerConfig {
+				cfg.PodStartupConfig.SyntheticPodImage = ""
+				return cfg
+			},
+			validateRes: func(g *WithT, err error) {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("image is required for PodStartupChecker"))
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -160,6 +172,7 @@ func TestPodStartupConfig_Validate(t *testing.T) {
 					SyntheticPodLabelKey:       "cluster-health-monitor/checker-name",
 					SyntheticPodStartupTimeout: 5 * time.Second,
 					MaxSyntheticPods:           3,
+					SyntheticPodImage:          "mcr.microsoft.com/oss/v2/kubernetes/pause:3.9",
 				},
 			}
 

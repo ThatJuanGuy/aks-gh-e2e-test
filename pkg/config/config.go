@@ -85,6 +85,9 @@ type PodStartupConfig struct {
 	// will not create any more synthetic pods until some of the existing ones are deleted. Instead, it will fail the run with an error.
 	// Reaching this limit effectively disables the checker.
 	MaxSyntheticPods int `yaml:"maxSyntheticPods,omitempty"`
+	// Required.
+	// The container image to use for synthetic pods.
+	SyntheticPodImage string `yaml:"syntheticPodImage"`
 }
 
 type APIServerConfig struct {

@@ -266,9 +266,8 @@ func (c *PodStartupChecker) generateSyntheticPod() *corev1.Pod {
 			},
 			Containers: []corev1.Container{
 				{
-					// TODO? Maybe use a different image
 					Name:  "pause",
-					Image: "k8s.gcr.io/pause:3.2",
+					Image: c.config.SyntheticPodImage,
 				},
 			},
 			// TODO: Add pod cpu/memory requests and/or limits.

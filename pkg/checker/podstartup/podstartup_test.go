@@ -134,6 +134,7 @@ func TestPodStartupChecker_Run(t *testing.T) {
 					SyntheticPodLabelKey:       syntheticPodLabelKey,
 					SyntheticPodStartupTimeout: 5 * time.Second,
 					MaxSyntheticPods:           maxSyntheticPods,
+					SyntheticPodImage:          "mcr.microsoft.com/oss/v2/kubernetes/pause:3.9",
 				},
 				timeout:      5 * time.Second,
 				k8sClientset: tt.client,
@@ -257,6 +258,7 @@ func TestPodStartupChecker_garbageCollect(t *testing.T) {
 					SyntheticPodLabelKey:       syntheticPodLabelKey,
 					SyntheticPodStartupTimeout: 3 * time.Second,
 					MaxSyntheticPods:           5,
+					SyntheticPodImage:          "mcr.microsoft.com/oss/v2/kubernetes/pause:3.9",
 				},
 				timeout:      checkerTimeout,
 				k8sClientset: tt.client,
@@ -341,6 +343,7 @@ func TestPodStartupChecker_pollPodCreationToContainerRunningDuration(t *testing.
 					SyntheticPodLabelKey:       "cluster-health-monitor/checker-name",
 					SyntheticPodStartupTimeout: 5 * time.Second,
 					MaxSyntheticPods:           3,
+					SyntheticPodImage:          "mcr.microsoft.com/oss/v2/kubernetes/pause:3.9",
 				},
 			}
 
@@ -463,6 +466,7 @@ func TestPodStartupChecker_getImagePullDuration(t *testing.T) {
 			checker := &PodStartupChecker{
 				config: &config.PodStartupConfig{
 					SyntheticPodNamespace: namespace,
+					SyntheticPodImage:     "mcr.microsoft.com/oss/v2/kubernetes/pause:3.9",
 				},
 				k8sClientset: tt.client,
 			}
@@ -495,6 +499,7 @@ func TestGenerateSyntheticPod(t *testing.T) {
 				name: tt.checkerName,
 				config: &config.PodStartupConfig{
 					SyntheticPodLabelKey: "cluster-health-monitor/checker-name",
+					SyntheticPodImage:    "mcr.microsoft.com/oss/v2/kubernetes/pause:3.9",
 				},
 			}
 
