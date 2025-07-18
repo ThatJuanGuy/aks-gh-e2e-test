@@ -5,9 +5,10 @@ import "time"
 type CheckerType string
 
 const (
-	CheckTypeDNS        CheckerType = "dns"
-	CheckTypePodStartup CheckerType = "podStartup"
-	CheckTypeAPIServer  CheckerType = "apiServer"
+	CheckTypeDNS           CheckerType = "dns"
+	CheckTypePodStartup    CheckerType = "podStartup"
+	CheckTypeAPIServer     CheckerType = "apiServer"
+	CheckTypeMetricsServer CheckerType = "metricsServer"
 )
 
 // Config represents the configuration for the health checkers.

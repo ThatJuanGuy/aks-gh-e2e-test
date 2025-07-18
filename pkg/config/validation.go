@@ -62,6 +62,8 @@ func (c *CheckerConfig) validate() error {
 		if err := c.APIServerConfig.validate(c.Timeout); err != nil {
 			errs = append(errs, fmt.Errorf("checker config %q APIServerConfig validation failed: %w", c.Name, err))
 		}
+	case CheckTypeMetricsServer:
+		// There is no specific validation for MetricsServerConfig as it does not have additional fields.
 	default:
 		errs = append(errs, fmt.Errorf("checker config %q has unsupported type: %s", c.Name, c.Type))
 	}
