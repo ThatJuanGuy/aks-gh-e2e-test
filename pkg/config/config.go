@@ -2,8 +2,6 @@ package config
 
 import (
 	"time"
-
-	corev1 "k8s.io/api/core/v1"
 )
 
 type CheckerType string
@@ -92,10 +90,6 @@ type PodStartupConfig struct {
 	MaxSyntheticPods int `yaml:"maxSyntheticPods,omitempty"`
 	// The timeout for TCP requests to the synthetic pod.
 	SyntheticPodTCPTimeout time.Duration `yaml:"syntheticPodTCPTimeout,omitempty"`
-	// Tolerations to apply to synthetic pods, allowing them to be scheduled on nodes with matching taints.
-	SyntheticPodTolerations []corev1.Toleration `yaml:"syntheticPodTolerations,omitempty"`
-	// Node affinity rules for synthetic pods, controlling which nodes they can be scheduled on.
-	SyntheticPodNodeAffinity *corev1.NodeAffinity `yaml:"syntheticPodNodeAffinity,omitempty"`
 }
 
 type APIServerConfig struct {

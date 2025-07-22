@@ -45,26 +45,6 @@
           syntheticPodStartupTimeout: "5s"
           maxSyntheticPods: 10
           syntheticPodTCPTimeout: "5s"
-          syntheticPodTolerations:
-            - key: "node-role.kubernetes.io/master"
-              effect: "NoSchedule"
-            - key: "CriticalAddonsOnly"
-              operator: "Exists"
-          syntheticPodNodeAffinity:
-            requiredDuringSchedulingIgnoredDuringExecution:
-              nodeSelectorTerms:
-                - matchExpressions:
-                    - key: "kubernetes.azure.com/cluster"
-                      operator: "Exists"
-                    - key: "type"
-                      operator: "NotIn"
-                      values: ["virtual-kubelet"]
-                    - key: "kubernetes.io/os"
-                      operator: "In"
-                      values: ["linux"]
-                    - key: "kubernetes.azure.com/mode"
-                      operator: "In"
-                      values: ["system"]
       - name: "test-api-server"
         type: "apiServer"
         interval: "5s"
