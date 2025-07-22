@@ -243,67 +243,36 @@ func (c *PodStartupChecker) syntheticPodNamePrefix() string {
 func (c *PodStartupChecker) generateSyntheticPod() *corev1.Pod {
 	podName := fmt.Sprintf("%s%d", c.syntheticPodNamePrefix(), time.Now().UnixNano())
 
+	podSpec := corev1.PodSpec{
+		Tolerations: c.config.SyntheticPodTolerations,
+		Containers: []corev1.Container{
+			{
+				Name:  "synthetic",
+				Image: c.config.SyntheticPodImage,
+				Ports: []corev1.ContainerPort{
+					{
+						ContainerPort: c.config.SyntheticPodPort,
+						Protocol:      corev1.ProtocolTCP,
+					},
+				},
+			},
+		},
+		// TODO: Add pod cpu/memory requests and/or limits.
+	}
+
+	// Only set affinity if node affinity is provided
+	if c.config.SyntheticPodNodeAffinity != nil {
+		podSpec.Affinity = &corev1.Affinity{
+			NodeAffinity: c.config.SyntheticPodNodeAffinity,
+		}
+	}
+
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   podName,
 			Labels: c.syntheticPodLabels(),
 		},
-		// TODO? maybe allow configuring the pod spec in the config
-		Spec: corev1.PodSpec{
-			Tolerations: []corev1.Toleration{
-				{
-					Key:    "node-role.kubernetes.io/master",
-					Effect: corev1.TaintEffectNoSchedule,
-				},
-				{
-					Key:      "CriticalAddonsOnly",
-					Operator: corev1.TolerationOpExists,
-				},
-			},
-			Affinity: &corev1.Affinity{
-				NodeAffinity: &corev1.NodeAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
-						NodeSelectorTerms: []corev1.NodeSelectorTerm{
-							{
-								MatchExpressions: []corev1.NodeSelectorRequirement{
-									{
-										Key:      "kubernetes.azure.com/cluster",
-										Operator: corev1.NodeSelectorOpExists},
-									{
-										Key:      "type",
-										Operator: corev1.NodeSelectorOpNotIn,
-										Values:   []string{"virtual-kubelet"},
-									},
-									{
-										Key:      "kubernetes.io/os",
-										Operator: corev1.NodeSelectorOpIn,
-										Values:   []string{"linux"},
-									},
-									{
-										Key:      "kubernetes.azure.com/mode",
-										Operator: corev1.NodeSelectorOpIn,
-										Values:   []string{"system"},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			Containers: []corev1.Container{
-				{
-					Name:  "synthetic",
-					Image: c.config.SyntheticPodImage,
-					Ports: []corev1.ContainerPort{
-						{
-							ContainerPort: c.config.SyntheticPodPort,
-							Protocol:      corev1.ProtocolTCP,
-						},
-					},
-				},
-			},
-			// TODO: Add pod cpu/memory requests and/or limits.
-		},
+		Spec: podSpec,
 	}
 }
 

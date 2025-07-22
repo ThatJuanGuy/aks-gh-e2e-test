@@ -1,6 +1,10 @@
 package config
 
-import "time"
+import (
+	"time"
+
+	corev1 "k8s.io/api/core/v1"
+)
 
 type CheckerType string
 
@@ -101,6 +105,12 @@ type PodStartupConfig struct {
 	// Optional. Required and used only when CheckPodCommunication is true.
 	// The URL path to use for HTTP requests to the synthetic pod.
 	SyntheticPodPath string `yaml:"syntheticPodPath,omitempty"`
+	// Optional.
+	// Tolerations to apply to synthetic pods, allowing them to be scheduled on nodes with matching taints.
+	SyntheticPodTolerations []corev1.Toleration `yaml:"syntheticPodTolerations,omitempty"`
+	// Optional.
+	// Node affinity rules for synthetic pods, controlling which nodes they can be scheduled on.
+	SyntheticPodNodeAffinity *corev1.NodeAffinity `yaml:"syntheticPodNodeAffinity,omitempty"`
 }
 
 type APIServerConfig struct {
