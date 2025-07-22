@@ -90,21 +90,7 @@ type PodStartupConfig struct {
 	// will not create any more synthetic pods until some of the existing ones are deleted. Instead, it will fail the run with an error.
 	// Reaching this limit effectively disables the checker.
 	MaxSyntheticPods int `yaml:"maxSyntheticPods,omitempty"`
-	// Required.
-	// The container image to use for synthetic pods.
-	SyntheticPodImage string `yaml:"syntheticPodImage"`
 	// Optional.
-	// Whether to perform an HTTP request to the synthetic pod to verify it's responding after startup.
-	// If set to false, only the pod startup time will be measured. If set to true, an HTTP request will be made to the pod IP to verify
-	// it's serving traffic. This requires the synthetic pod image to be a web server that listens on the specified port.
-	CheckPodCommunication bool `yaml:"checkPodCommunication,omitempty"`
-	// Optional. Required and used only when CheckPodCommunication is true.
-	// The port number on which the synthetic pod's container listens for HTTP requests.
-	SyntheticPodPort int32 `yaml:"syntheticPodPort,omitempty"`
-	// Optional. Required and used only when CheckPodCommunication is true.
-	// The URL path to use for HTTP requests to the synthetic pod.
-	SyntheticPodPath string `yaml:"syntheticPodPath,omitempty"`
-	// Optional. Required and used only when CheckPodCommunication is true.
 	// The timeout for HTTP requests to the synthetic pod.
 	SyntheticPodHTTPTimeout time.Duration `yaml:"syntheticPodHTTPTimeout,omitempty"`
 	// Optional.

@@ -114,10 +114,6 @@ func (c *PodStartupConfig) validate(checkerConfigTimeout time.Duration) error {
 		errs = append(errs, fmt.Errorf("invalid max synthetic pods: value=%d, must be greater than 0", c.MaxSyntheticPods))
 	}
 
-	if c.SyntheticPodImage == "" {
-		errs = append(errs, fmt.Errorf("synthetic pod image is required for PodStartupChecker"))
-	}
-
 	return errors.Join(errs...)
 }
 

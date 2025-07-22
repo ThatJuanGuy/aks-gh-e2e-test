@@ -22,6 +22,13 @@ import (
 	"github.com/Azure/cluster-health-monitor/pkg/types"
 )
 
+const (
+	// Hardcoded values for pod communication testing
+	syntheticPodImage = "mcr.microsoft.com/azurelinux/base/nginx:1.25.4-4-azl3.0.20250702"
+	syntheticPodPort  = 80
+	syntheticPodPath  = "/"
+)
+
 type PodStartupChecker struct {
 	name         string
 	config       *config.PodStartupConfig
@@ -124,24 +131,21 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 		return types.Unhealthy(errCodePodStartupDurationExceeded, "pod exceeded the maximum healthy startup duration"), nil
 	}
 
-	// If pod communication check is enabled, wait for pod IP and make HTTP request
-	if c.config.CheckPodCommunication {
-		// Wait for pod to have an IP address and make an HTTP request to verify it's responding
-		podIP, err := c.waitForPodIP(ctx, synthPod.Name)
-		if err != nil {
-			if errors.Is(err, context.DeadlineExceeded) {
-				return types.Unhealthy(errCodeHTTPRequestTimeout, "timed out waiting for pod IP"), nil
-			}
-			return types.Unhealthy(errCodeHTTPRequestFailed, fmt.Sprintf("failed to get pod IP: %s", err)), nil
+	// perform pod communication check - get pod IP and make HTTP request // TODO change to TCP
+	podIP, err := c.getSyntheticPodIP(ctx, synthPod.Name)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return types.Unhealthy(errCodeHTTPRequestTimeout, "timed out waiting for pod IP"), nil
 		}
+		return types.Unhealthy(errCodeHTTPRequestFailed, fmt.Sprintf("failed to get pod IP: %s", err)), nil
+	}
 
-		err = c.makeHTTPRequest(ctx, podIP)
-		if err != nil {
-			if errors.Is(err, context.DeadlineExceeded) {
-				return types.Unhealthy(errCodeHTTPRequestTimeout, "HTTP request to synthetic pod timed out"), nil
-			}
-			return types.Unhealthy(errCodeHTTPRequestFailed, fmt.Sprintf("HTTP request to synthetic pod failed: %s", err)), nil
+	err = c.makeHTTPRequest(ctx, podIP)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return types.Unhealthy(errCodeHTTPRequestTimeout, "HTTP request to synthetic pod timed out"), nil
 		}
+		return types.Unhealthy(errCodeHTTPRequestFailed, fmt.Sprintf("HTTP request to synthetic pod failed: %s", err)), nil
 	}
 
 	return types.Healthy(), nil
@@ -248,16 +252,16 @@ func (c *PodStartupChecker) generateSyntheticPod() *corev1.Pod {
 		Containers: []corev1.Container{
 			{
 				Name:  "synthetic",
-				Image: c.config.SyntheticPodImage,
+				Image: syntheticPodImage,
 				Ports: []corev1.ContainerPort{
 					{
-						ContainerPort: c.config.SyntheticPodPort,
+						ContainerPort: syntheticPodPort,
 						Protocol:      corev1.ProtocolTCP,
 					},
 				},
 			},
 		},
-		// TODO: Add pod cpu/memory requests and/or limits.
+		// TODOcarlosalv: Add pod cpu/memory requests and/or limits.
 	}
 
 	// Only set affinity if node affinity is provided
@@ -276,26 +280,21 @@ func (c *PodStartupChecker) generateSyntheticPod() *corev1.Pod {
 	}
 }
 
-// waitForPodIP waits for the pod to have an IP address assigned
-func (c *PodStartupChecker) waitForPodIP(ctx context.Context, podName string) (string, error) {
-	var podIP string
-	err := wait.PollUntilContextCancel(ctx, pollingInterval, true, func(ctx context.Context) (bool, error) {
-		pod, err := c.k8sClientset.CoreV1().Pods(c.config.SyntheticPodNamespace).Get(ctx, podName, metav1.GetOptions{})
-		if err != nil {
-			return false, nil
-		}
-		if pod.Status.PodIP != "" {
-			podIP = pod.Status.PodIP
-			return true, nil
-		}
-		return false, nil
-	})
-	return podIP, err
+// getSyntheticPodIP gets the IP address assigned to the synthetic pod with the specified name
+func (c *PodStartupChecker) getSyntheticPodIP(ctx context.Context, podName string) (string, error) {
+	pod, err := c.k8sClientset.CoreV1().Pods(c.config.SyntheticPodNamespace).Get(ctx, podName, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("error getting pod %s: %w", podName, err)
+	}
+	if pod.Status.PodIP == "" {
+		return "", fmt.Errorf("pod IP is empty")
+	}
+	return pod.Status.PodIP, nil
 }
 
 // makeHTTPRequest makes a simple HTTP GET request to the pod IP to verify it's responding
 func (c *PodStartupChecker) makeHTTPRequest(ctx context.Context, podIP string) error {
-	url := fmt.Sprintf("http://%s:%d%s", podIP, c.config.SyntheticPodPort, c.config.SyntheticPodPath)
+	url := fmt.Sprintf("http://%s:%d%s", podIP, syntheticPodPort, syntheticPodPath)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {

@@ -46,10 +46,6 @@ data:
           syntheticPodLabelKey: "kubernetes.azure.com/cluster-health-monitor-checker-synthetic"
           syntheticPodStartupTimeout: "5s"
           maxSyntheticPods: 10
-          syntheticPodImage: "mcr.microsoft.com/azurelinux/base/nginx:1.25.4-4-azl3.0.20250702"
-          checkPodCommunication: true
-          syntheticPodPort: 80
-          syntheticPodPath: "/"
           syntheticPodHTTPTimeout: "5s"
           syntheticPodTolerations:
             - key: "node-role.kubernetes.io/master"
