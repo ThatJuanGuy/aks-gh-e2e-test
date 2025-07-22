@@ -46,7 +46,6 @@ data:
           syntheticPodLabelKey: "kubernetes.azure.com/cluster-health-monitor-checker-synthetic"
           syntheticPodStartupTimeout: "5s"
           maxSyntheticPods: 10
-          syntheticPodTCPTimeout: "5s"
       - name: "api-server"
         type: "apiServer"
         interval: "30s"

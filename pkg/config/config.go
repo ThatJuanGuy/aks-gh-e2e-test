@@ -88,8 +88,6 @@ type PodStartupConfig struct {
 	// will not create any more synthetic pods until some of the existing ones are deleted. Instead, it will fail the run with an error.
 	// Reaching this limit effectively disables the checker.
 	MaxSyntheticPods int `yaml:"maxSyntheticPods,omitempty"`
-	// The timeout for TCP requests to the synthetic pod.
-	SyntheticPodTCPTimeout time.Duration `yaml:"syntheticPodTCPTimeout,omitempty"`
 }
 
 type APIServerConfig struct {

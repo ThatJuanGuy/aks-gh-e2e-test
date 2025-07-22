@@ -27,6 +27,7 @@ const (
 	// Hardcoded values for pod communication testing
 	syntheticPodImage = "mcr.microsoft.com/azurelinux/base/nginx:1.25.4-4-azl3.0.20250702"
 	syntheticPodPort  = 80
+	tcpTimeout        = 10 * time.Second
 )
 
 type PodStartupChecker struct {
@@ -54,7 +55,7 @@ func BuildPodStartupChecker(config *config.CheckerConfig, kubeClient kubernetes.
 		config:       config.PodStartupConfig,
 		timeout:      config.Timeout,
 		k8sClientset: kubeClient,
-		tcpTimeout:   config.PodStartupConfig.SyntheticPodTCPTimeout,
+		tcpTimeout:   tcpTimeout,
 	}
 	klog.InfoS("Built PodStartupChecker",
 		"name", chk.name,
