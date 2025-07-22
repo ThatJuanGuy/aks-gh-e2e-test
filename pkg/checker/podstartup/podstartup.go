@@ -24,10 +24,14 @@ import (
 )
 
 const (
-	// Hardcoded values for pod communication testing
+	// syntheticPodImage is the hardcoded container image used for synthetic pods in pod-to-pod communication testing.
 	syntheticPodImage = "mcr.microsoft.com/azurelinux/base/nginx:1.25.4-4-azl3.0.20250702"
-	syntheticPodPort  = 80
-	tcpTimeout        = 10 * time.Second
+
+	// syntheticPodPort is the hardcoded TCP port that synthetic pods listen on for connectivity testing.
+	syntheticPodPort = 80
+
+	// tcpTimeout defines the maximum duration to wait for TCP connection establishment during pod-to-pod communication testing.
+	tcpTimeout = 10 * time.Second
 )
 
 type PodStartupChecker struct {
@@ -324,7 +328,7 @@ func (c *PodStartupChecker) getSyntheticPodIP(ctx context.Context, podName strin
 	return pod.Status.PodIP, nil
 }
 
-// makeTCPRequest makes a simple TCP connection to the pod IP to verify it's responding
+// makeTCPRequest makes a simple TCP connection to the pod IP
 func (c *PodStartupChecker) makeTCPRequest(ctx context.Context, podIP string) error {
 	address := fmt.Sprintf("%s:%s", podIP, strconv.Itoa(syntheticPodPort))
 
