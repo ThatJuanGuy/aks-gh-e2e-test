@@ -105,6 +105,9 @@ type PodStartupConfig struct {
 	// Optional. Required and used only when CheckPodCommunication is true.
 	// The URL path to use for HTTP requests to the synthetic pod.
 	SyntheticPodPath string `yaml:"syntheticPodPath,omitempty"`
+	// Optional. Required and used only when CheckPodCommunication is true.
+	// The timeout for HTTP requests to the synthetic pod.
+	SyntheticPodHTTPTimeout time.Duration `yaml:"syntheticPodHTTPTimeout,omitempty"`
 	// Optional.
 	// Tolerations to apply to synthetic pods, allowing them to be scheduled on nodes with matching taints.
 	SyntheticPodTolerations []corev1.Toleration `yaml:"syntheticPodTolerations,omitempty"`

@@ -48,7 +48,7 @@ func BuildPodStartupChecker(config *config.CheckerConfig, kubeClient kubernetes.
 		timeout:      config.Timeout,
 		k8sClientset: kubeClient,
 		httpClient: &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: config.PodStartupConfig.SyntheticPodHTTPTimeout,
 		},
 	}
 	klog.InfoS("Built PodStartupChecker",

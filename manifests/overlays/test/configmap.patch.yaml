@@ -48,6 +48,7 @@
           checkPodCommunication: true
           syntheticPodPort: 80
           syntheticPodPath: "/"
+          syntheticPodHTTPTimeout: "5s"
           syntheticPodTolerations:
             - key: "node-role.kubernetes.io/master"
               effect: "NoSchedule"
