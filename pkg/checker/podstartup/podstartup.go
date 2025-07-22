@@ -296,7 +296,7 @@ func (c *PodStartupChecker) generateSyntheticPod() *corev1.Pod {
 					Image: c.config.SyntheticPodImage,
 					Ports: []corev1.ContainerPort{
 						{
-							ContainerPort: 80,
+							ContainerPort: c.config.SyntheticPodPort,
 							Protocol:      corev1.ProtocolTCP,
 						},
 					},
@@ -326,7 +326,7 @@ func (c *PodStartupChecker) waitForPodIP(ctx context.Context, podName string) (s
 
 // makeHTTPRequest makes a simple HTTP GET request to the pod IP to verify it's responding
 func (c *PodStartupChecker) makeHTTPRequest(ctx context.Context, podIP string) error {
-	url := fmt.Sprintf("http://%s:80", podIP)
+	url := fmt.Sprintf("http://%s:%d%s", podIP, c.config.SyntheticPodPort, c.config.SyntheticPodPath)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
