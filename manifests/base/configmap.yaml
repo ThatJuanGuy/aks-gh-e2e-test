@@ -46,7 +46,7 @@ data:
           syntheticPodLabelKey: "kubernetes.azure.com/cluster-health-monitor-checker-synthetic"
           syntheticPodStartupTimeout: "5s"
           maxSyntheticPods: 10
-          syntheticPodHTTPTimeout: "5s"
+          syntheticPodTCPTimeout: "5s"
           syntheticPodTolerations:
             - key: "node-role.kubernetes.io/master"
               effect: "NoSchedule"

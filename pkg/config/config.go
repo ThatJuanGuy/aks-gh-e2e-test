@@ -90,13 +90,10 @@ type PodStartupConfig struct {
 	// will not create any more synthetic pods until some of the existing ones are deleted. Instead, it will fail the run with an error.
 	// Reaching this limit effectively disables the checker.
 	MaxSyntheticPods int `yaml:"maxSyntheticPods,omitempty"`
-	// Optional.
-	// The timeout for HTTP requests to the synthetic pod.
-	SyntheticPodHTTPTimeout time.Duration `yaml:"syntheticPodHTTPTimeout,omitempty"`
-	// Optional.
+	// The timeout for TCP requests to the synthetic pod.
+	SyntheticPodTCPTimeout time.Duration `yaml:"syntheticPodTCPTimeout,omitempty"`
 	// Tolerations to apply to synthetic pods, allowing them to be scheduled on nodes with matching taints.
 	SyntheticPodTolerations []corev1.Toleration `yaml:"syntheticPodTolerations,omitempty"`
-	// Optional.
 	// Node affinity rules for synthetic pods, controlling which nodes they can be scheduled on.
 	SyntheticPodNodeAffinity *corev1.NodeAffinity `yaml:"syntheticPodNodeAffinity,omitempty"`
 }

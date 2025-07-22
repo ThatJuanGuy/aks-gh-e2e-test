@@ -4,9 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -46,7 +43,7 @@ func TestPodStartupChecker_Run(t *testing.T) {
 				// create/get/delete pod calls will succeed with this pod
 				fakePod := podWithLabels(podName, syntheticPodNamespace, map[string]string{syntheticPodLabelKey: checkerName}, timestamp)
 				fakePod.Status = corev1.PodStatus{
-					PodIP: "192.168.1.100", // Add mock pod IP
+					PodIP: "127.0.0.1", // Use localhost where port 80 is available
 					ContainerStatuses: []corev1.ContainerStatus{{
 						State: corev1.ContainerState{
 							Running: &corev1.ContainerStateRunning{StartedAt: metav1.NewTime(timestamp.Add(3 * time.Second))},
@@ -81,7 +78,7 @@ func TestPodStartupChecker_Run(t *testing.T) {
 				// create/get pod calls will return this pod
 				fakePod := podWithLabels(podName, syntheticPodNamespace, map[string]string{syntheticPodLabelKey: checkerName}, timestamp)
 				fakePod.Status = corev1.PodStatus{
-					PodIP: "192.168.1.100", // Add mock pod IP
+					PodIP: "127.0.0.1", // Use localhost where port 80 is available
 					ContainerStatuses: []corev1.ContainerStatus{{
 						State: corev1.ContainerState{
 							Running: &corev1.ContainerStateRunning{StartedAt: metav1.NewTime(timestamp.Add(10 * time.Second))},
@@ -133,24 +130,6 @@ func TestPodStartupChecker_Run(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := NewWithT(t)
 
-			// Create a mock HTTP server for successful responses
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusOK)
-				w.Write([]byte("nginx welcome page"))
-			}))
-			defer server.Close()
-
-			// Create a custom HTTP client that redirects requests to our test server
-			httpClient := &http.Client{
-				Timeout: 10 * time.Second,
-				Transport: &http.Transport{
-					Dial: func(network, addr string) (net.Conn, error) {
-						// Redirect all requests to our test server
-						return net.Dial(network, server.Listener.Addr().String())
-					},
-				},
-			}
-
 			podStartupChecker := &PodStartupChecker{
 				name: checkerName,
 				config: &config.PodStartupConfig{
@@ -161,7 +140,7 @@ func TestPodStartupChecker_Run(t *testing.T) {
 				},
 				timeout:      5 * time.Second,
 				k8sClientset: tt.client,
-				httpClient:   httpClient,
+				tcpTimeout:   5 * time.Second,
 			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
