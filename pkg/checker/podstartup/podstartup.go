@@ -124,21 +124,24 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 		return types.Unhealthy(errCodePodStartupDurationExceeded, "pod exceeded the maximum healthy startup duration"), nil
 	}
 
-	// Wait for pod to have an IP address and make an HTTP request to verify it's responding
-	podIP, err := c.waitForPodIP(ctx, synthPod.Name)
-	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
-			return types.Unhealthy(errCodeHTTPRequestTimeout, "timed out waiting for pod IP"), nil
+	// If pod communication check is enabled, wait for pod IP and make HTTP request
+	if c.config.CheckPodCommunication {
+		// Wait for pod to have an IP address and make an HTTP request to verify it's responding
+		podIP, err := c.waitForPodIP(ctx, synthPod.Name)
+		if err != nil {
+			if errors.Is(err, context.DeadlineExceeded) {
+				return types.Unhealthy(errCodeHTTPRequestTimeout, "timed out waiting for pod IP"), nil
+			}
+			return types.Unhealthy(errCodeHTTPRequestFailed, fmt.Sprintf("failed to get pod IP: %s", err)), nil
 		}
-		return types.Unhealthy(errCodeHTTPRequestFailed, fmt.Sprintf("failed to get pod IP: %s", err)), nil
-	}
 
-	err = c.makeHTTPRequest(ctx, podIP)
-	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
-			return types.Unhealthy(errCodeHTTPRequestTimeout, "HTTP request to synthetic pod timed out"), nil
+		err = c.makeHTTPRequest(ctx, podIP)
+		if err != nil {
+			if errors.Is(err, context.DeadlineExceeded) {
+				return types.Unhealthy(errCodeHTTPRequestTimeout, "HTTP request to synthetic pod timed out"), nil
+			}
+			return types.Unhealthy(errCodeHTTPRequestFailed, fmt.Sprintf("HTTP request to synthetic pod failed: %s", err)), nil
 		}
-		return types.Unhealthy(errCodeHTTPRequestFailed, fmt.Sprintf("HTTP request to synthetic pod failed: %s", err)), nil
 	}
 
 	return types.Healthy(), nil
@@ -239,6 +242,7 @@ func (c *PodStartupChecker) syntheticPodNamePrefix() string {
 
 func (c *PodStartupChecker) generateSyntheticPod() *corev1.Pod {
 	podName := fmt.Sprintf("%s%d", c.syntheticPodNamePrefix(), time.Now().UnixNano())
+
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   podName,
@@ -288,7 +292,7 @@ func (c *PodStartupChecker) generateSyntheticPod() *corev1.Pod {
 			},
 			Containers: []corev1.Container{
 				{
-					Name:  "nginx",
+					Name:  "synthetic",
 					Image: c.config.SyntheticPodImage,
 					Ports: []corev1.ContainerPort{
 						{

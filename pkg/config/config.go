@@ -89,6 +89,12 @@ type PodStartupConfig struct {
 	// Required.
 	// The container image to use for synthetic pods.
 	SyntheticPodImage string `yaml:"syntheticPodImage"`
+	// Optional.
+	// Whether to perform an HTTP request to the synthetic pod to verify it's responding after startup.
+	// If set to false, only the pod startup time will be measured.
+	// If set to true (default), an HTTP request will be made to the pod IP to verify it's serving traffic.
+	// This requires the synthetic pod image to be a web server that listens on port 80.
+	CheckPodCommunication bool `yaml:"checkPodCommunication,omitempty"`
 }
 
 type APIServerConfig struct {
