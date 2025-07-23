@@ -149,16 +149,13 @@ func TestPodStartupChecker_Run(t *testing.T) {
 			},
 		},
 		{
-			name: "unhealthy result - fail to get pod IP",
+			name: "error - fail to get pod IP",
 			mutators: []scenarioMutator{
 				func(s *testScenario) { s.podIP = "" },
 			},
 			validateResult: func(g *WithT, result *types.Result, err error) {
-				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(result).ToNot(BeNil())
-				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
-				g.Expect(result.Detail.Code).To(Equal(errCodeRequestFailed))
-				g.Expect(result.Detail.Message).To(ContainSubstring("failed to get pod IP"))
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("failed to get synthetic pod IP"))
 			},
 		},
 		{

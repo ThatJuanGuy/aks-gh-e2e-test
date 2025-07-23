@@ -141,10 +141,7 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 	// perform pod communication check - get pod IP and create TCP connection
 	podIP, err := c.getSyntheticPodIP(ctx, synthPod.Name)
 	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
-			return types.Unhealthy(errCodeRequestTimeout, "timed out waiting for pod IP"), nil
-		}
-		return types.Unhealthy(errCodeRequestFailed, fmt.Sprintf("failed to get pod IP: %s", err)), nil
+		return nil, fmt.Errorf("failed to get synthetic pod IP: %w", err)
 	}
 
 	err = c.createTCPConnection(ctx, podIP)
