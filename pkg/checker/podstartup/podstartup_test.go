@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"testing"
 	"time"
 
@@ -19,9 +20,88 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 )
 
-// TODOcarlosalv add tests for communication check
+// =============================================================================
+// Test Helpers and Mocks
+// =============================================================================
+
+// Pod and Event creation helpers
+func podWithLabels(name string, namespace string, labels map[string]string, creationTime time.Time) *corev1.Pod {
+	return &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              name,
+			Namespace:         namespace,
+			Labels:            labels,
+			CreationTimestamp: metav1.NewTime(creationTime),
+		},
+	}
+}
+
+func imageSuccessfullyPulledEvent(namespace, podName string, pullDuration time.Duration) *corev1.Event {
+	return &corev1.Event{
+		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "event1"},
+		Message: fmt.Sprintf("Successfully pulled image \"k8s.gcr.io/pause:3.2\" in %s (%s including waiting). Image size: 299513 bytes.",
+			pullDuration, pullDuration),
+		Reason:         "Pulled",
+		InvolvedObject: corev1.ObjectReference{Name: podName},
+	}
+}
+
+func imageAlreadyPresentEvent(namespace, podName string) *corev1.Event {
+	return &corev1.Event{
+		ObjectMeta:     metav1.ObjectMeta{Namespace: namespace, Name: "event1"},
+		Message:        "Container image \"k8s.gcr.io/pause:3.2\" already present on machine",
+		Reason:         "Pulled",
+		InvolvedObject: corev1.ObjectReference{Name: podName},
+	}
+}
+
+// mockDialer is a mock implementation of the Dialer interface for testing
+type mockDialer struct {
+	dialFunc func(ctx context.Context, network, address string) (net.Conn, error)
+}
+
+func (m *mockDialer) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	return m.dialFunc(ctx, network, address)
+}
+
+// Dialer creation helpers
+func successfulDialer() Dialer {
+	return &mockDialer{
+		dialFunc: func(ctx context.Context, network, address string) (net.Conn, error) {
+			conn, _ := net.Pipe()
+			return conn, nil
+		},
+	}
+}
+
+func failingDialer(errMsg string) Dialer {
+	return &mockDialer{
+		dialFunc: func(ctx context.Context, network, address string) (net.Conn, error) {
+			return nil, fmt.Errorf(errMsg, address)
+		},
+	}
+}
+
+// =============================================================================
+// Test Functions
+// =============================================================================
+
 func TestPodStartupChecker_Run(t *testing.T) {
-	timestamp := time.Now()
+	// Defines adjustable parameters for the test scenarios
+	type testScenario struct {
+		podName         string
+		namespace       string
+		labels          map[string]string
+		podIP           string
+		startupDelay    time.Duration
+		preExistingPods []string
+		hasDeleteError  bool
+		dialer          Dialer
+	}
+
+	// Mutator function type
+	type scenarioMutator func(*testScenario)
+
 	checkerName := "test"
 	syntheticPodNamespace := "test-namespace"
 	syntheticPodLabelKey := "cluster-health-monitor/checker-name"
@@ -29,38 +109,12 @@ func TestPodStartupChecker_Run(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		client         *k8sfake.Clientset
+		mutators       []scenarioMutator
 		validateResult func(g *WithT, result *types.Result, err error)
 	}{
 		{
-			name: "healthy result - no pre-existing synthetic pods",
-			client: func() *k8sfake.Clientset {
-				podName := "pod1"
-				client := k8sfake.NewClientset(
-					// pre-create a fake image pull event for the pod
-					imageAlreadyPresentEvent(syntheticPodNamespace, podName),
-				)
-				// create/get/delete pod calls will succeed with this pod
-				fakePod := podWithLabels(podName, syntheticPodNamespace, map[string]string{syntheticPodLabelKey: checkerName}, timestamp)
-				fakePod.Status = corev1.PodStatus{
-					PodIP: "127.0.0.1", // Use localhost where port 80 is available
-					ContainerStatuses: []corev1.ContainerStatus{{
-						State: corev1.ContainerState{
-							Running: &corev1.ContainerStateRunning{StartedAt: metav1.NewTime(timestamp.Add(3 * time.Second))},
-						},
-					}},
-				}
-				client.PrependReactor("create", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
-					return true, fakePod, nil
-				})
-				client.PrependReactor("get", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
-					return true, fakePod, nil
-				})
-				client.PrependReactor("delete", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
-					return true, fakePod, nil
-				})
-				return client
-			}(),
+			name:     "healthy result - no pre-existing synthetic pods",
+			mutators: nil, // Use default scenario
 			validateResult: func(g *WithT, result *types.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
@@ -69,33 +123,9 @@ func TestPodStartupChecker_Run(t *testing.T) {
 		},
 		{
 			name: "unhealthy result - pod startup took too long",
-			client: func() *k8sfake.Clientset {
-				podName := "pod1"
-				client := k8sfake.NewClientset(
-					// pre-create a fake image pull event for the pod
-					imageAlreadyPresentEvent(syntheticPodNamespace, podName),
-				)
-				// create/get pod calls will return this pod
-				fakePod := podWithLabels(podName, syntheticPodNamespace, map[string]string{syntheticPodLabelKey: checkerName}, timestamp)
-				fakePod.Status = corev1.PodStatus{
-					PodIP: "127.0.0.1", // Use localhost where port 80 is available
-					ContainerStatuses: []corev1.ContainerStatus{{
-						State: corev1.ContainerState{
-							Running: &corev1.ContainerStateRunning{StartedAt: metav1.NewTime(timestamp.Add(10 * time.Second))},
-						},
-					}},
-				}
-				client.PrependReactor("create", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
-					return true, fakePod, nil
-				})
-				client.PrependReactor("get", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
-					return true, fakePod, nil
-				})
-				client.PrependReactor("delete", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
-					return true, fakePod, nil
-				})
-				return client
-			}(),
+			mutators: []scenarioMutator{
+				func(s *testScenario) { s.startupDelay = 10 * time.Second },
+			},
 			validateResult: func(g *WithT, result *types.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
@@ -105,23 +135,43 @@ func TestPodStartupChecker_Run(t *testing.T) {
 		},
 		{
 			name: "error - max synthetic pods reached",
-			client: func() *k8sfake.Clientset {
-				client := k8sfake.NewClientset()
-				// preload client with the maximum number of synthetic pods
-				for i := range maxSyntheticPods {
-					podName := fmt.Sprintf("pod%d", i)
-					client.CoreV1().Pods(syntheticPodNamespace).Create(context.Background(), //nolint:errcheck // ignore error for test setup
-						podWithLabels(podName, syntheticPodNamespace, map[string]string{syntheticPodLabelKey: checkerName}, timestamp), metav1.CreateOptions{})
-				}
-				// prevent pod deletion from succeeding
-				client.PrependReactor("delete", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.New("error occurred")
-				})
-				return client
-			}(),
+			mutators: []scenarioMutator{
+				func(s *testScenario) {
+					for i := 0; i < maxSyntheticPods; i++ {
+						s.preExistingPods = append(s.preExistingPods, fmt.Sprintf("pod%d", i))
+					}
+					s.hasDeleteError = true
+				},
+			},
 			validateResult: func(g *WithT, result *types.Result, err error) {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err.Error()).To(ContainSubstring("maximum number of synthetic pods reached"))
+			},
+		},
+		{
+			name: "unhealthy result - fail to get pod IP",
+			mutators: []scenarioMutator{
+				func(s *testScenario) { s.podIP = "" },
+			},
+			validateResult: func(g *WithT, result *types.Result, err error) {
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(result).ToNot(BeNil())
+				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
+				g.Expect(result.Detail.Code).To(Equal(errCodeRequestFailed))
+				g.Expect(result.Detail.Message).To(ContainSubstring("failed to get pod IP"))
+			},
+		},
+		{
+			name: "unhealthy result - TCP dialer error",
+			mutators: []scenarioMutator{
+				func(s *testScenario) { s.dialer = failingDialer("error") },
+			},
+			validateResult: func(g *WithT, result *types.Result, err error) {
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(result).ToNot(BeNil())
+				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
+				g.Expect(result.Detail.Code).To(Equal(errCodeRequestFailed))
+				g.Expect(result.Detail.Message).To(ContainSubstring("TCP request to synthetic pod failed"))
 			},
 		},
 	}
@@ -129,6 +179,58 @@ func TestPodStartupChecker_Run(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			g := NewWithT(t)
+
+			// Initialize default healthy scenario
+			scenario := &testScenario{
+				podName:        "pod1",
+				namespace:      syntheticPodNamespace,
+				labels:         map[string]string{syntheticPodLabelKey: checkerName},
+				podIP:          "10.0.0.0",
+				startupDelay:   3 * time.Second,
+				hasDeleteError: false,
+				dialer:         successfulDialer(),
+			}
+
+			// Apply mutators to modify the scenario
+			for _, mutator := range tt.mutators {
+				mutator(scenario)
+			}
+
+			// Build the test client and setup
+			events := []runtime.Object{imageAlreadyPresentEvent(scenario.namespace, scenario.podName)}
+			client := k8sfake.NewClientset(events...)
+
+			// Add pre-existing pods if any
+			podCreationTimestamp := time.Now()
+			for _, podName := range scenario.preExistingPods {
+				pod := podWithLabels(podName, scenario.namespace, scenario.labels, podCreationTimestamp)
+				client.CoreV1().Pods(scenario.namespace).Create(context.Background(), pod, metav1.CreateOptions{}) //nolint:errcheck
+			}
+
+			// Create the main test pod
+			fakePod := podWithLabels(scenario.podName, scenario.namespace, scenario.labels, podCreationTimestamp)
+			fakePod.Status = corev1.PodStatus{
+				PodIP: scenario.podIP,
+				ContainerStatuses: []corev1.ContainerStatus{{
+					State: corev1.ContainerState{
+						Running: &corev1.ContainerStateRunning{StartedAt: metav1.NewTime(podCreationTimestamp.Add(scenario.startupDelay))},
+					},
+				}},
+			}
+
+			// Add reactors
+			client.PrependReactor("create", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				return true, fakePod, nil
+			})
+			client.PrependReactor("get", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				return true, fakePod, nil
+			})
+			client.PrependReactor("delete", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				if scenario.hasDeleteError {
+					return true, nil, errors.New("error occurred")
+				}
+				return true, fakePod, nil
+			})
 
 			podStartupChecker := &PodStartupChecker{
 				name: checkerName,
@@ -139,11 +241,11 @@ func TestPodStartupChecker_Run(t *testing.T) {
 					MaxSyntheticPods:           maxSyntheticPods,
 				},
 				timeout:      5 * time.Second,
-				k8sClientset: tt.client,
-				tcpTimeout:   5 * time.Second,
+				k8sClientset: client,
+				dialer:       scenario.dialer,
 			}
 
-			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), podStartupChecker.timeout)
 			defer cancel()
 
 			result, err := podStartupChecker.Run(ctx)
@@ -309,7 +411,7 @@ func TestPodStartupChecker_pollPodCreationToContainerRunningDuration(t *testing.
 			},
 		},
 		{
-			name: "error - polling timeout",
+			name: "error - polling timeout occurred",
 			pod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      podName,
@@ -507,41 +609,133 @@ func TestGenerateSyntheticPod(t *testing.T) {
 
 			// Verify pod name is k8s compliant (DNS subdomain format)
 			g.Expect(validation.NameIsDNSSubdomain(pod.Name, false)).To(BeEmpty()) // this should not return any validation errors
-			// Verify pod name has expected prefix
 			g.Expect(pod.Name).To(HavePrefix(checker.syntheticPodNamePrefix()))
-			// Verify checker labels are applied
 			g.Expect(pod.Labels).To(Equal(checker.syntheticPodLabels()))
 		})
 	}
 }
 
-// --- helpers ---
-func podWithLabels(name string, namespace string, labels map[string]string, creationTime time.Time) *corev1.Pod {
-	return &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              name,
-			Namespace:         namespace,
-			Labels:            labels,
-			CreationTimestamp: metav1.NewTime(creationTime),
+func TestPodStartupChecker_getSyntheticPodIP(t *testing.T) {
+	podName := "test-pod"
+	namespace := "test-namespace"
+
+	tests := []struct {
+		name        string
+		scenario    func() *k8sfake.Clientset
+		validateRes func(g *WithT, podIP string, err error)
+	}{
+		{
+			name: "successfully gets pod IP",
+			scenario: func() *k8sfake.Clientset {
+				client := k8sfake.NewClientset()
+				pod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      podName,
+						Namespace: namespace,
+					},
+					Status: corev1.PodStatus{
+						PodIP: "10.0.0.0",
+					},
+				}
+				client.CoreV1().Pods(namespace).Create(context.Background(), pod, metav1.CreateOptions{}) //nolint:errcheck
+				return client
+			},
+			validateRes: func(g *WithT, podIP string, err error) {
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(podIP).To(Equal("10.0.0.0"))
+			},
+		},
+		{
+			name: "error - pod not found",
+			scenario: func() *k8sfake.Clientset {
+				return k8sfake.NewClientset()
+			},
+			validateRes: func(g *WithT, podIP string, err error) {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("error getting pod"))
+				g.Expect(podIP).To(BeEmpty())
+			},
+		},
+		{
+			name: "error - pod IP is empty",
+			scenario: func() *k8sfake.Clientset {
+				client := k8sfake.NewClientset()
+				pod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      podName,
+						Namespace: namespace,
+					},
+					Status: corev1.PodStatus{
+						PodIP: "",
+					},
+				}
+				client.CoreV1().Pods(namespace).Create(context.Background(), pod, metav1.CreateOptions{}) //nolint:errcheck
+				return client
+			},
+			validateRes: func(g *WithT, podIP string, err error) {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("pod IP is empty"))
+				g.Expect(podIP).To(BeEmpty())
+			},
 		},
 	}
-}
 
-func imageSuccessfullyPulledEvent(namespace, podName string, pullDuration time.Duration) *corev1.Event {
-	return &corev1.Event{
-		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "event1"},
-		Message: fmt.Sprintf("Successfully pulled image \"k8s.gcr.io/pause:3.2\" in %s (%s including waiting). Image size: 299513 bytes.",
-			pullDuration, pullDuration),
-		Reason:         "Pulled",
-		InvolvedObject: corev1.ObjectReference{Name: podName},
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := NewWithT(t)
+
+			checker := &PodStartupChecker{
+				config: &config.PodStartupConfig{
+					SyntheticPodNamespace: namespace,
+				},
+				k8sClientset: tt.scenario(),
+			}
+
+			podIP, err := checker.getSyntheticPodIP(context.Background(), podName)
+			tt.validateRes(g, podIP, err)
+		})
 	}
 }
 
-func imageAlreadyPresentEvent(namespace, podName string) *corev1.Event {
-	return &corev1.Event{
-		ObjectMeta:     metav1.ObjectMeta{Namespace: namespace, Name: "event1"},
-		Message:        "Container image \"k8s.gcr.io/pause:3.2\" already present on machine",
-		Reason:         "Pulled",
-		InvolvedObject: corev1.ObjectReference{Name: podName},
+func TestPodStartupChecker_makeTCPRequest(t *testing.T) {
+	tests := []struct {
+		name        string
+		podIP       string
+		dialer      Dialer
+		validateRes func(g *WithT, err error)
+	}{
+		{
+			name:   "successful TCP connection",
+			podIP:  "10.0.0.0",
+			dialer: successfulDialer(),
+			validateRes: func(g *WithT, err error) {
+				g.Expect(err).ToNot(HaveOccurred())
+			},
+		},
+		{
+			name:   "failed TCP connection",
+			podIP:  "10.0.0.0",
+			dialer: failingDialer("error occurred"),
+			validateRes: func(g *WithT, err error) {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("TCP connection failed"))
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := NewWithT(t)
+
+			checker := &PodStartupChecker{
+				dialer: tt.dialer,
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+
+			err := checker.createTCPConnection(ctx, tt.podIP)
+			tt.validateRes(g, err)
+		})
 	}
 }

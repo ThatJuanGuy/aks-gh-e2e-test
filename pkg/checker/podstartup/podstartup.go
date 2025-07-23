@@ -23,6 +23,11 @@ import (
 	"github.com/Azure/cluster-health-monitor/pkg/types"
 )
 
+// Dialer is an interface for making network connections
+type Dialer interface {
+	DialContext(ctx context.Context, network, address string) (net.Conn, error)
+}
+
 const (
 	// syntheticPodImage is the hardcoded container image used for synthetic pods in pod-to-pod communication testing.
 	syntheticPodImage = "mcr.microsoft.com/azurelinux/base/nginx:1.25.4-4-azl3.0.20250702"
@@ -31,7 +36,7 @@ const (
 	syntheticPodPort = 80
 
 	// tcpTimeout defines the maximum duration to wait for TCP connection establishment during pod-to-pod communication testing.
-	tcpTimeout = 10 * time.Second
+	tcpTimeout = 2 * time.Second // TODOcarlosalv needs validation to account for it. // What should this value be?
 )
 
 type PodStartupChecker struct {
@@ -39,7 +44,7 @@ type PodStartupChecker struct {
 	config       *config.PodStartupConfig
 	timeout      time.Duration
 	k8sClientset kubernetes.Interface
-	tcpTimeout   time.Duration
+	dialer       Dialer
 }
 
 // How often to poll the pod status to check if the container is running.
@@ -59,7 +64,9 @@ func BuildPodStartupChecker(config *config.CheckerConfig, kubeClient kubernetes.
 		config:       config.PodStartupConfig,
 		timeout:      config.Timeout,
 		k8sClientset: kubeClient,
-		tcpTimeout:   tcpTimeout,
+		dialer: &net.Dialer{
+			Timeout: tcpTimeout,
+		},
 	}
 	klog.InfoS("Built PodStartupChecker",
 		"name", chk.name,
@@ -138,17 +145,17 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 	podIP, err := c.getSyntheticPodIP(ctx, synthPod.Name)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return types.Unhealthy(errCodeHTTPRequestTimeout, "timed out waiting for pod IP"), nil
+			return types.Unhealthy(errCodeRequestTimeout, "timed out waiting for pod IP"), nil
 		}
-		return types.Unhealthy(errCodeHTTPRequestFailed, fmt.Sprintf("failed to get pod IP: %s", err)), nil
+		return types.Unhealthy(errCodeRequestFailed, fmt.Sprintf("failed to get pod IP: %s", err)), nil
 	}
 
-	err = c.makeTCPRequest(ctx, podIP)
+	err = c.createTCPConnection(ctx, podIP)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return types.Unhealthy(errCodeHTTPRequestTimeout, "TCP request to synthetic pod timed out"), nil
+			return types.Unhealthy(errCodeRequestTimeout, "TCP request to synthetic pod timed out"), nil
 		}
-		return types.Unhealthy(errCodeHTTPRequestFailed, fmt.Sprintf("TCP request to synthetic pod failed: %s", err)), nil
+		return types.Unhealthy(errCodeRequestFailed, fmt.Sprintf("TCP request to synthetic pod failed: %s", err)), nil
 	}
 
 	return types.Healthy(), nil
@@ -328,15 +335,11 @@ func (c *PodStartupChecker) getSyntheticPodIP(ctx context.Context, podName strin
 	return pod.Status.PodIP, nil
 }
 
-// makeTCPRequest makes a simple TCP connection to the pod IP
-func (c *PodStartupChecker) makeTCPRequest(ctx context.Context, podIP string) error {
+// createTCPConnection makes a simple TCP connection to the pod IP
+func (c *PodStartupChecker) createTCPConnection(ctx context.Context, podIP string) error {
 	address := fmt.Sprintf("%s:%s", podIP, strconv.Itoa(syntheticPodPort))
 
-	dialer := &net.Dialer{
-		Timeout: c.tcpTimeout,
-	}
-
-	conn, err := dialer.DialContext(ctx, "tcp", address)
+	conn, err := c.dialer.DialContext(ctx, "tcp", address)
 	if err != nil {
 		return fmt.Errorf("TCP connection failed: %w", err)
 	}
