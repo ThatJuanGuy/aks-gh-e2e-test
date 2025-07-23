@@ -340,7 +340,11 @@ func (c *PodStartupChecker) createTCPConnection(ctx context.Context, podIP strin
 	if err != nil {
 		return fmt.Errorf("TCP connection failed: %w", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			klog.ErrorS(err, "Failed to close TCP connection", "podIP", podIP)
+		}
+	}()
 
 	return nil
 }
