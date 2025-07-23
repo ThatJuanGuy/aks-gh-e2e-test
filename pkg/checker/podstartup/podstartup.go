@@ -34,9 +34,6 @@ const (
 
 	// syntheticPodPort is the hardcoded TCP port that synthetic pods listen on for connectivity testing.
 	syntheticPodPort = 80
-
-	// tcpTimeout defines the maximum duration to wait for TCP connection establishment during pod-to-pod communication testing.
-	tcpTimeout = 2 * time.Second // TODOcarlosalv needs validation to account for it. // What should this value be?
 )
 
 type PodStartupChecker struct {
@@ -65,7 +62,7 @@ func BuildPodStartupChecker(config *config.CheckerConfig, kubeClient kubernetes.
 		timeout:      config.Timeout,
 		k8sClientset: kubeClient,
 		dialer: &net.Dialer{
-			Timeout: tcpTimeout,
+			Timeout: config.PodStartupConfig.TCPTimeout,
 		},
 	}
 	klog.InfoS("Built PodStartupChecker",
@@ -141,7 +138,7 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 		return types.Unhealthy(errCodePodStartupDurationExceeded, "pod exceeded the maximum healthy startup duration"), nil
 	}
 
-	// perform pod communication check - get pod IP and make TCP request
+	// perform pod communication check - get pod IP and create TCP connection
 	podIP, err := c.getSyntheticPodIP(ctx, synthPod.Name)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {

@@ -105,9 +105,19 @@ func (c *PodStartupConfig) validate(checkerConfigTimeout time.Duration) error {
 		errs = append(errs, fmt.Errorf("invalid synthetic pod label key: value='%s', error='%s'", c.SyntheticPodLabelKey, labelErr))
 	}
 
-	if checkerConfigTimeout <= c.SyntheticPodStartupTimeout {
-		errs = append(errs, fmt.Errorf("checker timeout must be greater than synthetic pod startup timeout: checker timeout='%s', synthetic pod startup timeout='%s'",
-			checkerConfigTimeout, c.SyntheticPodStartupTimeout))
+	if checkerConfigTimeout <= c.SyntheticPodStartupTimeout+c.TCPTimeout {
+		errs = append(errs, fmt.Errorf(
+			"checker timeout must be greater than the combined synthetic pod startup timeout and TCP timeout: checker timeout='%s', synthetic pod startup timeout='%s', TCP timeout='%s'",
+			checkerConfigTimeout, c.SyntheticPodStartupTimeout, c.TCPTimeout,
+		))
+	}
+
+	if c.SyntheticPodStartupTimeout <= 0 {
+		errs = append(errs, fmt.Errorf("synthetic pod startup timeout must be greater than 0: value='%s'", c.SyntheticPodStartupTimeout))
+	}
+
+	if c.TCPTimeout <= 0 {
+		errs = append(errs, fmt.Errorf("TCP timeout must be greater than 0: value='%s'", c.TCPTimeout))
 	}
 
 	if c.MaxSyntheticPods <= 0 {

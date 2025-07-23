@@ -28,6 +28,7 @@ func TestConfigValidate_Valid(t *testing.T) {
 					SyntheticPodLabelKey:       "cluster-health-monitor/checker-name",
 					SyntheticPodStartupTimeout: 5 * time.Second,
 					MaxSyntheticPods:           10,
+					TCPTimeout:                 2 * time.Second,
 				},
 			},
 		},
@@ -122,15 +123,38 @@ func TestPodStartupConfig_Validate(t *testing.T) {
 			},
 		},
 		{
-			name: "timeout less than or equal to pod startup timeout",
+			name: "timeout less than or equal to combined pod startup timeout and tcp timeout",
 			mutateConfig: func(cfg *CheckerConfig) *CheckerConfig {
 				cfg.Timeout = 3 * time.Second
-				cfg.PodStartupConfig.SyntheticPodStartupTimeout = 5 * time.Second
+				cfg.PodStartupConfig.SyntheticPodStartupTimeout = 2 * time.Second
+				cfg.PodStartupConfig.TCPTimeout = 2 * time.Second
 				return cfg
 			},
 			validateRes: func(g *WithT, err error) {
 				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("checker timeout must be greater than synthetic pod startup timeout"))
+				g.Expect(err.Error()).To(ContainSubstring("checker timeout must be greater than the combined synthetic pod startup timeout and TCP timeout"))
+			},
+		},
+		{
+			name: "pod startup timeout is zero",
+			mutateConfig: func(cfg *CheckerConfig) *CheckerConfig {
+				cfg.PodStartupConfig.SyntheticPodStartupTimeout = 0
+				return cfg
+			},
+			validateRes: func(g *WithT, err error) {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("synthetic pod startup timeout must be greater than 0"))
+			},
+		},
+		{
+			name: "tcp timeout is zero",
+			mutateConfig: func(cfg *CheckerConfig) *CheckerConfig {
+				cfg.PodStartupConfig.TCPTimeout = 0
+				return cfg
+			},
+			validateRes: func(g *WithT, err error) {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("TCP timeout must be greater than 0"))
 			},
 		},
 		{
@@ -160,6 +184,7 @@ func TestPodStartupConfig_Validate(t *testing.T) {
 					SyntheticPodLabelKey:       "cluster-health-monitor/checker-name",
 					SyntheticPodStartupTimeout: 5 * time.Second,
 					MaxSyntheticPods:           3,
+					TCPTimeout:                 2 * time.Second,
 				},
 			}
 
