@@ -5,4 +5,6 @@ const (
 	errCodePodCreationError           = "pod_creation_error"
 	errCodePodCreationTimeout         = "pod_creation_timeout"
 	errCodePodStartupDurationExceeded = "pod_startup_duration_exceeded"
+	errCodeRequestFailed              = "request_failed"
+	errCodeRequestTimeout             = "request_timeout"
 )

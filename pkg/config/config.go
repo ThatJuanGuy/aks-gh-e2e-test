@@ -1,6 +1,8 @@
 package config
 
-import "time"
+import (
+	"time"
+)
 
 type CheckerType string
 
@@ -87,8 +89,9 @@ type PodStartupConfig struct {
 	// Reaching this limit effectively disables the checker.
 	MaxSyntheticPods int `yaml:"maxSyntheticPods,omitempty"`
 	// Required.
-	// The container image to use for synthetic pods.
-	SyntheticPodImage string `yaml:"syntheticPodImage"`
+	// The maximum duration for which the checker will wait for a TCP connection to be established with a synthetic pod. Exceeding this
+	// duration will cause the checker to return unhealthy status.
+	TCPTimeout time.Duration `yaml:"tcpTimeout,omitempty"`
 }
 
 type APIServerConfig struct {
