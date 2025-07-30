@@ -94,7 +94,7 @@ type PodStartupConfig struct {
 	TCPTimeout time.Duration `yaml:"tcpTimeout,omitempty"`
 
 	// Optional.
-	// This field is only used for Automatic clusters. If set to true, the PodStartupChecker will trigger node provisioning and deploy synthetic pods to the new node.
+	// This field is meant to be enabled only on AKS Automatic clusters. If set to true, the PodStartupChecker will trigger node provisioning and deploy synthetic pods to the new node.
 	EnableNodeProvisioningTest bool `yaml:"enableNodeProvisioningTest,omitempty"`
 }
 
