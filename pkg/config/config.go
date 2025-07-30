@@ -92,6 +92,10 @@ type PodStartupConfig struct {
 	// The maximum duration for which the checker will wait for a TCP connection to be established with a synthetic pod. Exceeding this
 	// duration will cause the checker to return unhealthy status.
 	TCPTimeout time.Duration `yaml:"tcpTimeout,omitempty"`
+
+	// Optional.
+	// This field is meant to be enabled only on AKS Automatic clusters. If set to true, the PodStartupChecker will trigger node provisioning and deploy synthetic pods to the new node.
+	EnableNodeProvisioningTest bool `yaml:"enableNodeProvisioningTest,omitempty"`
 }
 
 type APIServerConfig struct {
