@@ -34,11 +34,11 @@ push:
 # By default, docker buildx create will pull image moby/buildkit:buildx-stable-1 and hit the too many requests error
 .PHONY: docker-buildx-builder
 docker-buildx-builder:
-	@if ! docker buildx ls | grep $(BUILDX_BUILDER_NAME); then \
-		docker run --rm --privileged mcr.microsoft.com/mirror/docker/multiarch/qemu-user-static:$(QEMU_VERSION) --reset -p yes; \
-		docker buildx create --driver-opt image=mcr.microsoft.com/oss/v2/moby/buildkit:$(BUILDKIT_VERSION) --name $(BUILDX_BUILDER_NAME) --use; \
-		docker buildx inspect $(BUILDX_BUILDER_NAME) --bootstrap; \
-	fi
+    @if ! docker buildx ls | grep $(BUILDX_BUILDER_NAME); then \
+        docker run --rm --privileged mcr.microsoft.com/mirror/docker/multiarch/qemu-user-static:$(QEMU_VERSION) --reset -p yes; \
+        docker buildx create --driver-opt image=mcr.microsoft.com/oss/v2/moby/buildkit:$(BUILDKIT_VERSION) --name $(BUILDX_BUILDER_NAME) --use; \
+        docker buildx inspect $(BUILDX_BUILDER_NAME) --bootstrap; \
+    fi
 
 .PHONY: docker-build-cluster-health-monitor
 docker-build-cluster-health-monitor: docker-buildx-builder
