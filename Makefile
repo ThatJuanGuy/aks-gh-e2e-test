@@ -25,6 +25,7 @@ OUTPUT_TYPE ?= type=registry
 BUILDX_BUILDER_NAME ?= img-builder
 QEMU_VERSION ?= 7.2.0-1
 BUILDKIT_VERSION ?= v0.18.1
+PLATFORM ?= linux/amd64,linux/arm64
 
 .PHONY: push
 push:
@@ -44,7 +45,7 @@ docker-build-cluster-health-monitor: docker-buildx-builder
 	docker buildx build \
 		--file docker/$(CLUSTER_HEALTH_MONITOR_IMAGE_NAME).Dockerfile \
 		--output=$(OUTPUT_TYPE) \
-		--platform="linux/amd64" \
+		--platform="$(PLATFORM)" \
 		--pull \
 		--tag $(REGISTRY)/$(CLUSTER_HEALTH_MONITOR_IMAGE_NAME):$(CLUSTER_HEALTH_MONITOR_IMAGE_VERSION) .
 
