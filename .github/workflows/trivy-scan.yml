@@ -38,6 +38,7 @@ jobs:
           CLUSTER_HEALTH_MONITOR_IMAGE_NAME: ${{ env.IMAGE_NAME }}
           CLUSTER_HEALTH_MONITOR_IMAGE_VERSION: ${{ steps.vars.outputs.version }}
           OUTPUT_TYPE: type=docker
+          PLATFORM: linux/amd64
       
       - name: Run Trivy scan
         uses: aquasecurity/trivy-action@0.32.0
