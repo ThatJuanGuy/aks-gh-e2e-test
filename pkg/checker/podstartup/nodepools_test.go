@@ -78,7 +78,7 @@ func TestDeleteKarpenterNodePool(t *testing.T) {
 			name: "successful deletion",
 		},
 		{
-			name: "not found",
+			name: "not found - skip without error",
 			getClient: func() *dynamicfake.FakeDynamicClient {
 				client := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
 				client.PrependReactor("delete", "nodepool", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
