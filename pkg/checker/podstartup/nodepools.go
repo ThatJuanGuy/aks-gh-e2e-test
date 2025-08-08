@@ -12,7 +12,6 @@ import (
 )
 
 func (c *PodStartupChecker) createKarpenterNodePool(ctx context.Context, nodePool *karpenter.NodePool) error {
-	// If node provisioning test is enabled, we will create a NodePool first, then create synthetic pods on a new node from the node pool.
 	unstructuredNodePool := &unstructured.Unstructured{}
 	scheme.Scheme.AddKnownTypes(NodePoolGVR.GroupVersion(), nodePool)
 	if err := scheme.Scheme.Convert(nodePool, unstructuredNodePool, nil); err != nil {
