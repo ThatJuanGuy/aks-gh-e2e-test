@@ -14,8 +14,11 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 
 	"github.com/Azure/cluster-health-monitor/pkg/checker"
@@ -37,11 +40,18 @@ const (
 )
 
 type PodStartupChecker struct {
-	name         string
-	config       *config.PodStartupConfig
-	timeout      time.Duration
-	k8sClientset kubernetes.Interface
-	dialer       Dialer
+	name          string
+	config        *config.PodStartupConfig
+	timeout       time.Duration
+	k8sClientset  kubernetes.Interface
+	dialer        Dialer
+	dynamicClient dynamic.Interface // to interact with Karpenter's custom resources
+}
+
+var NodePoolGVR = schema.GroupVersionResource{
+	Group:    "karpenter.sh",
+	Version:  "v1",
+	Resource: "nodepool",
 }
 
 // How often to poll the pod status to check if the container is running.
@@ -70,6 +80,19 @@ func BuildPodStartupChecker(config *config.CheckerConfig, kubeClient kubernetes.
 		"config", chk.config,
 		"timeout", chk.timeout.String(),
 	)
+
+	restConfig, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get in-cluster config: %w", err)
+	}
+
+	// create a dynamic client to interact with Karpenter's custom resources
+	dynamicClient, err := dynamic.NewForConfig(restConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create dynamic client: %w", err)
+	}
+
+	chk.dynamicClient = dynamicClient
 	return chk, nil
 }
 
