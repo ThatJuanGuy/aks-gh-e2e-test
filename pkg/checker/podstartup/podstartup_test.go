@@ -577,37 +577,50 @@ func TestPodStartupChecker_getImagePullDuration(t *testing.T) {
 
 func TestGenerateSyntheticPod(t *testing.T) {
 	tests := []struct {
-		name        string
-		checkerName string
+		name                       string
+		checkerName                string
+		enableNodeProvisioningTest bool
 	}{
 		{
 			name:        "generates valid synthetic pod",
 			checkerName: "test",
 		},
 		{
-			name:        "succesfully handles uppercase checker name",
+			name:        "successfully handles uppercase checker name",
 			checkerName: "UPPERCASE",
+		},
+		{
+			name:                       "successfully enables node provisioning test",
+			checkerName:                "test",
+			enableNodeProvisioningTest: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			g := NewWithT(t)
-
 			checker := &PodStartupChecker{
 				name: tt.checkerName,
 				config: &config.PodStartupConfig{
-					SyntheticPodLabelKey: "cluster-health-monitor/checker-name",
+					SyntheticPodLabelKey:       "cluster-health-monitor/checker-name",
+					EnableNodeProvisioningTest: tt.enableNodeProvisioningTest,
 				},
 			}
 
-			pod := checker.generateSyntheticPod()
+			timestampStr := fmt.Sprintf("%d", time.Now().UnixNano())
+			pod := checker.generateSyntheticPod(timestampStr)
 			g.Expect(pod).ToNot(BeNil())
 
 			// Verify pod name is k8s compliant (DNS subdomain format)
 			g.Expect(validation.NameIsDNSSubdomain(pod.Name, false)).To(BeEmpty()) // this should not return any validation errors
 			g.Expect(pod.Name).To(HavePrefix(checker.syntheticPodNamePrefix()))
 			g.Expect(pod.Labels).To(Equal(checker.syntheticPodLabels()))
+
+			if tt.enableNodeProvisioningTest {
+				g.Expect(pod.Spec.NodeSelector).To(HaveKeyWithValue("nodeprovisioningtest", timestampStr))
+			} else {
+				g.Expect(pod.Spec.NodeSelector).ToNot(HaveKey("nodeprovisioningtest"))
+			}
 		})
 	}
 }

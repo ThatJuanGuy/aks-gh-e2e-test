@@ -104,8 +104,10 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 			len(pods.Items), c.config.MaxSyntheticPods)
 	}
 
+	timeStampStr := fmt.Sprintf("%d", time.Now().UnixNano())
+
 	// Create a synthetic pod to measure the startup time.
-	synthPod, err := c.k8sClientset.CoreV1().Pods(c.config.SyntheticPodNamespace).Create(ctx, c.generateSyntheticPod(), metav1.CreateOptions{})
+	synthPod, err := c.k8sClientset.CoreV1().Pods(c.config.SyntheticPodNamespace).Create(ctx, c.generateSyntheticPod(timeStampStr), metav1.CreateOptions{})
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			return types.Unhealthy(errCodePodCreationTimeout, "timed out creating synthetic pod"), nil
@@ -248,8 +250,8 @@ func (c *PodStartupChecker) syntheticPodNamePrefix() string {
 	return strings.ToLower(fmt.Sprintf("%s-synthetic-", c.name))
 }
 
-func (c *PodStartupChecker) generateSyntheticPod() *corev1.Pod {
-	podName := fmt.Sprintf("%s%d", c.syntheticPodNamePrefix(), time.Now().UnixNano())
+func (c *PodStartupChecker) generateSyntheticPod(timestampStr string) *corev1.Pod {
+	podName := fmt.Sprintf("%s%s", c.syntheticPodNamePrefix(), timestampStr)
 
 	podSpec := corev1.PodSpec{
 		Containers: []corev1.Container{
@@ -306,6 +308,13 @@ func (c *PodStartupChecker) generateSyntheticPod() *corev1.Pod {
 			},
 		},
 		// TODOcarlosalv: Add pod cpu/memory requests and/or limits.
+	}
+
+	if c.config.EnableNodeProvisioningTest {
+		// If node provisioning test is enabled, we will add a node selector to ensure the synthetic pod is scheduled on a node from the NodePool created by the checker.
+		podSpec.NodeSelector = map[string]string{
+			"nodeprovisioningtest": timestampStr,
+		}
 	}
 
 	return &corev1.Pod{
