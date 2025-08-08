@@ -15,7 +15,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 )
@@ -89,14 +91,16 @@ func failingDialer(errMsg string) Dialer {
 func TestPodStartupChecker_Run(t *testing.T) {
 	// Defines adjustable parameters for the test scenarios
 	type testScenario struct {
-		podName         string
-		namespace       string
-		labels          map[string]string
-		podIP           string
-		startupDelay    time.Duration
-		preExistingPods []string
-		hasDeleteError  bool
-		dialer          Dialer
+		podName                string
+		namespace              string
+		labels                 map[string]string
+		podIP                  string
+		startupDelay           time.Duration
+		preExistingPods        []string
+		hasDeleteError         bool
+		dialer                 Dialer
+		enableNodeProvisioning bool
+		fakeDynamicClient      *dynamicfake.FakeDynamicClient
 	}
 
 	// Mutator function type
@@ -110,12 +114,12 @@ func TestPodStartupChecker_Run(t *testing.T) {
 	tests := []struct {
 		name           string
 		mutators       []scenarioMutator
-		validateResult func(g *WithT, result *types.Result, err error)
+		validateResult func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient)
 	}{
 		{
 			name:     "healthy result - no pre-existing synthetic pods",
 			mutators: nil, // Use default scenario
-			validateResult: func(g *WithT, result *types.Result, err error) {
+			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
 				g.Expect(result.Status).To(Equal(types.StatusHealthy))
@@ -126,7 +130,7 @@ func TestPodStartupChecker_Run(t *testing.T) {
 			mutators: []scenarioMutator{
 				func(s *testScenario) { s.startupDelay = 10 * time.Second },
 			},
-			validateResult: func(g *WithT, result *types.Result, err error) {
+			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
 				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
@@ -143,7 +147,7 @@ func TestPodStartupChecker_Run(t *testing.T) {
 					s.hasDeleteError = true
 				},
 			},
-			validateResult: func(g *WithT, result *types.Result, err error) {
+			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err.Error()).To(ContainSubstring("maximum number of synthetic pods reached"))
 			},
@@ -153,7 +157,7 @@ func TestPodStartupChecker_Run(t *testing.T) {
 			mutators: []scenarioMutator{
 				func(s *testScenario) { s.podIP = "" },
 			},
-			validateResult: func(g *WithT, result *types.Result, err error) {
+			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err.Error()).To(ContainSubstring("failed to get synthetic pod IP"))
 			},
@@ -163,12 +167,42 @@ func TestPodStartupChecker_Run(t *testing.T) {
 			mutators: []scenarioMutator{
 				func(s *testScenario) { s.dialer = failingDialer("error") },
 			},
-			validateResult: func(g *WithT, result *types.Result, err error) {
+			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
 				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
 				g.Expect(result.Detail.Code).To(Equal(errCodeRequestFailed))
 				g.Expect(result.Detail.Message).To(ContainSubstring("TCP request to synthetic pod failed"))
+			},
+		},
+		{
+			name: "healthy result - default scenario with node provisioning test",
+			mutators: []scenarioMutator{
+				func(s *testScenario) {
+					s.enableNodeProvisioning = true
+				},
+			},
+			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(result).ToNot(BeNil())
+				g.Expect(result.Status).To(Equal(types.StatusHealthy))
+				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(2)) // One create and one delete action for the NodePool
+			},
+		},
+		{
+			name: "error - failed to create node pool",
+			mutators: []scenarioMutator{
+				func(s *testScenario) {
+					s.enableNodeProvisioning = true
+					s.fakeDynamicClient.PrependReactor("create", "nodepool", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, &unstructured.Unstructured{}, errors.New("unexpected error occurred while creating node pool")
+					})
+				},
+			},
+			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("unexpected error occurred while creating node pool"))
+				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(1)) // One create action for the NodePool
 			},
 		},
 	}
@@ -179,13 +213,14 @@ func TestPodStartupChecker_Run(t *testing.T) {
 
 			// Initialize default healthy scenario
 			scenario := &testScenario{
-				podName:        "pod1",
-				namespace:      syntheticPodNamespace,
-				labels:         map[string]string{syntheticPodLabelKey: checkerName},
-				podIP:          "10.0.0.0",
-				startupDelay:   3 * time.Second,
-				hasDeleteError: false,
-				dialer:         successfulDialer(),
+				podName:           "pod1",
+				namespace:         syntheticPodNamespace,
+				labels:            map[string]string{syntheticPodLabelKey: checkerName},
+				podIP:             "10.0.0.0",
+				startupDelay:      3 * time.Second,
+				hasDeleteError:    false,
+				dialer:            successfulDialer(),
+				fakeDynamicClient: dynamicfake.NewSimpleDynamicClient(runtime.NewScheme()),
 			}
 
 			// Apply mutators to modify the scenario
@@ -236,17 +271,19 @@ func TestPodStartupChecker_Run(t *testing.T) {
 					SyntheticPodLabelKey:       syntheticPodLabelKey,
 					SyntheticPodStartupTimeout: 5 * time.Second,
 					MaxSyntheticPods:           maxSyntheticPods,
+					EnableNodeProvisioningTest: scenario.enableNodeProvisioning,
 				},
-				timeout:      5 * time.Second,
-				k8sClientset: client,
-				dialer:       scenario.dialer,
+				timeout:       5 * time.Second,
+				k8sClientset:  client,
+				dialer:        scenario.dialer,
+				dynamicClient: scenario.fakeDynamicClient,
 			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), podStartupChecker.timeout)
 			defer cancel()
 
 			result, err := podStartupChecker.Run(ctx)
-			tt.validateResult(g, result, err)
+			tt.validateResult(g, result, err, scenario.fakeDynamicClient)
 		})
 	}
 }
