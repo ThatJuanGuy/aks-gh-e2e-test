@@ -123,6 +123,7 @@ func TestPodStartupChecker_Run(t *testing.T) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
 				g.Expect(result.Status).To(Equal(types.StatusHealthy))
+				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(0)) // No dynamic client actions should be taken
 			},
 		},
 		{
@@ -135,6 +136,7 @@ func TestPodStartupChecker_Run(t *testing.T) {
 				g.Expect(result).ToNot(BeNil())
 				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
 				g.Expect(result.Detail.Code).To(Equal(errCodePodStartupDurationExceeded))
+				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(0)) // No dynamic client actions should be taken
 			},
 		},
 		{
@@ -150,6 +152,7 @@ func TestPodStartupChecker_Run(t *testing.T) {
 			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err.Error()).To(ContainSubstring("maximum number of synthetic pods reached"))
+				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(0)) // No dynamic client actions should be taken
 			},
 		},
 		{
@@ -160,6 +163,7 @@ func TestPodStartupChecker_Run(t *testing.T) {
 			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err.Error()).To(ContainSubstring("failed to get synthetic pod IP"))
+				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(0)) // No dynamic client actions should be taken
 			},
 		},
 		{
@@ -173,6 +177,7 @@ func TestPodStartupChecker_Run(t *testing.T) {
 				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
 				g.Expect(result.Detail.Code).To(Equal(errCodeRequestFailed))
 				g.Expect(result.Detail.Message).To(ContainSubstring("TCP request to synthetic pod failed"))
+				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(0)) // No dynamic client actions should be taken
 			},
 		},
 		{
