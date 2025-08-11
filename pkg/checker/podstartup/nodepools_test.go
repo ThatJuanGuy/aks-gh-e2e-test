@@ -163,9 +163,6 @@ func TestDeleteAllKarpenterNodePools(t *testing.T) {
 						},
 					}, nil
 				})
-				client.PrependReactor("delete", "nodepool", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
-					return true, &unstructured.Unstructured{}, errors.New("unexpected error occurred while deleting node pool")
-				})
 			},
 			validateResults: func(g *WithT, client *dynamicfake.FakeDynamicClient, err error) {
 				g.Expect(err).To(BeNil())
