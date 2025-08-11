@@ -427,10 +427,10 @@ func TestPodStartupChecker_garbageCollect(t *testing.T) {
 				return client
 			}(),
 			validateRes: func(g *WithT, pods *corev1.PodList, err error) {
-				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(pods.Items).To(HaveLen(1))
 				g.Expect(pods.Items[0].Name).To(Equal("chk-synthetic-new"))
-				g.Expect(err).To(ContainSubstring("error listing node pools"))
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("error listing node pools"))
 			},
 		},
 	}
