@@ -2,6 +2,9 @@ package podstartup
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -34,6 +37,33 @@ func (c *PodStartupChecker) deleteKarpenterNodePool(ctx context.Context, nodePoo
 	}
 
 	return nil
+}
+
+func (c *PodStartupChecker) deleteAllKarpenterNodePools(ctx context.Context) error {
+	var errs []error
+
+	// List all NodePools in the synthetic pod namespace.
+	nodePools, err := c.dynamicClient.Resource(NodePoolGVR).Namespace(c.config.SyntheticPodNamespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	// Iterate over the NodePools and delete each one.
+	for _, nodePool := range nodePools.Items {
+		nodePoolName, found, err := unstructured.NestedString(nodePool.Object, "metadata", "name")
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to get Karpenter Node Pool name: %w", err))
+			continue
+		}
+		if found && strings.HasPrefix(nodePoolName, c.nodepoolNamePrefix) {
+			err := c.deleteKarpenterNodePool(ctx, nodePoolName)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to delete old Karpenter Node Pool %s: %w", nodePoolName, err))
+			}
+		}
+	}
+
+	return errors.Join(errs...)
 }
 
 func karpenterNodePool(nodePoolName, timestampStr string) *karpenter.NodePool {

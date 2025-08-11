@@ -40,12 +40,13 @@ const (
 )
 
 type PodStartupChecker struct {
-	name          string
-	config        *config.PodStartupConfig
-	timeout       time.Duration
-	k8sClientset  kubernetes.Interface
-	dialer        Dialer
-	dynamicClient dynamic.Interface // to interact with Karpenter's custom resources
+	name               string
+	config             *config.PodStartupConfig
+	timeout            time.Duration
+	k8sClientset       kubernetes.Interface
+	dialer             Dialer
+	dynamicClient      dynamic.Interface // to interact with Karpenter's custom resources
+	nodepoolNamePrefix string
 }
 
 var NodePoolGVR = schema.GroupVersionResource{
@@ -74,6 +75,7 @@ func BuildPodStartupChecker(config *config.CheckerConfig, kubeClient kubernetes.
 		dialer: &net.Dialer{
 			Timeout: config.PodStartupConfig.TCPTimeout,
 		},
+		nodepoolNamePrefix: fmt.Sprintf("%s-nodepool", config.Name),
 	}
 	klog.InfoS("Built PodStartupChecker",
 		"name", chk.name,
@@ -128,7 +130,7 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 	}
 
 	timeStampStr := fmt.Sprintf("%d", time.Now().UnixNano())
-	nodePoolName := fmt.Sprintf("%s-nodepool-%s", c.name, timeStampStr)
+	nodePoolName := fmt.Sprintf("%s-%s", c.nodepoolNamePrefix, timeStampStr)
 
 	if c.config.EnableNodeProvisioningTest {
 
@@ -215,8 +217,11 @@ func (c *PodStartupChecker) garbageCollect(ctx context.Context) error {
 		}
 	}
 
-	//TODO: list Karpenter Node Pools and delete
-
+	if c.config.EnableNodeProvisioningTest {
+		if err := c.deleteAllKarpenterNodePools(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("failed to delete old Karpenter Node Pools: %w", err))
+		}
+	}
 	return errors.Join(errs...)
 }
 
