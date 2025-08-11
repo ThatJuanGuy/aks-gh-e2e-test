@@ -173,7 +173,7 @@ func TestDeleteAllKarpenterNodePools(t *testing.T) {
 			},
 		},
 		{
-			name: "deletion seuccess",
+			name: "deletion success",
 			mutateClient: func(client *dynamicfake.FakeDynamicClient) {
 				client.PrependReactor("list", "nodepool", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, &unstructured.UnstructuredList{
