@@ -128,6 +128,17 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 	}
 
 	timeStampStr := fmt.Sprintf("%d", time.Now().UnixNano())
+	nodePoolName := fmt.Sprintf("%s-nodepool-%s", c.name, timeStampStr)
+
+	if c.config.EnableNodeProvisioningTest {
+
+		//TODO: check NodePool CRD before creating
+
+		// If node provisioning test is enabled, we will create a NodePool first, then create synthetic pods on a new node from the node pool.
+		if err := c.createKarpenterNodePool(ctx, karpenterNodePool(nodePoolName, timeStampStr)); err != nil {
+			return nil, fmt.Errorf("failed to create Karpenter NodePool: %w", err)
+		}
+	}
 
 	// Create a synthetic pod to measure the startup time.
 	synthPod, err := c.k8sClientset.CoreV1().Pods(c.config.SyntheticPodNamespace).Create(ctx, c.generateSyntheticPod(timeStampStr), metav1.CreateOptions{})
@@ -142,6 +153,12 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 		if err != nil && !apierrors.IsNotFound(err) {
 			// Logging instead of returning an error here to avoid failing the checker run.
 			klog.ErrorS(err, "Failed to delete synthetic pod", "name", synthPod.Name)
+		}
+
+		if c.config.EnableNodeProvisioningTest {
+			if err := c.deleteKarpenterNodePool(ctx, nodePoolName); err != nil {
+				klog.ErrorS(err, "Failed to delete Karpenter NodePool", "name", nodePoolName)
+			}
 		}
 	}()
 
@@ -197,6 +214,9 @@ func (c *PodStartupChecker) garbageCollect(ctx context.Context) error {
 			}
 		}
 	}
+
+	//TODO: list Karpenter Node Pools and delete
+
 	return errors.Join(errs...)
 }
 
