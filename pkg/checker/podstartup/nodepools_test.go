@@ -31,7 +31,7 @@ func TestCreateKarpenterNodePool(t *testing.T) {
 			name: "creation failure",
 			getClient: func() *dynamicfake.FakeDynamicClient {
 				client := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
-				client.PrependReactor("create", "nodepool", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+				client.PrependReactor("create", "nodepools", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, &unstructured.Unstructured{}, errors.New("unexpected error occurred while creating node pool")
 				})
 				return client
@@ -83,7 +83,7 @@ func TestDeleteKarpenterNodePool(t *testing.T) {
 			name: "not found - skip without error",
 			getClient: func() *dynamicfake.FakeDynamicClient {
 				client := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
-				client.PrependReactor("delete", "nodepool", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+				client.PrependReactor("delete", "nodepools", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, &unstructured.Unstructured{}, apierrors.NewNotFound(
 						NodePoolGVR.GroupResource(),
 						"test-nodepool",
@@ -96,7 +96,7 @@ func TestDeleteKarpenterNodePool(t *testing.T) {
 			name: "deletion failure",
 			getClient: func() *dynamicfake.FakeDynamicClient {
 				client := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
-				client.PrependReactor("delete", "nodepool", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+				client.PrependReactor("delete", "nodepools", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, &unstructured.Unstructured{}, errors.New("unexpected error occurred while deleting node pool")
 				})
 				return client
@@ -149,7 +149,7 @@ func TestDeleteAllKarpenterNodePools(t *testing.T) {
 		{
 			name: "deletion success",
 			mutateClient: func(client *dynamicfake.FakeDynamicClient) {
-				client.PrependReactor("list", "nodepool", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+				client.PrependReactor("list", "nodepools", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, &unstructured.UnstructuredList{
 						Items: []unstructured.Unstructured{
 							{
@@ -167,7 +167,7 @@ func TestDeleteAllKarpenterNodePools(t *testing.T) {
 						},
 					}, nil
 				})
-				client.PrependReactor("delete", "nodepool", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+				client.PrependReactor("delete", "nodepools", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, &unstructured.Unstructured{}, nil
 				})
 			},
@@ -179,7 +179,7 @@ func TestDeleteAllKarpenterNodePools(t *testing.T) {
 		{
 			name: "error of Karpenter NodePool with no name field in metadata",
 			mutateClient: func(client *dynamicfake.FakeDynamicClient) {
-				client.PrependReactor("list", "nodepool", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+				client.PrependReactor("list", "nodepools", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, &unstructured.UnstructuredList{
 						Items: []unstructured.Unstructured{
 							{
@@ -196,7 +196,7 @@ func TestDeleteAllKarpenterNodePools(t *testing.T) {
 						},
 					}, nil
 				})
-				client.PrependReactor("delete", "nodepool", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+				client.PrependReactor("delete", "nodepools", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, &unstructured.Unstructured{}, nil
 				})
 			},
@@ -209,7 +209,7 @@ func TestDeleteAllKarpenterNodePools(t *testing.T) {
 		{
 			name: "deletion failure",
 			mutateClient: func(client *dynamicfake.FakeDynamicClient) {
-				client.PrependReactor("list", "nodepool", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+				client.PrependReactor("list", "nodepools", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, &unstructured.UnstructuredList{
 						Items: []unstructured.Unstructured{
 							{
@@ -227,7 +227,7 @@ func TestDeleteAllKarpenterNodePools(t *testing.T) {
 						},
 					}, nil
 				})
-				client.PrependReactor("delete", "nodepool", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+				client.PrependReactor("delete", "nodepools", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, &unstructured.Unstructured{}, errors.New("unexpected error occurred while deleting node pool")
 				})
 			},

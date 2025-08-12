@@ -112,6 +112,8 @@ func TestPodStartupChecker_Run(t *testing.T) {
 	syntheticPodLabelKey := "cluster-health-monitor/checker-name"
 	maxSyntheticPods := 3
 
+	crdGVR := schema.GroupVersionResource{Group: "apiextensions.k8s.io", Version: "v1", Resource: "customresourcedefinitions"}
+
 	tests := []struct {
 		name           string
 		mutators       []scenarioMutator
@@ -186,6 +188,21 @@ func TestPodStartupChecker_Run(t *testing.T) {
 			mutators: []scenarioMutator{
 				func(s *testScenario) {
 					s.enableNodeProvisioning = true
+					s.fakeDynamicClient.PrependReactor("get", "customresourcedefinitions", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, &unstructured.UnstructuredList{
+							Items: []unstructured.Unstructured{
+								{
+									Object: map[string]interface{}{
+										"apiVersion": "apiextensions.k8s.io/v1",
+										"kind":       "CustomResourceDefinition",
+										"metadata": map[string]interface{}{
+											"name": "nodepools.karpenter.sh",
+										},
+									},
+								},
+							},
+						}, nil
+					})
 				},
 			},
 
@@ -193,7 +210,140 @@ func TestPodStartupChecker_Run(t *testing.T) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
 				g.Expect(result.Status).To(Equal(types.StatusHealthy))
-				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(3)) // One create, one delete and one list action for the NodePool
+
+				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(4))
+				g.Expect(fakeDynamicClient.Actions()[0].GetResource()).To(Equal(NodePoolGVR))
+				g.Expect(fakeDynamicClient.Actions()[0].GetVerb()).To(Equal("list"))
+				g.Expect(fakeDynamicClient.Actions()[1].GetResource()).To(Equal(crdGVR))
+				g.Expect(fakeDynamicClient.Actions()[1].GetVerb()).To(Equal("get"))
+				g.Expect(fakeDynamicClient.Actions()[2].GetResource()).To(Equal(NodePoolGVR))
+				g.Expect(fakeDynamicClient.Actions()[2].GetVerb()).To(Equal("create"))
+				g.Expect(fakeDynamicClient.Actions()[3].GetResource()).To(Equal(NodePoolGVR))
+				g.Expect(fakeDynamicClient.Actions()[3].GetVerb()).To(Equal("delete"))
+			},
+		},
+		{
+			name: "healthy result - default scenario with node provisioning test",
+			mutators: []scenarioMutator{
+				func(s *testScenario) {
+					s.enableNodeProvisioning = true
+					s.fakeDynamicClient.PrependReactor("get", "customresourcedefinitions", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, &unstructured.UnstructuredList{
+							Items: []unstructured.Unstructured{
+								{
+									Object: map[string]interface{}{
+										"apiVersion": "apiextensions.k8s.io/v1",
+										"kind":       "CustomResourceDefinition",
+										"metadata": map[string]interface{}{
+											"name": "nodepools.karpenter.sh",
+										},
+									},
+								},
+							},
+						}, nil
+					})
+				},
+			},
+
+			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(result).ToNot(BeNil())
+				g.Expect(result.Status).To(Equal(types.StatusHealthy))
+
+				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(4))
+				g.Expect(fakeDynamicClient.Actions()[0].GetResource()).To(Equal(NodePoolGVR))
+				g.Expect(fakeDynamicClient.Actions()[0].GetVerb()).To(Equal("list"))
+				g.Expect(fakeDynamicClient.Actions()[1].GetResource()).To(Equal(crdGVR))
+				g.Expect(fakeDynamicClient.Actions()[1].GetVerb()).To(Equal("get"))
+				g.Expect(fakeDynamicClient.Actions()[2].GetResource()).To(Equal(NodePoolGVR))
+				g.Expect(fakeDynamicClient.Actions()[2].GetVerb()).To(Equal("create"))
+				g.Expect(fakeDynamicClient.Actions()[3].GetResource()).To(Equal(NodePoolGVR))
+				g.Expect(fakeDynamicClient.Actions()[3].GetVerb()).To(Equal("delete"))
+			},
+		},
+		{
+			name: "healthy result - default scenario with node provisioning test and garbage collection",
+			mutators: []scenarioMutator{
+				func(s *testScenario) {
+					s.enableNodeProvisioning = true
+					s.fakeDynamicClient.PrependReactor("get", "customresourcedefinitions", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, &unstructured.UnstructuredList{
+							Items: []unstructured.Unstructured{
+								{
+									Object: map[string]interface{}{
+										"apiVersion": "apiextensions.k8s.io/v1",
+										"kind":       "CustomResourceDefinition",
+										"metadata": map[string]interface{}{
+											"name": "nodepools.karpenter.sh",
+										},
+									},
+								},
+							},
+						}, nil
+					})
+					s.fakeDynamicClient.PrependReactor("list", "nodepools", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, &unstructured.UnstructuredList{
+							Items: []unstructured.Unstructured{
+								{
+									Object: map[string]interface{}{
+										"apiVersion": "karpenter.sh/v1",
+										"kind":       "NodePool",
+										"metadata": map[string]interface{}{
+											"name": "test-node-pool",
+											"labels": map[string]interface{}{
+												syntheticPodLabelKey: "123456",
+											},
+										},
+									},
+								},
+							},
+						}, nil
+					})
+				},
+			},
+
+			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(result).ToNot(BeNil())
+				g.Expect(result.Status).To(Equal(types.StatusHealthy))
+
+				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(5))
+				g.Expect(fakeDynamicClient.Actions()[0].GetResource()).To(Equal(NodePoolGVR))
+				g.Expect(fakeDynamicClient.Actions()[0].GetVerb()).To(Equal("list"))
+				g.Expect(fakeDynamicClient.Actions()[1].GetResource()).To(Equal(NodePoolGVR))
+				g.Expect(fakeDynamicClient.Actions()[1].GetVerb()).To(Equal("delete"))
+				g.Expect(fakeDynamicClient.Actions()[2].GetResource()).To(Equal(crdGVR))
+				g.Expect(fakeDynamicClient.Actions()[2].GetVerb()).To(Equal("get"))
+				g.Expect(fakeDynamicClient.Actions()[3].GetResource()).To(Equal(NodePoolGVR))
+				g.Expect(fakeDynamicClient.Actions()[3].GetVerb()).To(Equal("create"))
+				g.Expect(fakeDynamicClient.Actions()[4].GetResource()).To(Equal(NodePoolGVR))
+				g.Expect(fakeDynamicClient.Actions()[4].GetVerb()).To(Equal("delete"))
+			},
+		},
+		{
+			name: "skipped result - node pool CRD not found",
+			mutators: []scenarioMutator{
+				func(s *testScenario) {
+					s.enableNodeProvisioning = true
+					s.fakeDynamicClient.PrependReactor("get", "customresourcedefinitions", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, apierrors.NewNotFound(
+							schema.GroupResource{
+								Group:    "apiextensions.k8s.io",
+								Resource: "customresourcedefinitions",
+							}, "nodepools.karpenter.sh")
+					})
+				},
+			},
+			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(result).ToNot(BeNil())
+				g.Expect(result.Status).To(Equal(types.StatusSkipped))
+
+				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(2))
+				g.Expect(fakeDynamicClient.Actions()[0].GetResource()).To(Equal(NodePoolGVR))
+				g.Expect(fakeDynamicClient.Actions()[0].GetVerb()).To(Equal("list"))
+				g.Expect(fakeDynamicClient.Actions()[1].GetResource()).To(Equal(crdGVR))
+				g.Expect(fakeDynamicClient.Actions()[1].GetVerb()).To(Equal("get"))
 			},
 		},
 		{
@@ -201,7 +351,22 @@ func TestPodStartupChecker_Run(t *testing.T) {
 			mutators: []scenarioMutator{
 				func(s *testScenario) {
 					s.enableNodeProvisioning = true
-					s.fakeDynamicClient.PrependReactor("create", "nodepool", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+					s.fakeDynamicClient.PrependReactor("get", "customresourcedefinitions", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, &unstructured.UnstructuredList{
+							Items: []unstructured.Unstructured{
+								{
+									Object: map[string]interface{}{
+										"apiVersion": "apiextensions.k8s.io/v1",
+										"kind":       "CustomResourceDefinition",
+										"metadata": map[string]interface{}{
+											"name": "nodepools.karpenter.sh",
+										},
+									},
+								},
+							},
+						}, nil
+					})
+					s.fakeDynamicClient.PrependReactor("create", "nodepools", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, &unstructured.Unstructured{}, errors.New("unexpected error occurred while creating node pool")
 					})
 				},
@@ -209,7 +374,14 @@ func TestPodStartupChecker_Run(t *testing.T) {
 			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err.Error()).To(ContainSubstring("unexpected error occurred while creating node pool"))
-				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(2)) // One create and one list action for the NodePool
+
+				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(3))
+				g.Expect(fakeDynamicClient.Actions()[0].GetResource()).To(Equal(NodePoolGVR))
+				g.Expect(fakeDynamicClient.Actions()[0].GetVerb()).To(Equal("list"))
+				g.Expect(fakeDynamicClient.Actions()[1].GetResource()).To(Equal(crdGVR))
+				g.Expect(fakeDynamicClient.Actions()[1].GetVerb()).To(Equal("get"))
+				g.Expect(fakeDynamicClient.Actions()[2].GetResource()).To(Equal(NodePoolGVR))
+				g.Expect(fakeDynamicClient.Actions()[2].GetVerb()).To(Equal("create"))
 			},
 		},
 	}
@@ -421,7 +593,7 @@ func TestPodStartupChecker_garbageCollect(t *testing.T) {
 				client := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
 					NodePoolGVR: "NodePoolList",
 				})
-				client.PrependReactor("list", "nodepool", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+				client.PrependReactor("list", "nodepools", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, nil, errors.New("error listing node pools")
 				})
 				return client

@@ -51,7 +51,7 @@ type PodStartupChecker struct {
 var NodePoolGVR = schema.GroupVersionResource{
 	Group:    "karpenter.sh",
 	Version:  "v1",
-	Resource: "nodepool",
+	Resource: "nodepools",
 }
 
 // How often to poll the pod status to check if the container is running.
@@ -131,10 +131,14 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 	nodePoolName := fmt.Sprintf("%s-nodepool-%s", c.name, timeStampStr)
 
 	if c.config.EnableNodeProvisioningTest {
-
-		//TODO: check NodePool CRD before creating
-
-		// If node provisioning test is enabled, we will create a NodePool first, then create synthetic pods on a new node from the node pool.
+		karpenterNodePoolCRDPresent, err := c.isKarpenterNodePoolCRDPresent(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check Karpenter NodePool CRD presence: %w", err)
+		}
+		if !karpenterNodePoolCRDPresent {
+			return types.Skipped("Karpenter NodePool CRD was not found, pod startup test was skipped"), nil
+		}
+		// create a NodePool first, then create synthetic pods on a new node from the node pool.
 		if err := c.createKarpenterNodePool(ctx, c.karpenterNodePool(nodePoolName, timeStampStr)); err != nil {
 			return nil, fmt.Errorf("failed to create Karpenter NodePool: %w", err)
 		}

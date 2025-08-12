@@ -9,9 +9,27 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubectl/pkg/scheme"
 	karpenter "sigs.k8s.io/karpenter/pkg/apis/v1"
 )
+
+func (c *PodStartupChecker) isKarpenterNodePoolCRDPresent(ctx context.Context) (bool, error) {
+	// Check if the Karpenter NodePool CRD is present in the cluster.
+	customerresourcedefinitionsGVR := schema.GroupVersionResource{
+		Group:    "apiextensions.k8s.io",
+		Version:  "v1",
+		Resource: "customresourcedefinitions",
+	}
+	_, err := c.dynamicClient.Resource(customerresourcedefinitionsGVR).Get(ctx, "nodepools.karpenter.sh", metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return false, nil // CRD doesn't exist, but this is not an error condition
+		}
+		return false, err // Other errors should be returned
+	}
+	return true, nil
+}
 
 func (c *PodStartupChecker) createKarpenterNodePool(ctx context.Context, nodePool *karpenter.NodePool) error {
 	unstructuredNodePool := &unstructured.Unstructured{}
