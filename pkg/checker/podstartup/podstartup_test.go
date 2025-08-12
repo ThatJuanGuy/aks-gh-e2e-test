@@ -186,6 +186,21 @@ func TestPodStartupChecker_Run(t *testing.T) {
 			mutators: []scenarioMutator{
 				func(s *testScenario) {
 					s.enableNodeProvisioning = true
+					s.fakeDynamicClient.PrependReactor("get", "customresourcedefinitions", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, &unstructured.UnstructuredList{
+							Items: []unstructured.Unstructured{
+								{
+									Object: map[string]interface{}{
+										"apiVersion": "apiextensions.k8s.io/v1",
+										"kind":       "CustomResourceDefinition",
+										"metadata": map[string]interface{}{
+											"name": "nodepools.karpenter.sh",
+										},
+									},
+								},
+							},
+						}, nil
+					})
 				},
 			},
 
@@ -193,7 +208,120 @@ func TestPodStartupChecker_Run(t *testing.T) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
 				g.Expect(result.Status).To(Equal(types.StatusHealthy))
-				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(3)) // One create, one delete and one list action for the NodePool
+
+				// One get action for the CustomResourceDefinition
+				// One create, one delete and one list action for the NodePool
+				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(4))
+			},
+		},
+		{
+			name: "healthy result - default scenario with node provisioning test",
+			mutators: []scenarioMutator{
+				func(s *testScenario) {
+					s.enableNodeProvisioning = true
+					s.fakeDynamicClient.PrependReactor("get", "customresourcedefinitions", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, &unstructured.UnstructuredList{
+							Items: []unstructured.Unstructured{
+								{
+									Object: map[string]interface{}{
+										"apiVersion": "apiextensions.k8s.io/v1",
+										"kind":       "CustomResourceDefinition",
+										"metadata": map[string]interface{}{
+											"name": "nodepools.karpenter.sh",
+										},
+									},
+								},
+							},
+						}, nil
+					})
+				},
+			},
+
+			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(result).ToNot(BeNil())
+				g.Expect(result.Status).To(Equal(types.StatusHealthy))
+
+				// One list action for the NodePool in garbage collection
+				// One get action for the CustomResourceDefinition
+				// One create and one delete action for the NodePool
+				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(4))
+			},
+		},
+		{
+			name: "healthy result - default scenario with node provisioning test and garbage collection",
+			mutators: []scenarioMutator{
+				func(s *testScenario) {
+					s.enableNodeProvisioning = true
+					s.fakeDynamicClient.PrependReactor("get", "customresourcedefinitions", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, &unstructured.UnstructuredList{
+							Items: []unstructured.Unstructured{
+								{
+									Object: map[string]interface{}{
+										"apiVersion": "apiextensions.k8s.io/v1",
+										"kind":       "CustomResourceDefinition",
+										"metadata": map[string]interface{}{
+											"name": "nodepools.karpenter.sh",
+										},
+									},
+								},
+							},
+						}, nil
+					})
+					s.fakeDynamicClient.PrependReactor("list", "nodepools", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, &unstructured.UnstructuredList{
+							Items: []unstructured.Unstructured{
+								{
+									Object: map[string]interface{}{
+										"apiVersion": "karpenter.sh/v1",
+										"kind":       "NodePool",
+										"metadata": map[string]interface{}{
+											"name": "test-node-pool",
+											"labels": map[string]interface{}{
+												syntheticPodLabelKey: "123456",
+											},
+										},
+									},
+								},
+							},
+						}, nil
+					})
+				},
+			},
+
+			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(result).ToNot(BeNil())
+				g.Expect(result.Status).To(Equal(types.StatusHealthy))
+
+				// One list and one delete action for the NodePool in garbage collection
+				// One get action for the CustomResourceDefinition
+				// One create and one delete for the NodePool
+				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(5))
+			},
+		},
+		{
+			name: "skipped result - node pool CRD not found",
+			mutators: []scenarioMutator{
+				func(s *testScenario) {
+					s.enableNodeProvisioning = true
+					s.fakeDynamicClient.PrependReactor("get", "customresourcedefinitions", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, apierrors.NewNotFound(
+							schema.GroupResource{
+								Group:    "apiextensions.k8s.io",
+								Resource: "customresourcedefinitions",
+							}, "nodepools.karpenter.sh")
+					})
+				},
+			},
+			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(result).ToNot(BeNil())
+				g.Expect(result.Status).To(Equal(types.StatusSkipped))
+
+				// One list action for the NodePool in garbage collection
+				// One get action for the CustomResourceDefinition
+				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(2))
 			},
 		},
 		{
@@ -201,6 +329,21 @@ func TestPodStartupChecker_Run(t *testing.T) {
 			mutators: []scenarioMutator{
 				func(s *testScenario) {
 					s.enableNodeProvisioning = true
+					s.fakeDynamicClient.PrependReactor("get", "customresourcedefinitions", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, &unstructured.UnstructuredList{
+							Items: []unstructured.Unstructured{
+								{
+									Object: map[string]interface{}{
+										"apiVersion": "apiextensions.k8s.io/v1",
+										"kind":       "CustomResourceDefinition",
+										"metadata": map[string]interface{}{
+											"name": "nodepools.karpenter.sh",
+										},
+									},
+								},
+							},
+						}, nil
+					})
 					s.fakeDynamicClient.PrependReactor("create", "nodepools", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, &unstructured.Unstructured{}, errors.New("unexpected error occurred while creating node pool")
 					})
@@ -209,7 +352,11 @@ func TestPodStartupChecker_Run(t *testing.T) {
 			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err.Error()).To(ContainSubstring("unexpected error occurred while creating node pool"))
-				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(2)) // One create and one list action for the NodePool
+
+				// one list action for the NodePool in garbage collection
+				// One get action for the CustomResourceDefinition
+				// One create the NodePool
+				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(3))
 			},
 		},
 	}

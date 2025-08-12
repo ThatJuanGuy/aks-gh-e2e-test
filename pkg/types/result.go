@@ -8,6 +8,8 @@ const (
 	StatusHealthy Status = "healthy"
 	// StatusUnhealthy indicates the checker failed.
 	StatusUnhealthy Status = "unhealthy"
+	// StatusSkipped indicates the test was skipped by the checker.
+	StatusSkipped Status = "skipped"
 )
 
 // Result represents the result of a health check.
@@ -41,6 +43,16 @@ func Unhealthy(code, message string) *Result {
 		Status: StatusUnhealthy,
 		Detail: Detail{
 			Code:    code,
+			Message: message,
+		},
+	}
+}
+
+// Skipped is a helper function to create a skipped Result with a specific code and message.
+func Skipped(message string) *Result {
+	return &Result{
+		Status: StatusSkipped,
+		Detail: Detail{
 			Message: message,
 		},
 	}
