@@ -146,7 +146,7 @@ func TestDeleteAllKarpenterNodePools(t *testing.T) {
 			},
 		},
 		{
-			name: "node pool with other prefixes",
+			name: "node pool without labels",
 			mutateClient: func(client *dynamicfake.FakeDynamicClient) {
 				client.PrependReactor("list", "nodepool", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, &unstructured.UnstructuredList{
@@ -157,6 +157,33 @@ func TestDeleteAllKarpenterNodePools(t *testing.T) {
 									"kind":       "NodePool",
 									"metadata": map[string]interface{}{
 										"name": "other-nodepool-1",
+									},
+								},
+							},
+						},
+					}, nil
+				})
+			},
+			validateResults: func(g *WithT, client *dynamicfake.FakeDynamicClient, err error) {
+				g.Expect(err).To(BeNil())
+				g.Expect(client.Actions()).To(HaveLen(1))
+			},
+		},
+		{
+			name: "node pool without node provisioning test label",
+			mutateClient: func(client *dynamicfake.FakeDynamicClient) {
+				client.PrependReactor("list", "nodepool", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, &unstructured.UnstructuredList{
+						Items: []unstructured.Unstructured{
+							{
+								Object: map[string]interface{}{
+									"apiVersion": "karpenter.sh/v1",
+									"kind":       "NodePool",
+									"metadata": map[string]interface{}{
+										"name": "other-nodepool-1",
+										"labels": map[string]interface{}{
+											"randomLabel": "123456",
+										},
 									},
 								},
 							},
@@ -181,6 +208,9 @@ func TestDeleteAllKarpenterNodePools(t *testing.T) {
 									"kind":       "NodePool",
 									"metadata": map[string]interface{}{
 										"name": "test-checker-nodepool-1",
+										"labels": map[string]interface{}{
+											_nodeProvisioningTestLabel: "123456",
+										},
 									},
 								},
 							},
@@ -208,6 +238,9 @@ func TestDeleteAllKarpenterNodePools(t *testing.T) {
 									"kind":       "NodePool",
 									"metadata": map[string]interface{}{
 										"name": "test-checker-nodepool-1",
+										"labels": map[string]interface{}{
+											_nodeProvisioningTestLabel: "123456",
+										},
 									},
 								},
 							},
@@ -242,7 +275,6 @@ func TestDeleteAllKarpenterNodePools(t *testing.T) {
 				config: &config.PodStartupConfig{
 					SyntheticPodNamespace: "test",
 				},
-				nodepoolNamePrefix: "test-checker-nodepool",
 			}
 			err := checker.deleteAllKarpenterNodePools(ctx)
 			tt.validateResults(g, fakeDynamicClient, err)

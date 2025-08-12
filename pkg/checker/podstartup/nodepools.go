@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -13,6 +12,8 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 	karpenter "sigs.k8s.io/karpenter/pkg/apis/v1"
 )
+
+const _nodeProvisioningTestLabel = "nodeprovisioningtest"
 
 func (c *PodStartupChecker) createKarpenterNodePool(ctx context.Context, nodePool *karpenter.NodePool) error {
 	unstructuredNodePool := &unstructured.Unstructured{}
@@ -50,17 +51,30 @@ func (c *PodStartupChecker) deleteAllKarpenterNodePools(ctx context.Context) err
 
 	// Iterate over the NodePools and delete each one.
 	for _, nodePool := range nodePools.Items {
-		nodePoolName, found, err := unstructured.NestedString(nodePool.Object, "metadata", "name")
+		labels, labelsMapFound, err := unstructured.NestedStringMap(nodePool.Object, "metadata", "labels")
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to get Karpenter Node Pool name: %w", err))
+			errs = append(errs, fmt.Errorf("failed to parse Karpenter Node Pool labels: %w", err))
 			continue
 		}
-		if found && strings.HasPrefix(nodePoolName, c.nodepoolNamePrefix) {
-			err := c.deleteKarpenterNodePool(ctx, nodePoolName)
-			if err != nil {
+
+		_, labelFound := labels[_nodeProvisioningTestLabel]
+
+		if !labelsMapFound || !labelFound {
+			continue
+		}
+
+		nodePoolName, nameFound, err := unstructured.NestedString(nodePool.Object, "metadata", "name")
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to parse Karpenter Node Pool name: %w", err))
+			continue
+		}
+
+		if nameFound {
+			if err := c.deleteKarpenterNodePool(ctx, nodePoolName); err != nil {
 				errs = append(errs, fmt.Errorf("failed to delete old Karpenter Node Pool %s: %w", nodePoolName, err))
 			}
 		}
+
 	}
 
 	return errors.Join(errs...)
@@ -74,6 +88,9 @@ func karpenterNodePool(nodePoolName, timestampStr string) *karpenter.NodePool {
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nodePoolName,
+			Labels: map[string]string{
+				_nodeProvisioningTestLabel: timestampStr,
+			},
 		},
 		Spec: karpenter.NodePoolSpec{
 			Template: karpenter.NodeClaimTemplate{
@@ -86,7 +103,7 @@ func karpenterNodePool(nodePoolName, timestampStr string) *karpenter.NodePool {
 					Requirements: []karpenter.NodeSelectorRequirementWithMinValues{
 						{
 							NodeSelectorRequirement: corev1.NodeSelectorRequirement{
-								Key:      "nodeprovisioningtest",
+								Key:      _nodeProvisioningTestLabel,
 								Operator: corev1.NodeSelectorOpIn,
 								Values:   []string{timestampStr},
 							},
