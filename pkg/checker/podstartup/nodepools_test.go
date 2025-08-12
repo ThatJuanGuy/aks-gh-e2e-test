@@ -201,8 +201,8 @@ func TestDeleteAllKarpenterNodePools(t *testing.T) {
 				})
 			},
 			validateResults: func(g *WithT, client *dynamicfake.FakeDynamicClient, err error) {
-				g.Expect(err).To(BeNil())
 				g.Expect(client.Actions()).To(HaveLen(1))
+				g.Expect(err).To(HaveOccurred())
 				g.Expect(err.Error()).To(ContainSubstring("got Karpenter NodePool with no name field in metadata"))
 			},
 		},
