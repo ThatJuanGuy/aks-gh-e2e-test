@@ -112,6 +112,8 @@ func TestPodStartupChecker_Run(t *testing.T) {
 	syntheticPodLabelKey := "cluster-health-monitor/checker-name"
 	maxSyntheticPods := 3
 
+	crdGVR := schema.GroupVersionResource{Group: "apiextensions.k8s.io", Version: "v1", Resource: "customresourcedefinitions"}
+
 	tests := []struct {
 		name           string
 		mutators       []scenarioMutator
@@ -209,9 +211,15 @@ func TestPodStartupChecker_Run(t *testing.T) {
 				g.Expect(result).ToNot(BeNil())
 				g.Expect(result.Status).To(Equal(types.StatusHealthy))
 
-				// One get action for the CustomResourceDefinition
-				// One create, one delete and one list action for the NodePool
 				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(4))
+				g.Expect(fakeDynamicClient.Actions()[0].GetResource()).To(Equal(NodePoolGVR))
+				g.Expect(fakeDynamicClient.Actions()[0].GetVerb()).To(Equal("list"))
+				g.Expect(fakeDynamicClient.Actions()[1].GetResource()).To(Equal(crdGVR))
+				g.Expect(fakeDynamicClient.Actions()[1].GetVerb()).To(Equal("get"))
+				g.Expect(fakeDynamicClient.Actions()[2].GetResource()).To(Equal(NodePoolGVR))
+				g.Expect(fakeDynamicClient.Actions()[2].GetVerb()).To(Equal("create"))
+				g.Expect(fakeDynamicClient.Actions()[3].GetResource()).To(Equal(NodePoolGVR))
+				g.Expect(fakeDynamicClient.Actions()[3].GetVerb()).To(Equal("delete"))
 			},
 		},
 		{
@@ -242,10 +250,15 @@ func TestPodStartupChecker_Run(t *testing.T) {
 				g.Expect(result).ToNot(BeNil())
 				g.Expect(result.Status).To(Equal(types.StatusHealthy))
 
-				// One list action for the NodePool in garbage collection
-				// One get action for the CustomResourceDefinition
-				// One create and one delete action for the NodePool
 				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(4))
+				g.Expect(fakeDynamicClient.Actions()[0].GetResource()).To(Equal(NodePoolGVR))
+				g.Expect(fakeDynamicClient.Actions()[0].GetVerb()).To(Equal("list"))
+				g.Expect(fakeDynamicClient.Actions()[1].GetResource()).To(Equal(crdGVR))
+				g.Expect(fakeDynamicClient.Actions()[1].GetVerb()).To(Equal("get"))
+				g.Expect(fakeDynamicClient.Actions()[2].GetResource()).To(Equal(NodePoolGVR))
+				g.Expect(fakeDynamicClient.Actions()[2].GetVerb()).To(Equal("create"))
+				g.Expect(fakeDynamicClient.Actions()[3].GetResource()).To(Equal(NodePoolGVR))
+				g.Expect(fakeDynamicClient.Actions()[3].GetVerb()).To(Equal("delete"))
 			},
 		},
 		{
@@ -294,10 +307,17 @@ func TestPodStartupChecker_Run(t *testing.T) {
 				g.Expect(result).ToNot(BeNil())
 				g.Expect(result.Status).To(Equal(types.StatusHealthy))
 
-				// One list and one delete action for the NodePool in garbage collection
-				// One get action for the CustomResourceDefinition
-				// One create and one delete for the NodePool
 				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(5))
+				g.Expect(fakeDynamicClient.Actions()[0].GetResource()).To(Equal(NodePoolGVR))
+				g.Expect(fakeDynamicClient.Actions()[0].GetVerb()).To(Equal("list"))
+				g.Expect(fakeDynamicClient.Actions()[1].GetResource()).To(Equal(NodePoolGVR))
+				g.Expect(fakeDynamicClient.Actions()[1].GetVerb()).To(Equal("delete"))
+				g.Expect(fakeDynamicClient.Actions()[2].GetResource()).To(Equal(crdGVR))
+				g.Expect(fakeDynamicClient.Actions()[2].GetVerb()).To(Equal("get"))
+				g.Expect(fakeDynamicClient.Actions()[3].GetResource()).To(Equal(NodePoolGVR))
+				g.Expect(fakeDynamicClient.Actions()[3].GetVerb()).To(Equal("create"))
+				g.Expect(fakeDynamicClient.Actions()[4].GetResource()).To(Equal(NodePoolGVR))
+				g.Expect(fakeDynamicClient.Actions()[4].GetVerb()).To(Equal("delete"))
 			},
 		},
 		{
@@ -319,9 +339,11 @@ func TestPodStartupChecker_Run(t *testing.T) {
 				g.Expect(result).ToNot(BeNil())
 				g.Expect(result.Status).To(Equal(types.StatusSkipped))
 
-				// One list action for the NodePool in garbage collection
-				// One get action for the CustomResourceDefinition
 				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(2))
+				g.Expect(fakeDynamicClient.Actions()[0].GetResource()).To(Equal(NodePoolGVR))
+				g.Expect(fakeDynamicClient.Actions()[0].GetVerb()).To(Equal("list"))
+				g.Expect(fakeDynamicClient.Actions()[1].GetResource()).To(Equal(crdGVR))
+				g.Expect(fakeDynamicClient.Actions()[1].GetVerb()).To(Equal("get"))
 			},
 		},
 		{
@@ -353,10 +375,13 @@ func TestPodStartupChecker_Run(t *testing.T) {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err.Error()).To(ContainSubstring("unexpected error occurred while creating node pool"))
 
-				// one list action for the NodePool in garbage collection
-				// One get action for the CustomResourceDefinition
-				// One create the NodePool
 				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(3))
+				g.Expect(fakeDynamicClient.Actions()[0].GetResource()).To(Equal(NodePoolGVR))
+				g.Expect(fakeDynamicClient.Actions()[0].GetVerb()).To(Equal("list"))
+				g.Expect(fakeDynamicClient.Actions()[1].GetResource()).To(Equal(crdGVR))
+				g.Expect(fakeDynamicClient.Actions()[1].GetVerb()).To(Equal("get"))
+				g.Expect(fakeDynamicClient.Actions()[2].GetResource()).To(Equal(NodePoolGVR))
+				g.Expect(fakeDynamicClient.Actions()[2].GetVerb()).To(Equal("create"))
 			},
 		},
 	}
