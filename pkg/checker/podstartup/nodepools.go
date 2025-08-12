@@ -13,8 +13,6 @@ import (
 	karpenter "sigs.k8s.io/karpenter/pkg/apis/v1"
 )
 
-const _nodeProvisioningTestLabel = "nodeprovisioningtest"
-
 func (c *PodStartupChecker) createKarpenterNodePool(ctx context.Context, nodePool *karpenter.NodePool) error {
 	unstructuredNodePool := &unstructured.Unstructured{}
 	scheme.Scheme.AddKnownTypes(NodePoolGVR.GroupVersion(), nodePool)
@@ -44,43 +42,34 @@ func (c *PodStartupChecker) deleteAllKarpenterNodePools(ctx context.Context) err
 	var errs []error
 
 	// List all NodePools in the synthetic pod namespace.
-	nodePools, err := c.dynamicClient.Resource(NodePoolGVR).Namespace(c.config.SyntheticPodNamespace).List(ctx, metav1.ListOptions{})
+	nodePools, err := c.dynamicClient.Resource(NodePoolGVR).Namespace(c.config.SyntheticPodNamespace).List(ctx, metav1.ListOptions{
+		LabelSelector: c.config.SyntheticPodLabelKey,
+	})
 	if err != nil {
 		return err
 	}
 
 	// Iterate over the NodePools and delete each one.
 	for _, nodePool := range nodePools.Items {
-		labels, labelsMapFound, err := unstructured.NestedStringMap(nodePool.Object, "metadata", "labels")
-		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to parse Karpenter Node Pool labels: %w", err))
-			continue
-		}
-
-		_, labelFound := labels[_nodeProvisioningTestLabel]
-
-		if !labelsMapFound || !labelFound {
-			continue
-		}
-
 		nodePoolName, nameFound, err := unstructured.NestedString(nodePool.Object, "metadata", "name")
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to parse Karpenter Node Pool name: %w", err))
 			continue
 		}
 
-		if nameFound {
-			if err := c.deleteKarpenterNodePool(ctx, nodePoolName); err != nil {
-				errs = append(errs, fmt.Errorf("failed to delete old Karpenter Node Pool %s: %w", nodePoolName, err))
-			}
+		if !nameFound {
+			continue
 		}
 
+		if err := c.deleteKarpenterNodePool(ctx, nodePoolName); err != nil {
+			errs = append(errs, fmt.Errorf("failed to delete old Karpenter Node Pool %s: %w", nodePoolName, err))
+		}
 	}
 
 	return errors.Join(errs...)
 }
 
-func karpenterNodePool(nodePoolName, timestampStr string) *karpenter.NodePool {
+func (c *PodStartupChecker) karpenterNodePool(nodePoolName, timestampStr string) *karpenter.NodePool {
 	return &karpenter.NodePool{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "NodePool",
@@ -89,7 +78,7 @@ func karpenterNodePool(nodePoolName, timestampStr string) *karpenter.NodePool {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nodePoolName,
 			Labels: map[string]string{
-				_nodeProvisioningTestLabel: timestampStr,
+				c.config.SyntheticPodLabelKey: timestampStr,
 			},
 		},
 		Spec: karpenter.NodePoolSpec{
@@ -103,7 +92,7 @@ func karpenterNodePool(nodePoolName, timestampStr string) *karpenter.NodePool {
 					Requirements: []karpenter.NodeSelectorRequirementWithMinValues{
 						{
 							NodeSelectorRequirement: corev1.NodeSelectorRequirement{
-								Key:      _nodeProvisioningTestLabel,
+								Key:      c.config.SyntheticPodLabelKey,
 								Operator: corev1.NodeSelectorOpIn,
 								Values:   []string{timestampStr},
 							},

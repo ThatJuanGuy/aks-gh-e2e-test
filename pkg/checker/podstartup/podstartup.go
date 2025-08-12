@@ -135,7 +135,7 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 		//TODO: check NodePool CRD before creating
 
 		// If node provisioning test is enabled, we will create a NodePool first, then create synthetic pods on a new node from the node pool.
-		if err := c.createKarpenterNodePool(ctx, karpenterNodePool(nodePoolName, timeStampStr)); err != nil {
+		if err := c.createKarpenterNodePool(ctx, c.karpenterNodePool(nodePoolName, timeStampStr)); err != nil {
 			return nil, fmt.Errorf("failed to create Karpenter NodePool: %w", err)
 		}
 	}

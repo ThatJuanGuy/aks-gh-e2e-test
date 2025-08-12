@@ -54,9 +54,10 @@ func TestCreateKarpenterNodePool(t *testing.T) {
 				dynamicClient: fakeDynamicClient,
 				config: &config.PodStartupConfig{
 					SyntheticPodNamespace: "test",
+					SyntheticPodLabelKey:  "test-key",
 				},
 			}
-			err := checker.createKarpenterNodePool(ctx, karpenterNodePool(nodePoolName, timestampStr))
+			err := checker.createKarpenterNodePool(ctx, checker.karpenterNodePool(nodePoolName, timestampStr))
 			if tt.expectedErrorString != "" {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err.Error()).To(ContainSubstring(tt.expectedErrorString))
@@ -209,7 +210,7 @@ func TestDeleteAllKarpenterNodePools(t *testing.T) {
 									"metadata": map[string]interface{}{
 										"name": "test-checker-nodepool-1",
 										"labels": map[string]interface{}{
-											_nodeProvisioningTestLabel: "123456",
+											"test-key": "123456",
 										},
 									},
 								},
@@ -239,7 +240,7 @@ func TestDeleteAllKarpenterNodePools(t *testing.T) {
 									"metadata": map[string]interface{}{
 										"name": "test-checker-nodepool-1",
 										"labels": map[string]interface{}{
-											_nodeProvisioningTestLabel: "123456",
+											"test-key": "123456",
 										},
 									},
 								},
@@ -274,6 +275,7 @@ func TestDeleteAllKarpenterNodePools(t *testing.T) {
 				dynamicClient: fakeDynamicClient,
 				config: &config.PodStartupConfig{
 					SyntheticPodNamespace: "test",
+					SyntheticPodLabelKey:  "test-key",
 				},
 			}
 			err := checker.deleteAllKarpenterNodePools(ctx)
