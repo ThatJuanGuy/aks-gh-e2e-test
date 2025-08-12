@@ -51,7 +51,7 @@ type PodStartupChecker struct {
 var NodePoolGVR = schema.GroupVersionResource{
 	Group:    "karpenter.sh",
 	Version:  "v1",
-	Resource: "nodepool",
+	Resource: "nodepools",
 }
 
 // How often to poll the pod status to check if the container is running.

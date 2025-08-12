@@ -16,6 +16,78 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 )
 
+func TestIsKarpenterNodePoolCRDPresent(t *testing.T) {
+	g := NewWithT(t)
+
+	tests := []struct {
+		name                string
+		getClient           func() *dynamicfake.FakeDynamicClient
+		expectedErrorString string
+	}{
+		{
+			name: "CRD exists",
+			getClient: func() *dynamicfake.FakeDynamicClient {
+				client := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
+				client.PrependReactor("get", "customresourcedefinitions", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, &unstructured.Unstructured{
+						Object: map[string]interface{}{
+							"metadata": map[string]interface{}{
+								"name": "nodepools.karpenter.sh",
+							},
+						},
+					}, nil
+				})
+				return client
+			},
+		},
+		{
+			name: "CRD does not exist",
+			getClient: func() *dynamicfake.FakeDynamicClient {
+				client := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
+				client.PrependReactor("get", "customresourcedefinitions", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, nil, apierrors.NewNotFound(schema.GroupResource{
+						Group:    "apiextensions.k8s.io",
+						Resource: "customresourcedefinitions",
+					}, "nodepools.karpenter.sh")
+				})
+				return client
+			},
+		},
+		{
+			name: "error getting CRD",
+			getClient: func() *dynamicfake.FakeDynamicClient {
+				client := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
+				client.PrependReactor("get", "customresourcedefinitions", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, nil, apierrors.NewInternalError(errors.New("internal error"))
+				})
+				return client
+			},
+			expectedErrorString: "internal error",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			fakeDynamicClient := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
+			if tt.getClient != nil {
+				fakeDynamicClient = tt.getClient()
+			}
+
+			checker := &PodStartupChecker{
+				dynamicClient: fakeDynamicClient,
+			}
+			_, err := checker.isKarpenterNodePoolCRDPresent(ctx)
+			if tt.expectedErrorString != "" {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring(tt.expectedErrorString))
+			} else {
+				g.Expect(err).To(BeNil())
+			}
+		})
+	}
+}
+
 func TestCreateKarpenterNodePool(t *testing.T) {
 	g := NewWithT(t)
 
@@ -31,7 +103,7 @@ func TestCreateKarpenterNodePool(t *testing.T) {
 			name: "creation failure",
 			getClient: func() *dynamicfake.FakeDynamicClient {
 				client := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
-				client.PrependReactor("create", "nodepool", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+				client.PrependReactor("create", "nodepools", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, &unstructured.Unstructured{}, errors.New("unexpected error occurred while creating node pool")
 				})
 				return client
@@ -83,7 +155,7 @@ func TestDeleteKarpenterNodePool(t *testing.T) {
 			name: "not found - skip without error",
 			getClient: func() *dynamicfake.FakeDynamicClient {
 				client := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
-				client.PrependReactor("delete", "nodepool", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+				client.PrependReactor("delete", "nodepools", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, &unstructured.Unstructured{}, apierrors.NewNotFound(
 						NodePoolGVR.GroupResource(),
 						"test-nodepool",
@@ -96,7 +168,7 @@ func TestDeleteKarpenterNodePool(t *testing.T) {
 			name: "deletion failure",
 			getClient: func() *dynamicfake.FakeDynamicClient {
 				client := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
-				client.PrependReactor("delete", "nodepool", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+				client.PrependReactor("delete", "nodepools", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, &unstructured.Unstructured{}, errors.New("unexpected error occurred while deleting node pool")
 				})
 				return client

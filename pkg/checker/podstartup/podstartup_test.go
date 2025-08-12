@@ -201,7 +201,7 @@ func TestPodStartupChecker_Run(t *testing.T) {
 			mutators: []scenarioMutator{
 				func(s *testScenario) {
 					s.enableNodeProvisioning = true
-					s.fakeDynamicClient.PrependReactor("create", "nodepool", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+					s.fakeDynamicClient.PrependReactor("create", "nodepools", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, &unstructured.Unstructured{}, errors.New("unexpected error occurred while creating node pool")
 					})
 				},
