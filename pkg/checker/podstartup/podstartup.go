@@ -135,7 +135,7 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 		//TODO: check NodePool CRD before creating
 
 		// If node provisioning test is enabled, we will create a NodePool first, then create synthetic pods on a new node from the node pool.
-		if err := c.createKarpenterNodePool(ctx, karpenterNodePool(nodePoolName, timeStampStr)); err != nil {
+		if err := c.createKarpenterNodePool(ctx, c.karpenterNodePool(nodePoolName, timeStampStr)); err != nil {
 			return nil, fmt.Errorf("failed to create Karpenter NodePool: %w", err)
 		}
 	}
@@ -215,8 +215,11 @@ func (c *PodStartupChecker) garbageCollect(ctx context.Context) error {
 		}
 	}
 
-	//TODO: list Karpenter Node Pools and delete
-
+	if c.config.EnableNodeProvisioningTest {
+		if err := c.deleteAllKarpenterNodePools(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("failed to delete old Karpenter Node Pools: %w", err))
+		}
+	}
 	return errors.Join(errs...)
 }
 

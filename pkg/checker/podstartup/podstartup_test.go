@@ -17,6 +17,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
@@ -187,11 +188,12 @@ func TestPodStartupChecker_Run(t *testing.T) {
 					s.enableNodeProvisioning = true
 				},
 			},
+
 			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
 				g.Expect(result.Status).To(Equal(types.StatusHealthy))
-				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(2)) // One create and one delete action for the NodePool
+				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(3)) // One create, one delete and one list action for the NodePool
 			},
 		},
 		{
@@ -207,7 +209,7 @@ func TestPodStartupChecker_Run(t *testing.T) {
 			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err.Error()).To(ContainSubstring("unexpected error occurred while creating node pool"))
-				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(1)) // One create action for the NodePool
+				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(2)) // One create and one list action for the NodePool
 			},
 		},
 	}
@@ -218,14 +220,16 @@ func TestPodStartupChecker_Run(t *testing.T) {
 
 			// Initialize default healthy scenario
 			scenario := &testScenario{
-				podName:           "pod1",
-				namespace:         syntheticPodNamespace,
-				labels:            map[string]string{syntheticPodLabelKey: checkerName},
-				podIP:             "10.0.0.0",
-				startupDelay:      3 * time.Second,
-				hasDeleteError:    false,
-				dialer:            successfulDialer(),
-				fakeDynamicClient: dynamicfake.NewSimpleDynamicClient(runtime.NewScheme()),
+				podName:        "pod1",
+				namespace:      syntheticPodNamespace,
+				labels:         map[string]string{syntheticPodLabelKey: checkerName},
+				podIP:          "10.0.0.0",
+				startupDelay:   3 * time.Second,
+				hasDeleteError: false,
+				dialer:         successfulDialer(),
+				fakeDynamicClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
+					NodePoolGVR: "NodePoolList",
+				}),
 			}
 
 			// Apply mutators to modify the scenario
@@ -300,9 +304,11 @@ func TestPodStartupChecker_garbageCollect(t *testing.T) {
 	syntheticPodLabelKey := "cluster-health-monitor/checker-name"
 
 	tests := []struct {
-		name        string
-		client      *k8sfake.Clientset
-		validateRes func(g *WithT, pods *corev1.PodList, err error)
+		name                       string
+		enableNodeProvisioningTest bool
+		client                     *k8sfake.Clientset
+		dynamicClient              *dynamicfake.FakeDynamicClient
+		validateRes                func(g *WithT, pods *corev1.PodList, err error)
 	}{
 		{
 			name: "only removes pods older than timeout",
@@ -388,6 +394,45 @@ func TestPodStartupChecker_garbageCollect(t *testing.T) {
 				g.Expect(pods.Items).To(HaveLen(1)) // one pod should be deleted
 			},
 		},
+		{
+			name:                       "clean up node pools success",
+			enableNodeProvisioningTest: true,
+			client: k8sfake.NewClientset(
+				podWithLabels("chk-synthetic-old", syntheticPodNamespace, map[string]string{syntheticPodLabelKey: checkerName}, time.Now().Add(-2*time.Hour)),
+				podWithLabels("chk-synthetic-new", syntheticPodNamespace, map[string]string{syntheticPodLabelKey: checkerName}, time.Now()),
+			),
+			dynamicClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
+				NodePoolGVR: "NodePoolList",
+			}),
+			validateRes: func(g *WithT, pods *corev1.PodList, err error) {
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(pods.Items).To(HaveLen(1))
+				g.Expect(pods.Items[0].Name).To(Equal("chk-synthetic-new"))
+			},
+		},
+		{
+			name:                       "clean up node pools failure",
+			enableNodeProvisioningTest: true,
+			client: k8sfake.NewClientset(
+				podWithLabels("chk-synthetic-old", syntheticPodNamespace, map[string]string{syntheticPodLabelKey: checkerName}, time.Now().Add(-2*time.Hour)),
+				podWithLabels("chk-synthetic-new", syntheticPodNamespace, map[string]string{syntheticPodLabelKey: checkerName}, time.Now()),
+			),
+			dynamicClient: func() *dynamicfake.FakeDynamicClient {
+				client := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
+					NodePoolGVR: "NodePoolList",
+				})
+				client.PrependReactor("list", "nodepool", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, nil, errors.New("error listing node pools")
+				})
+				return client
+			}(),
+			validateRes: func(g *WithT, pods *corev1.PodList, err error) {
+				g.Expect(pods.Items).To(HaveLen(1))
+				g.Expect(pods.Items[0].Name).To(Equal("chk-synthetic-new"))
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("error listing node pools"))
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -402,9 +447,11 @@ func TestPodStartupChecker_garbageCollect(t *testing.T) {
 					SyntheticPodLabelKey:       syntheticPodLabelKey,
 					SyntheticPodStartupTimeout: 3 * time.Second,
 					MaxSyntheticPods:           5,
+					EnableNodeProvisioningTest: tt.enableNodeProvisioningTest,
 				},
-				timeout:      checkerTimeout,
-				k8sClientset: tt.client,
+				timeout:       checkerTimeout,
+				k8sClientset:  tt.client,
+				dynamicClient: tt.dynamicClient,
 			}
 
 			// Run garbage collect

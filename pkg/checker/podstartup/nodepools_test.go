@@ -11,6 +11,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	k8stesting "k8s.io/client-go/testing"
 )
@@ -53,9 +54,10 @@ func TestCreateKarpenterNodePool(t *testing.T) {
 				dynamicClient: fakeDynamicClient,
 				config: &config.PodStartupConfig{
 					SyntheticPodNamespace: "test",
+					SyntheticPodLabelKey:  "test-key",
 				},
 			}
-			err := checker.createKarpenterNodePool(ctx, karpenterNodePool(nodePoolName, timestampStr))
+			err := checker.createKarpenterNodePool(ctx, checker.karpenterNodePool(nodePoolName, timestampStr))
 			if tt.expectedErrorString != "" {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err.Error()).To(ContainSubstring(tt.expectedErrorString))
@@ -125,6 +127,138 @@ func TestDeleteKarpenterNodePool(t *testing.T) {
 			} else {
 				g.Expect(err).To(BeNil())
 			}
+		})
+	}
+}
+
+func TestDeleteAllKarpenterNodePools(t *testing.T) {
+	g := NewWithT(t)
+
+	tests := []struct {
+		name            string
+		mutateClient    func(client *dynamicfake.FakeDynamicClient)
+		validateResults func(g *WithT, client *dynamicfake.FakeDynamicClient, err error)
+	}{
+		{
+			name: "no node pools to delete",
+			validateResults: func(g *WithT, client *dynamicfake.FakeDynamicClient, err error) {
+				g.Expect(err).To(BeNil())
+				g.Expect(client.Actions()).To(HaveLen(1))
+			},
+		},
+		{
+			name: "deletion success",
+			mutateClient: func(client *dynamicfake.FakeDynamicClient) {
+				client.PrependReactor("list", "nodepool", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, &unstructured.UnstructuredList{
+						Items: []unstructured.Unstructured{
+							{
+								Object: map[string]interface{}{
+									"apiVersion": "karpenter.sh/v1",
+									"kind":       "NodePool",
+									"metadata": map[string]interface{}{
+										"name": "test-checker-nodepool-1",
+										"labels": map[string]interface{}{
+											"test-key": "123456",
+										},
+									},
+								},
+							},
+						},
+					}, nil
+				})
+				client.PrependReactor("delete", "nodepool", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, &unstructured.Unstructured{}, nil
+				})
+			},
+			validateResults: func(g *WithT, client *dynamicfake.FakeDynamicClient, err error) {
+				g.Expect(err).To(BeNil())
+				g.Expect(client.Actions()).To(HaveLen(2))
+			},
+		},
+		{
+			name: "error of Karpenter NodePool with no name field in metadata",
+			mutateClient: func(client *dynamicfake.FakeDynamicClient) {
+				client.PrependReactor("list", "nodepool", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, &unstructured.UnstructuredList{
+						Items: []unstructured.Unstructured{
+							{
+								Object: map[string]interface{}{
+									"apiVersion": "karpenter.sh/v1",
+									"kind":       "NodePool",
+									"metadata": map[string]interface{}{
+										"labels": map[string]interface{}{
+											"test-key": "123456",
+										},
+									},
+								},
+							},
+						},
+					}, nil
+				})
+				client.PrependReactor("delete", "nodepool", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, &unstructured.Unstructured{}, nil
+				})
+			},
+			validateResults: func(g *WithT, client *dynamicfake.FakeDynamicClient, err error) {
+				g.Expect(client.Actions()).To(HaveLen(1))
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("got Karpenter NodePool with no name field in metadata"))
+			},
+		},
+		{
+			name: "deletion failure",
+			mutateClient: func(client *dynamicfake.FakeDynamicClient) {
+				client.PrependReactor("list", "nodepool", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, &unstructured.UnstructuredList{
+						Items: []unstructured.Unstructured{
+							{
+								Object: map[string]interface{}{
+									"apiVersion": "karpenter.sh/v1",
+									"kind":       "NodePool",
+									"metadata": map[string]interface{}{
+										"name": "test-checker-nodepool-1",
+										"labels": map[string]interface{}{
+											"test-key": "123456",
+										},
+									},
+								},
+							},
+						},
+					}, nil
+				})
+				client.PrependReactor("delete", "nodepool", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, &unstructured.Unstructured{}, errors.New("unexpected error occurred while deleting node pool")
+				})
+			},
+			validateResults: func(g *WithT, client *dynamicfake.FakeDynamicClient, err error) {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("unexpected error occurred while deleting node pool"))
+				g.Expect(client.Actions()).To(HaveLen(2))
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			fakeDynamicClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
+				NodePoolGVR: "NodePoolList",
+			})
+			if tt.mutateClient != nil {
+				tt.mutateClient(fakeDynamicClient)
+			}
+
+			checker := &PodStartupChecker{
+				name:          "test-checker",
+				dynamicClient: fakeDynamicClient,
+				config: &config.PodStartupConfig{
+					SyntheticPodNamespace: "test",
+					SyntheticPodLabelKey:  "test-key",
+				},
+			}
+			err := checker.deleteAllKarpenterNodePools(ctx)
+			tt.validateResults(g, fakeDynamicClient, err)
 		})
 	}
 }
