@@ -188,6 +188,7 @@ func TestPodStartupChecker_Run(t *testing.T) {
 					s.enableNodeProvisioning = true
 				},
 			},
+
 			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
@@ -200,18 +201,7 @@ func TestPodStartupChecker_Run(t *testing.T) {
 			mutators: []scenarioMutator{
 				func(s *testScenario) {
 					s.enableNodeProvisioning = true
-					s.fakeDynamicClient.PrependReactor("get", "customresourcedefinitions", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
-						return true, &unstructured.Unstructured{
-							Object: map[string]interface{}{
-								"apiVersion": "apiextensions.k8s.io/v1",
-								"kind":       "CustomResourceDefinition",
-								"metadata": map[string]interface{}{
-									"name": "nodepools.karpenter.sh",
-								},
-							},
-						}, nil
-					})
-					s.fakeDynamicClient.PrependReactor("create", "nodepools", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+					s.fakeDynamicClient.PrependReactor("create", "nodepool", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, &unstructured.Unstructured{}, errors.New("unexpected error occurred while creating node pool")
 					})
 				},
@@ -219,7 +209,7 @@ func TestPodStartupChecker_Run(t *testing.T) {
 			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err.Error()).To(ContainSubstring("unexpected error occurred while creating node pool"))
-				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(2)) // One get action for CRD and one create action for the NodePool
+				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(2)) // One create and one list action for the NodePool
 			},
 		},
 	}
