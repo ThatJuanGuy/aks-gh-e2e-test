@@ -58,6 +58,7 @@ func (c *PodStartupChecker) deleteAllKarpenterNodePools(ctx context.Context) err
 		}
 
 		if !nameFound {
+			errs = append(errs, fmt.Errorf("got Karpenter NodePool with no name field in metadata"))
 			continue
 		}
 
