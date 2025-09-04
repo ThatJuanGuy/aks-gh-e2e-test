@@ -39,7 +39,7 @@ func (c *PodStartupChecker) createKarpenterNodePool(ctx context.Context, nodePoo
 	}
 
 	// Create the NodePool resource.
-	if _, err := c.dynamicClient.Resource(NodePoolGVR).Namespace(c.config.SyntheticPodNamespace).Create(ctx, unstructuredNodePool, metav1.CreateOptions{}); err != nil {
+	if _, err := c.dynamicClient.Resource(NodePoolGVR).Create(ctx, unstructuredNodePool, metav1.CreateOptions{}); err != nil {
 		return err
 	}
 
@@ -48,7 +48,7 @@ func (c *PodStartupChecker) createKarpenterNodePool(ctx context.Context, nodePoo
 
 func (c *PodStartupChecker) deleteKarpenterNodePool(ctx context.Context, nodePoolName string) error {
 	// Delete the NodePool resource.
-	err := c.dynamicClient.Resource(NodePoolGVR).Namespace(c.config.SyntheticPodNamespace).Delete(ctx, nodePoolName, metav1.DeleteOptions{})
+	err := c.dynamicClient.Resource(NodePoolGVR).Delete(ctx, nodePoolName, metav1.DeleteOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
