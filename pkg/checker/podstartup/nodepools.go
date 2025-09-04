@@ -60,7 +60,7 @@ func (c *PodStartupChecker) deleteAllKarpenterNodePools(ctx context.Context) err
 	var errs []error
 
 	// List all NodePools in the synthetic pod namespace.
-	nodePools, err := c.dynamicClient.Resource(NodePoolGVR).Namespace(c.config.SyntheticPodNamespace).List(ctx, metav1.ListOptions{
+	nodePools, err := c.dynamicClient.Resource(NodePoolGVR).List(ctx, metav1.ListOptions{
 		LabelSelector: c.config.SyntheticPodLabelKey,
 	})
 	if err != nil {
