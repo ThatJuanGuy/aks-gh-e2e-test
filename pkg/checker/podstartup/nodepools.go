@@ -59,7 +59,7 @@ func (c *PodStartupChecker) deleteKarpenterNodePool(ctx context.Context, nodePoo
 func (c *PodStartupChecker) deleteAllKarpenterNodePools(ctx context.Context) error {
 	var errs []error
 
-	// List all NodePools in the synthetic pod namespace.
+	// List all NodePools.
 	nodePools, err := c.dynamicClient.Resource(NodePoolGVR).List(ctx, metav1.ListOptions{
 		LabelSelector: c.config.SyntheticPodLabelKey,
 	})
