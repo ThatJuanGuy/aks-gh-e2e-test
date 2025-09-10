@@ -99,7 +99,7 @@ type PodStartupConfig struct {
 	EnableNodeProvisioningTest bool `yaml:"enableNodeProvisioningTest,omitempty"`
 
 	// Optional.
-	// The PodStartupChecker will attach specified CSI drives to the synthetic pods.
+	// The PodStartupChecker will attach specified CSI storages to the synthetic pods.
 	EnabledCSITests []CSIType `yaml:"enabledCSITests,omitempty"`
 }
 
