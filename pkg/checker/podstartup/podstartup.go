@@ -143,6 +143,8 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 		}
 	}
 
+	// TODO: create PVCs if CSI tests are enabled.
+
 	// Create a synthetic pod to measure the startup time.
 	synthPod, err := c.k8sClientset.CoreV1().Pods(c.config.SyntheticPodNamespace).Create(ctx, c.generateSyntheticPod(timeStampStr), metav1.CreateOptions{})
 	if err != nil {

@@ -19,6 +19,7 @@ func TestGenerateSyntheticPod(t *testing.T) {
 		name                       string
 		checkerName                string
 		enableNodeProvisioningTest bool
+		csiTests                   []config.CSIType
 	}{
 		{
 			name:        "generates valid synthetic pod",
@@ -33,6 +34,16 @@ func TestGenerateSyntheticPod(t *testing.T) {
 			checkerName:                "test",
 			enableNodeProvisioningTest: true,
 		},
+		{
+			name:        "successfully enables all CSI tests",
+			checkerName: "test",
+			csiTests:    []config.CSIType{config.CSITypeAzureFile, config.CSITypeAzureDisk, config.CSITypeAzureBlob},
+		},
+		{
+			name:        "successfully enables one CSI tests",
+			checkerName: "test",
+			csiTests:    []config.CSIType{config.CSITypeAzureFile},
+		},
 	}
 
 	for _, tt := range tests {
@@ -43,6 +54,7 @@ func TestGenerateSyntheticPod(t *testing.T) {
 				config: &config.PodStartupConfig{
 					SyntheticPodLabelKey:       _testSyntheticLabelKey,
 					EnableNodeProvisioningTest: tt.enableNodeProvisioningTest,
+					EnabledCSITests:            tt.csiTests,
 				},
 			}
 
@@ -59,6 +71,54 @@ func TestGenerateSyntheticPod(t *testing.T) {
 				g.Expect(pod.Spec.NodeSelector).To(HaveKeyWithValue(_testSyntheticLabelKey, timestampStr))
 			} else {
 				g.Expect(pod.Spec.NodeSelector).ToNot(HaveKey(_testSyntheticLabelKey))
+			}
+
+			g.Expect(len(pod.Spec.Volumes)).To(Equal(len(tt.csiTests)))
+			g.Expect(len(pod.Spec.Containers)).To(Equal(1))
+			g.Expect(len(pod.Spec.Containers[0].VolumeMounts)).To(Equal(len(tt.csiTests)))
+
+			for _, csiTest := range tt.csiTests {
+				switch csiTest {
+				case config.CSITypeAzureFile:
+					g.Expect(pod.Spec.Volumes).To(ContainElement(corev1.Volume{
+						Name: "azurefile-volume",
+						VolumeSource: corev1.VolumeSource{
+							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+								ClaimName: "azurefile-pvc",
+							},
+						},
+					}))
+					g.Expect(pod.Spec.Containers[0].VolumeMounts).To(ContainElement(corev1.VolumeMount{
+						Name:      "azurefile-volume",
+						MountPath: "/mnt/azurefile",
+					}))
+				case config.CSITypeAzureDisk:
+					g.Expect(pod.Spec.Volumes).To(ContainElement(corev1.Volume{
+						Name: "azuredisk-volume",
+						VolumeSource: corev1.VolumeSource{
+							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+								ClaimName: "azuredisk-pvc",
+							},
+						},
+					}))
+					g.Expect(pod.Spec.Containers[0].VolumeMounts).To(ContainElement(corev1.VolumeMount{
+						Name:      "azuredisk-volume",
+						MountPath: "/mnt/azuredisk",
+					}))
+				case config.CSITypeAzureBlob:
+					g.Expect(pod.Spec.Volumes).To(ContainElement(corev1.Volume{
+						Name: "azureblob-volume",
+						VolumeSource: corev1.VolumeSource{
+							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+								ClaimName: "azureblob-pvc",
+							},
+						},
+					}))
+					g.Expect(pod.Spec.Containers[0].VolumeMounts).To(ContainElement(corev1.VolumeMount{
+						Name:      "azureblob-volume",
+						MountPath: "/mnt/azureblob",
+					}))
+				}
 			}
 		})
 	}

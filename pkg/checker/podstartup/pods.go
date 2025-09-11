@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Azure/cluster-health-monitor/pkg/config"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -26,6 +27,53 @@ func (c *PodStartupChecker) syntheticPodNamePrefix() string {
 func (c *PodStartupChecker) generateSyntheticPod(timestampStr string) *corev1.Pod {
 	podName := fmt.Sprintf("%s%s", c.syntheticPodNamePrefix(), timestampStr)
 
+	volumes := []corev1.Volume{}
+	volumeMounts := []corev1.VolumeMount{}
+
+	for _, csiTest := range c.config.EnabledCSITests {
+		switch csiTest {
+		case config.CSITypeAzureFile:
+			volumes = append(volumes, corev1.Volume{
+				Name: "azurefile-volume",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: "azurefile-pvc",
+					},
+				},
+			})
+			volumeMounts = append(volumeMounts, corev1.VolumeMount{
+				Name:      "azurefile-volume",
+				MountPath: "/mnt/azurefile",
+			})
+		case config.CSITypeAzureDisk:
+			volumes = append(volumes, corev1.Volume{
+				Name: "azuredisk-volume",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: "azuredisk-pvc",
+					},
+				},
+			})
+			volumeMounts = append(volumeMounts, corev1.VolumeMount{
+				Name:      "azuredisk-volume",
+				MountPath: "/mnt/azuredisk",
+			})
+		case config.CSITypeAzureBlob:
+			volumes = append(volumes, corev1.Volume{
+				Name: "azureblob-volume",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: "azureblob-pvc",
+					},
+				},
+			})
+			volumeMounts = append(volumeMounts, corev1.VolumeMount{
+				Name:      "azureblob-volume",
+				MountPath: "/mnt/azureblob",
+			})
+		}
+	}
+
 	podSpec := corev1.PodSpec{
 		Containers: []corev1.Container{
 			{
@@ -37,6 +85,7 @@ func (c *PodStartupChecker) generateSyntheticPod(timestampStr string) *corev1.Po
 						Protocol:      corev1.ProtocolTCP,
 					},
 				},
+				VolumeMounts: volumeMounts,
 			},
 		},
 		Tolerations: []corev1.Toleration{
@@ -80,6 +129,7 @@ func (c *PodStartupChecker) generateSyntheticPod(timestampStr string) *corev1.Po
 				},
 			},
 		},
+		Volumes: volumes,
 		// TODOcarlosalv: Add pod cpu/memory requests and/or limits.
 	}
 

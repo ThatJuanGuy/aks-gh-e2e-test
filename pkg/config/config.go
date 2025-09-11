@@ -97,7 +97,19 @@ type PodStartupConfig struct {
 	// Optional.
 	// This field is meant to be enabled only on AKS Automatic clusters. If set to true, the PodStartupChecker will trigger node provisioning and deploy synthetic pods to the new node.
 	EnableNodeProvisioningTest bool `yaml:"enableNodeProvisioningTest,omitempty"`
+
+	// Optional.
+	// The PodStartupChecker will attach specified CSI storages to the synthetic pods.
+	EnabledCSITests []CSIType `yaml:"enabledCSITests,omitempty"`
 }
+
+type CSIType string
+
+const (
+	CSITypeAzureFile CSIType = "azureFile"
+	CSITypeAzureDisk CSIType = "azureDisk"
+	CSITypeAzureBlob CSIType = "azureBlob"
+)
 
 type APIServerConfig struct {
 	// Required.
