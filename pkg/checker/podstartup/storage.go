@@ -15,7 +15,7 @@ func (c *PodStartupChecker) azureDiskPVC() *corev1.PersistentVolumeClaim {
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "podstartup-azuredisk-pvc",
+			Name:      "azuredisk-pvc",
 			Namespace: c.config.SyntheticPodNamespace,
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
@@ -39,7 +39,7 @@ func (c *PodStartupChecker) azureFileStorageClass() *storagev1.StorageClass {
 			APIVersion: "storage.k8s.io/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "podstartup-azurefile-sc",
+			Name: "azurefile-sc",
 		},
 		Provisioner:          "file.csi.azure.com",
 		AllowVolumeExpansion: &allowVolumeExpansion,
@@ -66,7 +66,7 @@ func (c *PodStartupChecker) azureFilePVC() *corev1.PersistentVolumeClaim {
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "podstartup-azurefile-pvc",
+			Name:      "azurefile-pvc",
 			Namespace: c.config.SyntheticPodNamespace,
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
@@ -91,7 +91,7 @@ func (c *PodStartupChecker) azureBlobPVC() *corev1.PersistentVolumeClaim {
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "podstartup-azureblob-pvc",
+			Name:      "azureblob-pvc",
 			Namespace: c.config.SyntheticPodNamespace,
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
