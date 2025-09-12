@@ -92,6 +92,11 @@ func BuildPodStartupChecker(config *config.CheckerConfig, kubeClient kubernetes.
 	}
 
 	chk.dynamicClient = dynamicClient
+
+	if err := chk.createCSITestResources(context.Background()); err != nil {
+		return nil, fmt.Errorf("failed to create CSI test resources: %w", err)
+	}
+
 	return chk, nil
 }
 
@@ -142,8 +147,6 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 			return nil, fmt.Errorf("failed to create Karpenter NodePool: %w", err)
 		}
 	}
-
-	// TODO: create PVCs if CSI tests are enabled.
 
 	// Create a synthetic pod to measure the startup time.
 	synthPod, err := c.k8sClientset.CoreV1().Pods(c.config.SyntheticPodNamespace).Create(ctx, c.generateSyntheticPod(timeStampStr), metav1.CreateOptions{})
@@ -301,5 +304,34 @@ func (c *PodStartupChecker) createTCPConnection(ctx context.Context, podIP strin
 		}
 	}()
 
+	return nil
+}
+
+func (c *PodStartupChecker) createCSITestResources(ctx context.Context) error {
+	for _, csiType := range c.config.EnabledCSITests {
+		switch csiType {
+		case config.CSITypeAzureDisk:
+			_, err := c.k8sClientset.CoreV1().PersistentVolumeClaims(c.config.SyntheticPodNamespace).Create(ctx, c.azureDiskPVC(), metav1.CreateOptions{})
+			if err != nil {
+				return fmt.Errorf("failed to create Azure Disk PVC: %w", err)
+			}
+		case config.CSITypeAzureFile:
+			_, err := c.k8sClientset.StorageV1().StorageClasses().Create(ctx, c.azureFileStorageClass(), metav1.CreateOptions{})
+			if err != nil {
+				return fmt.Errorf("failed to create azurefile-csi storage class: %w", err)
+			}
+			_, err = c.k8sClientset.CoreV1().PersistentVolumeClaims(c.config.SyntheticPodNamespace).Create(ctx, c.azureFilePVC(), metav1.CreateOptions{})
+			if err != nil {
+				return fmt.Errorf("failed to create Azure File PVC: %w", err)
+			}
+		case config.CSITypeAzureBlob:
+			_, err := c.k8sClientset.CoreV1().PersistentVolumeClaims(c.config.SyntheticPodNamespace).Create(ctx, c.azureBlobPVC(), metav1.CreateOptions{})
+			if err != nil {
+				return fmt.Errorf("failed to create Azure Blob PVC: %w", err)
+			}
+		default:
+			return fmt.Errorf("unsupported CSI type: %s", csiType)
+		}
+	}
 	return nil
 }
