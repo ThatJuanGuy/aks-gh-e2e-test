@@ -93,7 +93,9 @@ func BuildPodStartupChecker(config *config.CheckerConfig, kubeClient kubernetes.
 
 	chk.dynamicClient = dynamicClient
 
-	if err := chk.createCSITestResources(context.Background()); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	if err := chk.createCSITestResources(ctx); err != nil {
 		return nil, fmt.Errorf("failed to create CSI test resources: %w", err)
 	}
 
