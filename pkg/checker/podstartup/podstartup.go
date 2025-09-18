@@ -90,7 +90,6 @@ func BuildPodStartupChecker(config *config.CheckerConfig, kubeClient kubernetes.
 	if err != nil {
 		return nil, fmt.Errorf("failed to create dynamic client: %w", err)
 	}
-
 	chk.dynamicClient = dynamicClient
 
 	return chk, nil
