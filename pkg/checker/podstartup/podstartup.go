@@ -93,13 +93,6 @@ func BuildPodStartupChecker(config *config.CheckerConfig, kubeClient kubernetes.
 
 	chk.dynamicClient = dynamicClient
 
-	// Give it 90 seconds to create all CSI test resources
-	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
-	defer cancel()
-	if err := chk.createCSITestResources(ctx); err != nil {
-		return nil, fmt.Errorf("failed to create CSI test resources: %w", err)
-	}
-
 	return chk, nil
 }
 
@@ -120,6 +113,10 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 	if err := c.garbageCollect(ctx); err != nil {
 		// Logging instead of returning an error here to avoid failing the checker run.
 		klog.ErrorS(err, "Failed to garbage collect old synthetic pods")
+	}
+
+	if err := c.createCSITestResources(ctx); err != nil {
+		return nil, fmt.Errorf("failed to create CSI test resources: %w", err)
 	}
 
 	// List pods to check the current number of synthetic pods. Do not run the checker if the maximum number of synthetic pods has been reached.
@@ -231,6 +228,10 @@ func (c *PodStartupChecker) garbageCollect(ctx context.Context) error {
 			errs = append(errs, fmt.Errorf("failed to delete old Karpenter Node Pools: %w", err))
 		}
 	}
+
+	if err := c.deleteCSITestResources(ctx); err != nil {
+		errs = append(errs, fmt.Errorf("failed to delete CSI test resources: %w", err))
+	}
 	return errors.Join(errs...)
 }
 
@@ -307,34 +308,5 @@ func (c *PodStartupChecker) createTCPConnection(ctx context.Context, podIP strin
 		}
 	}()
 
-	return nil
-}
-
-func (c *PodStartupChecker) createCSITestResources(ctx context.Context) error {
-	for _, csiType := range c.config.EnabledCSITests {
-		switch csiType {
-		case config.CSITypeAzureDisk:
-			_, err := c.k8sClientset.CoreV1().PersistentVolumeClaims(c.config.SyntheticPodNamespace).Create(ctx, c.azureDiskPVC(), metav1.CreateOptions{})
-			if err != nil {
-				return fmt.Errorf("failed to create Azure Disk PVC: %w", err)
-			}
-		case config.CSITypeAzureFile:
-			_, err := c.k8sClientset.StorageV1().StorageClasses().Create(ctx, c.azureFileStorageClass(), metav1.CreateOptions{})
-			if err != nil {
-				return fmt.Errorf("failed to create azurefile-csi storage class: %w", err)
-			}
-			_, err = c.k8sClientset.CoreV1().PersistentVolumeClaims(c.config.SyntheticPodNamespace).Create(ctx, c.azureFilePVC(), metav1.CreateOptions{})
-			if err != nil {
-				return fmt.Errorf("failed to create Azure File PVC: %w", err)
-			}
-		case config.CSITypeAzureBlob:
-			_, err := c.k8sClientset.CoreV1().PersistentVolumeClaims(c.config.SyntheticPodNamespace).Create(ctx, c.azureBlobPVC(), metav1.CreateOptions{})
-			if err != nil {
-				return fmt.Errorf("failed to create Azure Blob PVC: %w", err)
-			}
-		default:
-			return fmt.Errorf("unsupported CSI type: %s", csiType)
-		}
-	}
 	return nil
 }
