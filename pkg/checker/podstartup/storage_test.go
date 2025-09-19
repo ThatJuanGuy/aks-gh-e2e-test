@@ -18,7 +18,7 @@ func TestStorageResources(t *testing.T) {
 	g := NewWithT(t)
 	checker := &PodStartupChecker{
 		config: &config.PodStartupConfig{
-			EnabledCSITests:       []config.CSIType{config.CSITypeAzureDisk, config.CSITypeAzureFile, config.CSITypeAzureBlob},
+			EnabledCSIs:           []config.CSIType{config.CSITypeAzureDisk, config.CSITypeAzureFile, config.CSITypeAzureBlob},
 			SyntheticPodNamespace: "default",
 		},
 	}
@@ -41,33 +41,33 @@ func TestStorageResources(t *testing.T) {
 	g.Expect(pods.Spec.Volumes[2].PersistentVolumeClaim.ClaimName).To(Equal(checker.azureBlobPVC("timestampstr").Name))
 }
 
-func TestCreateCSITestResources(t *testing.T) {
+func TestCreateCSIResources(t *testing.T) {
 	testCases := []struct {
-		name            string
-		enabledCSITests []config.CSIType
-		k8sClient       *k8sfake.Clientset
-		validateFunc    func(g *WithT, err error, k8sClient *k8sfake.Clientset)
+		name         string
+		enabledCSIs  []config.CSIType
+		k8sClient    *k8sfake.Clientset
+		validateFunc func(g *WithT, err error, k8sClient *k8sfake.Clientset)
 	}{
 		{
-			name:            "CSI tests disabled",
-			enabledCSITests: []config.CSIType{},
-			k8sClient:       k8sfake.NewClientset(),
+			name:        "CSI tests disabled",
+			enabledCSIs: []config.CSIType{},
+			k8sClient:   k8sfake.NewClientset(),
 			validateFunc: func(g *WithT, err error, k8sClient *k8sfake.Clientset) {
 				g.Expect(err).ToNot(HaveOccurred())
 			},
 		},
 		{
-			name:            "CSI tests enabled - successful creation",
-			enabledCSITests: []config.CSIType{config.CSITypeAzureDisk, config.CSITypeAzureBlob, config.CSITypeAzureFile},
-			k8sClient:       k8sfake.NewClientset(),
+			name:        "CSI tests enabled - successful creation",
+			enabledCSIs: []config.CSIType{config.CSITypeAzureDisk, config.CSITypeAzureBlob, config.CSITypeAzureFile},
+			k8sClient:   k8sfake.NewClientset(),
 			validateFunc: func(g *WithT, err error, k8sClient *k8sfake.Clientset) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(k8sClient.Actions()).To(HaveLen(4)) // Expect 4 create actions for 3 PVCs and 1 StorageClass
 			},
 		},
 		{
-			name:            "CSI tests enabled - error on creating StorageClass",
-			enabledCSITests: []config.CSIType{config.CSITypeAzureDisk, config.CSITypeAzureBlob, config.CSITypeAzureFile},
+			name:        "CSI tests enabled - error on creating StorageClass",
+			enabledCSIs: []config.CSIType{config.CSITypeAzureDisk, config.CSITypeAzureBlob, config.CSITypeAzureFile},
 			k8sClient: func() *k8sfake.Clientset {
 				client := k8sfake.NewClientset()
 				client.PrependReactor("create", "storageclasses", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
@@ -82,8 +82,8 @@ func TestCreateCSITestResources(t *testing.T) {
 			},
 		},
 		{
-			name:            "CSI tests enabled - error on creating azure disk PVC",
-			enabledCSITests: []config.CSIType{config.CSITypeAzureDisk},
+			name:        "CSI tests enabled - error on creating azure disk PVC",
+			enabledCSIs: []config.CSIType{config.CSITypeAzureDisk},
 			k8sClient: func() *k8sfake.Clientset {
 				client := k8sfake.NewClientset()
 				client.PrependReactor("create", "persistentvolumeclaims", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
@@ -98,8 +98,8 @@ func TestCreateCSITestResources(t *testing.T) {
 			},
 		},
 		{
-			name:            "CSI tests enabled - error on creating azure blob PVC",
-			enabledCSITests: []config.CSIType{config.CSITypeAzureBlob},
+			name:        "CSI tests enabled - error on creating azure blob PVC",
+			enabledCSIs: []config.CSIType{config.CSITypeAzureBlob},
 			k8sClient: func() *k8sfake.Clientset {
 				client := k8sfake.NewClientset()
 				client.PrependReactor("create", "persistentvolumeclaims", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
@@ -114,8 +114,8 @@ func TestCreateCSITestResources(t *testing.T) {
 			},
 		},
 		{
-			name:            "CSI tests enabled - error on creating azure file PVC",
-			enabledCSITests: []config.CSIType{config.CSITypeAzureFile},
+			name:        "CSI tests enabled - error on creating azure file PVC",
+			enabledCSIs: []config.CSIType{config.CSITypeAzureFile},
 			k8sClient: func() *k8sfake.Clientset {
 				client := k8sfake.NewClientset()
 				client.PrependReactor("create", "persistentvolumeclaims", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
@@ -133,35 +133,35 @@ func TestCreateCSITestResources(t *testing.T) {
 	for _, tc := range testCases {
 		checker := &PodStartupChecker{
 			config: &config.PodStartupConfig{
-				EnabledCSITests: tc.enabledCSITests,
+				EnabledCSIs: tc.enabledCSIs,
 			},
 			k8sClientset: tc.k8sClient,
 		}
-		err := checker.createCSITestResources(context.Background(), "timestampstr")
+		err := checker.createCSIResources(context.Background(), "timestampstr")
 		g := NewWithT(t)
 		tc.validateFunc(g, err, tc.k8sClient)
 	}
 }
 
-func TestDeleteCSITestResources(t *testing.T) {
+func TestDeleteCSIResources(t *testing.T) {
 	testCases := []struct {
-		name            string
-		k8sClient       *k8sfake.Clientset
-		enabledCSITests []config.CSIType
-		validateFunc    func(g *WithT, err error, k8sClient *k8sfake.Clientset)
+		name         string
+		k8sClient    *k8sfake.Clientset
+		enabledCSIs  []config.CSIType
+		validateFunc func(g *WithT, err error, k8sClient *k8sfake.Clientset)
 	}{
 		{
-			name:            "all resources successfully deleted",
-			k8sClient:       k8sfake.NewClientset(),
-			enabledCSITests: []config.CSIType{config.CSITypeAzureDisk, config.CSITypeAzureFile, config.CSITypeAzureBlob},
+			name:        "all resources successfully deleted",
+			k8sClient:   k8sfake.NewClientset(),
+			enabledCSIs: []config.CSIType{config.CSITypeAzureDisk, config.CSITypeAzureFile, config.CSITypeAzureBlob},
 			validateFunc: func(g *WithT, err error, k8sClient *k8sfake.Clientset) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(k8sClient.Actions()).To(HaveLen(4)) // Expect 4 delete actions for 3 PVCs and 1 StorageClass
 			},
 		},
 		{
-			name:            "resources successfully deleted with some resources not found",
-			enabledCSITests: []config.CSIType{config.CSITypeAzureFile},
+			name:        "resources successfully deleted with some resources not found",
+			enabledCSIs: []config.CSIType{config.CSITypeAzureFile},
 			k8sClient: func() *k8sfake.Clientset {
 				client := k8sfake.NewClientset()
 				client.PrependReactor("delete", "storageclasses", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
@@ -175,8 +175,8 @@ func TestDeleteCSITestResources(t *testing.T) {
 			},
 		},
 		{
-			name:            "deletion error",
-			enabledCSITests: []config.CSIType{config.CSITypeAzureFile},
+			name:        "deletion error",
+			enabledCSIs: []config.CSIType{config.CSITypeAzureFile},
 			k8sClient: func() *k8sfake.Clientset {
 				client := k8sfake.NewClientset()
 				client.PrependReactor("delete", "storageclasses", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
@@ -195,11 +195,11 @@ func TestDeleteCSITestResources(t *testing.T) {
 		checker := &PodStartupChecker{
 			config: &config.PodStartupConfig{
 				SyntheticPodNamespace: "test-namespace",
-				EnabledCSITests:       tc.enabledCSITests,
+				EnabledCSIs:           tc.enabledCSIs,
 			},
 			k8sClientset: tc.k8sClient,
 		}
-		err := checker.deleteCSITestResources(context.Background(), "timestampstr")
+		err := checker.deleteCSIResources(context.Background(), "timestampstr")
 		g := NewWithT(t)
 		tc.validateFunc(g, err, tc.k8sClient)
 	}

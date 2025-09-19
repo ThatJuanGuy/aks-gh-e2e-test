@@ -54,7 +54,7 @@ func TestGenerateSyntheticPod(t *testing.T) {
 				config: &config.PodStartupConfig{
 					SyntheticPodLabelKey:       _testSyntheticLabelKey,
 					EnableNodeProvisioningTest: tt.enableNodeProvisioningTest,
-					EnabledCSITests:            tt.csiTests,
+					EnabledCSIs:                tt.csiTests,
 				},
 			}
 

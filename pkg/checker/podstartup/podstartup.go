@@ -116,11 +116,11 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 
 	timeStampStr := fmt.Sprintf("%d", time.Now().UnixNano())
 
-	if err := c.createCSITestResources(ctx, timeStampStr); err != nil {
+	if err := c.createCSIResources(ctx, timeStampStr); err != nil {
 		return nil, fmt.Errorf("failed to create CSI test resources: %w", err)
 	}
 	defer func() {
-		if err := c.deleteCSITestResources(ctx, timeStampStr); err != nil {
+		if err := c.deleteCSIResources(ctx, timeStampStr); err != nil {
 			klog.ErrorS(err, "Failed to delete CSI test resources")
 		}
 	}()

@@ -30,8 +30,8 @@ func (c *PodStartupChecker) generateSyntheticPod(timestampStr string) *corev1.Po
 	volumes := []corev1.Volume{}
 	volumeMounts := []corev1.VolumeMount{}
 
-	for _, csiTest := range c.config.EnabledCSITests {
-		switch csiTest {
+	for _, csiType := range c.config.EnabledCSIs {
+		switch csiType {
 		case config.CSITypeAzureFile:
 			volumes = append(volumes, corev1.Volume{
 				Name: "azurefile-volume",

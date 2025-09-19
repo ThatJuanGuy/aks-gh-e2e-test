@@ -474,7 +474,7 @@ func TestPodStartupChecker_Run(t *testing.T) {
 					SyntheticPodStartupTimeout: 5 * time.Second,
 					MaxSyntheticPods:           maxSyntheticPods,
 					EnableNodeProvisioningTest: scenario.enableNodeProvisioning,
-					EnabledCSITests:            scenario.enabledCSITests,
+					EnabledCSIs:                scenario.enabledCSITests,
 				},
 				timeout:       5 * time.Second,
 				k8sClientset:  client,

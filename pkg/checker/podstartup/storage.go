@@ -133,8 +133,8 @@ func (c *PodStartupChecker) azureBlobPVC(timestampStr string) *corev1.Persistent
 	}
 }
 
-func (c *PodStartupChecker) createCSITestResources(ctx context.Context, timestampStr string) error {
-	for _, csiType := range c.config.EnabledCSITests {
+func (c *PodStartupChecker) createCSIResources(ctx context.Context, timestampStr string) error {
+	for _, csiType := range c.config.EnabledCSIs {
 		switch csiType {
 		case config.CSITypeAzureDisk:
 			_, err := c.k8sClientset.CoreV1().PersistentVolumeClaims(c.config.SyntheticPodNamespace).Create(ctx, c.azureDiskPVC(timestampStr), metav1.CreateOptions{})
@@ -162,8 +162,8 @@ func (c *PodStartupChecker) createCSITestResources(ctx context.Context, timestam
 	return nil
 }
 
-func (c *PodStartupChecker) deleteCSITestResources(ctx context.Context, timestampStr string) error {
-	for _, csiType := range c.config.EnabledCSITests {
+func (c *PodStartupChecker) deleteCSIResources(ctx context.Context, timestampStr string) error {
+	for _, csiType := range c.config.EnabledCSIs {
 		switch csiType {
 		case config.CSITypeAzureDisk:
 			err := c.k8sClientset.CoreV1().PersistentVolumeClaims(c.config.SyntheticPodNamespace).Delete(ctx, c.azureDiskPVC(timestampStr).Name, metav1.DeleteOptions{})
