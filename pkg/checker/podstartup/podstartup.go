@@ -234,7 +234,7 @@ func (c *PodStartupChecker) garbageCollect(ctx context.Context) error {
 		}
 	}
 
-	// TODO: Garbage collect for CSI test resources
+	// TODO: Garbage collection for CSI test resources
 
 	return errors.Join(errs...)
 }
