@@ -37,7 +37,7 @@ func (c *PodStartupChecker) generateSyntheticPod(timestampStr string) *corev1.Po
 				Name: "azurefile-volume",
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: azureFilePVCName,
+						ClaimName: c.azureFilePVC(timestampStr).Name,
 					},
 				},
 			})
@@ -50,7 +50,7 @@ func (c *PodStartupChecker) generateSyntheticPod(timestampStr string) *corev1.Po
 				Name: "azuredisk-volume",
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: azureDiskPVCName,
+						ClaimName: c.azureDiskPVC(timestampStr).Name,
 					},
 				},
 			})
@@ -63,7 +63,7 @@ func (c *PodStartupChecker) generateSyntheticPod(timestampStr string) *corev1.Po
 				Name: "azureblob-volume",
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: azureBlobPVCName,
+						ClaimName: c.azureBlobPVC(timestampStr).Name,
 					},
 				},
 			})

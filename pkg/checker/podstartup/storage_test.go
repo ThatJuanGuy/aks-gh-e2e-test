@@ -22,7 +22,7 @@ func TestStorageResources(t *testing.T) {
 			SyntheticPodNamespace: "default",
 		},
 	}
-	pods := checker.generateSyntheticPod("test")
+	pods := checker.generateSyntheticPod("timestampstr")
 
 	g.Expect(pods).ToNot(BeNil())
 	g.Expect(pods.Spec.Volumes).ToNot(BeNil())
@@ -30,15 +30,15 @@ func TestStorageResources(t *testing.T) {
 
 	g.Expect(pods.Spec.Volumes[0]).ToNot(BeNil())
 	g.Expect(pods.Spec.Volumes[0].PersistentVolumeClaim).ToNot(BeNil())
-	g.Expect(pods.Spec.Volumes[0].PersistentVolumeClaim.ClaimName).To(Equal(checker.azureDiskPVC().Name))
+	g.Expect(pods.Spec.Volumes[0].PersistentVolumeClaim.ClaimName).To(Equal(checker.azureDiskPVC("timestampstr").Name))
 
 	g.Expect(pods.Spec.Volumes[1]).ToNot(BeNil())
 	g.Expect(pods.Spec.Volumes[1].PersistentVolumeClaim).ToNot(BeNil())
-	g.Expect(pods.Spec.Volumes[1].PersistentVolumeClaim.ClaimName).To(Equal(checker.azureFilePVC().Name))
+	g.Expect(pods.Spec.Volumes[1].PersistentVolumeClaim.ClaimName).To(Equal(checker.azureFilePVC("timestampstr").Name))
 
 	g.Expect(pods.Spec.Volumes[2]).ToNot(BeNil())
 	g.Expect(pods.Spec.Volumes[2].PersistentVolumeClaim).ToNot(BeNil())
-	g.Expect(pods.Spec.Volumes[2].PersistentVolumeClaim.ClaimName).To(Equal(checker.azureBlobPVC().Name))
+	g.Expect(pods.Spec.Volumes[2].PersistentVolumeClaim.ClaimName).To(Equal(checker.azureBlobPVC("timestampstr").Name))
 }
 
 func TestCreateCSITestResources(t *testing.T) {
@@ -137,7 +137,7 @@ func TestCreateCSITestResources(t *testing.T) {
 			},
 			k8sClientset: tc.k8sClient,
 		}
-		err := checker.createCSITestResources(context.Background())
+		err := checker.createCSITestResources(context.Background(), "timestampstr")
 		g := NewWithT(t)
 		tc.validateFunc(g, err, tc.k8sClient)
 	}
@@ -145,34 +145,38 @@ func TestCreateCSITestResources(t *testing.T) {
 
 func TestDeleteCSITestResources(t *testing.T) {
 	testCases := []struct {
-		name         string
-		k8sClient    *k8sfake.Clientset
-		validateFunc func(g *WithT, err error, k8sClient *k8sfake.Clientset)
+		name            string
+		k8sClient       *k8sfake.Clientset
+		enabledCSITests []config.CSIType
+		validateFunc    func(g *WithT, err error, k8sClient *k8sfake.Clientset)
 	}{
 		{
-			name:      "all resources successfully deleted",
-			k8sClient: k8sfake.NewClientset(),
+			name:            "all resources successfully deleted",
+			k8sClient:       k8sfake.NewClientset(),
+			enabledCSITests: []config.CSIType{config.CSITypeAzureDisk, config.CSITypeAzureFile, config.CSITypeAzureBlob},
 			validateFunc: func(g *WithT, err error, k8sClient *k8sfake.Clientset) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(k8sClient.Actions()).To(HaveLen(4)) // Expect 4 delete actions for 3 PVCs and 1 StorageClass
 			},
 		},
 		{
-			name: "resources successfully deleted with some resources not found",
+			name:            "resources successfully deleted with some resources not found",
+			enabledCSITests: []config.CSIType{config.CSITypeAzureFile},
 			k8sClient: func() *k8sfake.Clientset {
 				client := k8sfake.NewClientset()
 				client.PrependReactor("delete", "storageclasses", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
-					return true, nil, apierrors.NewNotFound(schema.GroupResource{Group: "storage.k8s.io", Resource: "storageclasses"}, azureFileStorageClassName)
+					return true, nil, apierrors.NewNotFound(schema.GroupResource{Group: "storage.k8s.io", Resource: "storageclasses"}, "azurefile-csi")
 				})
 				return client
 			}(),
 			validateFunc: func(g *WithT, err error, k8sClient *k8sfake.Clientset) {
 				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(k8sClient.Actions()).To(HaveLen(4)) // Expect 4 delete actions for 3 PVCs and 1 StorageClass
+				g.Expect(k8sClient.Actions()).To(HaveLen(2)) // Expect 1 StorageClass deletion and 1 PVC deletion
 			},
 		},
 		{
-			name: "deletion error",
+			name:            "deletion error",
+			enabledCSITests: []config.CSIType{config.CSITypeAzureFile},
 			k8sClient: func() *k8sfake.Clientset {
 				client := k8sfake.NewClientset()
 				client.PrependReactor("delete", "storageclasses", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
@@ -183,7 +187,7 @@ func TestDeleteCSITestResources(t *testing.T) {
 			validateFunc: func(g *WithT, err error, k8sClient *k8sfake.Clientset) {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err.Error()).To(ContainSubstring("unexpected error occurred while deleting storage class"))
-				g.Expect(k8sClient.Actions()).To(HaveLen(2)) // Expect 2 delete actions for 1 PVC and 1 StorageClass
+				g.Expect(k8sClient.Actions()).To(HaveLen(1)) // Expect 1 delete action for 1 StorageClass
 			},
 		},
 	}
@@ -191,10 +195,11 @@ func TestDeleteCSITestResources(t *testing.T) {
 		checker := &PodStartupChecker{
 			config: &config.PodStartupConfig{
 				SyntheticPodNamespace: "test-namespace",
+				EnabledCSITests:       tc.enabledCSITests,
 			},
 			k8sClientset: tc.k8sClient,
 		}
-		err := checker.deleteCSITestResources(context.Background())
+		err := checker.deleteCSITestResources(context.Background(), "timestampstr")
 		g := NewWithT(t)
 		tc.validateFunc(g, err, tc.k8sClient)
 	}

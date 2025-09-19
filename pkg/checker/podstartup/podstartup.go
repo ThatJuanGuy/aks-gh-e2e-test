@@ -114,9 +114,16 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 		klog.ErrorS(err, "Failed to garbage collect old synthetic pods")
 	}
 
-	if err := c.createCSITestResources(ctx); err != nil {
+	timeStampStr := fmt.Sprintf("%d", time.Now().UnixNano())
+
+	if err := c.createCSITestResources(ctx, timeStampStr); err != nil {
 		return nil, fmt.Errorf("failed to create CSI test resources: %w", err)
 	}
+	defer func() {
+		if err := c.deleteCSITestResources(ctx, timeStampStr); err != nil {
+			klog.ErrorS(err, "Failed to delete CSI test resources")
+		}
+	}()
 
 	// List pods to check the current number of synthetic pods. Do not run the checker if the maximum number of synthetic pods has been reached.
 	pods, err := c.k8sClientset.CoreV1().Pods(c.config.SyntheticPodNamespace).List(ctx, metav1.ListOptions{
@@ -130,7 +137,6 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 			len(pods.Items), c.config.MaxSyntheticPods)
 	}
 
-	timeStampStr := fmt.Sprintf("%d", time.Now().UnixNano())
 	nodePoolName := fmt.Sprintf("%s-nodepool-%s", c.name, timeStampStr)
 
 	if c.config.EnableNodeProvisioningTest {
@@ -228,9 +234,8 @@ func (c *PodStartupChecker) garbageCollect(ctx context.Context) error {
 		}
 	}
 
-	if err := c.deleteCSITestResources(ctx); err != nil {
-		errs = append(errs, fmt.Errorf("failed to delete CSI test resources: %w", err))
-	}
+	// TODO: Garbage collect for CSI test resources
+
 	return errors.Join(errs...)
 }
 

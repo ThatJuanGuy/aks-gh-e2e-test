@@ -627,21 +627,6 @@ func TestPodStartupChecker_garbageCollect(t *testing.T) {
 				g.Expect(err.Error()).To(ContainSubstring("error listing node pools"))
 			},
 		},
-		{
-			name: "error deleting CSI resources",
-			client: func() *k8sfake.Clientset {
-				client := k8sfake.NewClientset()
-				// only fail the Delete call for old-pod-1
-				client.PrependReactor("delete", "storageclasses", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
-					return true, nil, errors.New("error bad things")
-				})
-				return client
-			}(),
-			validateRes: func(g *WithT, pods *corev1.PodList, err error) {
-				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("failed to delete azurefile-csi storage class"))
-			},
-		},
 	}
 
 	for _, tt := range tests {
