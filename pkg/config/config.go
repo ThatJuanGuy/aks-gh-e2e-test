@@ -100,7 +100,7 @@ type PodStartupConfig struct {
 
 	// Optional.
 	// The PodStartupChecker will attach specified CSI storages to the synthetic pods.
-	EnabledCSITests []CSIType `yaml:"enabledCSITests,omitempty"`
+	EnabledCSIs []CSIType `yaml:"enabledCSIs,omitempty"`
 }
 
 type CSIType string

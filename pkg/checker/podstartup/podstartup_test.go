@@ -100,6 +100,8 @@ func TestPodStartupChecker_Run(t *testing.T) {
 		hasDeleteError         bool
 		dialer                 Dialer
 		enableNodeProvisioning bool
+		enabledCSITests        []config.CSIType
+		hasCSICreateError      bool
 		fakeDynamicClient      *dynamicfake.FakeDynamicClient
 	}
 
@@ -383,6 +385,19 @@ func TestPodStartupChecker_Run(t *testing.T) {
 				g.Expect(fakeDynamicClient.Actions()[2].GetVerb()).To(Equal("create"))
 			},
 		},
+		{
+			name: "error - failed to create CSI resources",
+			mutators: []scenarioMutator{
+				func(s *testScenario) {
+					s.enabledCSITests = []config.CSIType{config.CSITypeAzureFile}
+					s.hasCSICreateError = true
+				},
+			},
+			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("failed to create CSI test resources"))
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -444,6 +459,13 @@ func TestPodStartupChecker_Run(t *testing.T) {
 				return true, fakePod, nil
 			})
 
+			if scenario.hasCSICreateError {
+				// Simulate error when creating any CSI resources
+				client.PrependReactor("create", "storageclasses", func(action k8stesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("error creating storageclasses")
+				})
+			}
+
 			podStartupChecker := &PodStartupChecker{
 				name: checkerName,
 				config: &config.PodStartupConfig{
@@ -452,6 +474,7 @@ func TestPodStartupChecker_Run(t *testing.T) {
 					SyntheticPodStartupTimeout: 5 * time.Second,
 					MaxSyntheticPods:           maxSyntheticPods,
 					EnableNodeProvisioningTest: scenario.enableNodeProvisioning,
+					EnabledCSIs:                scenario.enabledCSITests,
 				},
 				timeout:       5 * time.Second,
 				k8sClientset:  client,

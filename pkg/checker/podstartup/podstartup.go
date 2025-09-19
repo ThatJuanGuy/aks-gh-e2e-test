@@ -90,8 +90,8 @@ func BuildPodStartupChecker(config *config.CheckerConfig, kubeClient kubernetes.
 	if err != nil {
 		return nil, fmt.Errorf("failed to create dynamic client: %w", err)
 	}
-
 	chk.dynamicClient = dynamicClient
+
 	return chk, nil
 }
 
@@ -114,6 +114,17 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 		klog.ErrorS(err, "Failed to garbage collect old synthetic pods")
 	}
 
+	timeStampStr := fmt.Sprintf("%d", time.Now().UnixNano())
+
+	if err := c.createCSIResources(ctx, timeStampStr); err != nil {
+		return nil, fmt.Errorf("failed to create CSI test resources: %w", err)
+	}
+	defer func() {
+		if err := c.deleteCSIResources(ctx, timeStampStr); err != nil {
+			klog.ErrorS(err, "Failed to delete CSI test resources")
+		}
+	}()
+
 	// List pods to check the current number of synthetic pods. Do not run the checker if the maximum number of synthetic pods has been reached.
 	pods, err := c.k8sClientset.CoreV1().Pods(c.config.SyntheticPodNamespace).List(ctx, metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(labels.Set(c.syntheticPodLabels())).String(),
@@ -126,7 +137,6 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 			len(pods.Items), c.config.MaxSyntheticPods)
 	}
 
-	timeStampStr := fmt.Sprintf("%d", time.Now().UnixNano())
 	nodePoolName := fmt.Sprintf("%s-nodepool-%s", c.name, timeStampStr)
 
 	if c.config.EnableNodeProvisioningTest {
@@ -142,8 +152,6 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 			return nil, fmt.Errorf("failed to create Karpenter NodePool: %w", err)
 		}
 	}
-
-	// TODO: create PVCs if CSI tests are enabled.
 
 	// Create a synthetic pod to measure the startup time.
 	synthPod, err := c.k8sClientset.CoreV1().Pods(c.config.SyntheticPodNamespace).Create(ctx, c.generateSyntheticPod(timeStampStr), metav1.CreateOptions{})
@@ -225,6 +233,9 @@ func (c *PodStartupChecker) garbageCollect(ctx context.Context) error {
 			errs = append(errs, fmt.Errorf("failed to delete old Karpenter Node Pools: %w", err))
 		}
 	}
+
+	// TODO: Garbage collection for CSI test resources
+
 	return errors.Join(errs...)
 }
 
