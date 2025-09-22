@@ -632,13 +632,7 @@ func TestPodStartupChecker_garbageCollect(t *testing.T) {
 			client: func() *k8sfake.Clientset {
 				client := k8sfake.NewClientset()
 				client.PrependReactor("list", "storageclasses", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
-					// fail the List call in garbageCollect because it uses a label selector. This prevents breaking the test which also
-					// lists storage classes but does not use a selector.
-					listAction, ok := action.(k8stesting.ListAction)
-					if ok && listAction.GetListRestrictions().Labels.String() != "" {
-						return true, nil, errors.New("error bad things")
-					}
-					return false, nil, nil
+					return true, nil, errors.New("error bad things")
 				})
 				return client
 			}(),
@@ -652,13 +646,7 @@ func TestPodStartupChecker_garbageCollect(t *testing.T) {
 			client: func() *k8sfake.Clientset {
 				client := k8sfake.NewClientset()
 				client.PrependReactor("list", "persistentvolumeclaims", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
-					// fail the List call in garbageCollect because it uses a label selector. This prevents breaking the test which also
-					// lists PVCs but does not use a selector.
-					listAction, ok := action.(k8stesting.ListAction)
-					if ok && listAction.GetListRestrictions().Labels.String() != "" {
-						return true, nil, errors.New("error bad things")
-					}
-					return false, nil, nil
+					return true, nil, errors.New("error bad things")
 				})
 				return client
 			}(),
