@@ -53,7 +53,7 @@ var _ = Describe("API server checker", Ordered, ContinueOnFailure, func() {
 		By("Creating a resource quota to limit configmaps in the object namespace to prevent creation")
 		quota := &corev1.ResourceQuota{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "testApiServerQuota",
+				Name:      "test-api-server-quota",
 				Namespace: apiServerObjectNamespace,
 			},
 			Spec: corev1.ResourceQuotaSpec{

@@ -77,7 +77,7 @@ func TestMetricsServerChecker_Run(t *testing.T) {
 			g := NewWithT(t)
 
 			checker := &MetricsServerChecker{
-				name:          "testMetricsServer",
+				name:          "test-metrics-server",
 				timeout:       1 * time.Second,
 				kubeClient:    k8sfake.NewSimpleClientset(),
 				metricsClient: tc.client,

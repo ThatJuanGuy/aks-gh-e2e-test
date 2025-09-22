@@ -19,7 +19,7 @@
         dnsConfig:
           domain: "mcr.microsoft.com"
           queryTimeout: "1s"
-      - name: "test-internal-localdns"
+      - name: "testInternalLocaldns"
         type: "dns"
         interval: "5s"
         timeout: "3s"
