@@ -212,23 +212,12 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 
 // garbageCollect deletes all pods created by the checker that are older than the checker's timeout.
 func (c *PodStartupChecker) garbageCollect(ctx context.Context) error {
-	// TODO: refactor pods garbage collection like storage resources garbage collections
-	podList, err := c.k8sClientset.CoreV1().Pods(c.config.SyntheticPodNamespace).List(ctx, metav1.ListOptions{
-		LabelSelector: labels.SelectorFromSet(labels.Set(c.syntheticPodLabels())).String(),
-	})
-	if err != nil {
-		return fmt.Errorf("failed to list pods for garbage collection: %w", err)
-	}
 	var errs []error
-	for _, pod := range podList.Items {
-		if time.Since(pod.CreationTimestamp.Time) > c.timeout {
-			err := c.k8sClientset.CoreV1().Pods(c.config.SyntheticPodNamespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
-			if err != nil && !apierrors.IsNotFound(err) {
-				errs = append(errs, fmt.Errorf("failed to delete old synthetic pod %s: %w", pod.Name, err))
-			}
-		}
+	if err := c.syntheticPodGarbageCollection(ctx); err != nil {
+		errs = append(errs, fmt.Errorf("failed to garbage collect outdated synthetic pods: %w", err))
 	}
 
+	// TODO: update and refactor node provisioning test GC flow
 	if c.config.EnableNodeProvisioningTest {
 		if err := c.deleteAllKarpenterNodePools(ctx); err != nil {
 			errs = append(errs, fmt.Errorf("failed to delete old Karpenter Node Pools: %w", err))

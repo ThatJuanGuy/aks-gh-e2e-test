@@ -2,12 +2,16 @@ package podstartup
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/Azure/cluster-health-monitor/pkg/config"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 func (c *PodStartupChecker) syntheticPodLabels() map[string]string {
@@ -159,4 +163,23 @@ func (c *PodStartupChecker) getSyntheticPodIP(ctx context.Context, podName strin
 		return "", fmt.Errorf("pod IP is empty")
 	}
 	return pod.Status.PodIP, nil
+}
+
+func (c *PodStartupChecker) syntheticPodGarbageCollection(ctx context.Context) error {
+	podList, err := c.k8sClientset.CoreV1().Pods(c.config.SyntheticPodNamespace).List(ctx, metav1.ListOptions{
+		LabelSelector: labels.SelectorFromSet(labels.Set(c.syntheticPodLabels())).String(),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to list pods for garbage collection: %w", err)
+	}
+	var errs []error
+	for _, pod := range podList.Items {
+		if time.Since(pod.CreationTimestamp.Time) > c.timeout {
+			err := c.k8sClientset.CoreV1().Pods(c.config.SyntheticPodNamespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			if err != nil && !apierrors.IsNotFound(err) {
+				errs = append(errs, fmt.Errorf("failed to delete old synthetic pod %s: %w", pod.Name, err))
+			}
+		}
+	}
+	return errors.Join(errs...)
 }

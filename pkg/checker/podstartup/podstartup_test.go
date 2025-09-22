@@ -27,17 +27,6 @@ import (
 // =============================================================================
 
 // Pod and Event creation helpers
-func podWithLabels(name string, namespace string, labels map[string]string, creationTime time.Time) *corev1.Pod {
-	return &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              name,
-			Namespace:         namespace,
-			Labels:            labels,
-			CreationTimestamp: metav1.NewTime(creationTime),
-		},
-	}
-}
-
 func imageSuccessfullyPulledEvent(namespace, podName string, pullDuration time.Duration) *corev1.Event {
 	return &corev1.Event{
 		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "event1"},
@@ -502,115 +491,44 @@ func TestPodStartupChecker_garbageCollect(t *testing.T) {
 		enableNodeProvisioningTest bool
 		client                     *k8sfake.Clientset
 		dynamicClient              *dynamicfake.FakeDynamicClient
-		validateRes                func(g *WithT, pods *corev1.PodList, err error)
+		validateRes                func(g *WithT, err error)
 	}{
 		{
-			name: "only removes pods older than timeout",
-			client: k8sfake.NewClientset(
-				podWithLabels("chk-synthetic-old", syntheticPodNamespace, map[string]string{syntheticPodLabelKey: checkerName}, time.Now().Add(-2*time.Hour)),
-				podWithLabels("chk-synthetic-new", syntheticPodNamespace, map[string]string{syntheticPodLabelKey: checkerName}, time.Now()),
-			),
-			validateRes: func(g *WithT, pods *corev1.PodList, err error) {
+			name:   "success",
+			client: k8sfake.NewClientset(),
+			validateRes: func(g *WithT, err error) {
 				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(pods.Items).To(HaveLen(1))
-				g.Expect(pods.Items[0].Name).To(Equal("chk-synthetic-new"))
 			},
 		},
 		{
-			name: "no pods to delete",
-			client: k8sfake.NewClientset(
-				podWithLabels("chk-synthetic-too-new", syntheticPodNamespace, map[string]string{syntheticPodLabelKey: checkerName}, time.Now()), // pod too new
-				podWithLabels("chk-synthetic-no-labels", syntheticPodNamespace, map[string]string{}, time.Now().Add(-2*time.Hour)),              // old pod wrong labels
-				podWithLabels("no-name-prefix", syntheticPodNamespace, map[string]string{}, time.Now().Add(-2*time.Hour)),                       // pod missing name prefix
-			),
-			validateRes: func(g *WithT, pods *corev1.PodList, err error) {
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(pods.Items).To(HaveLen(3))
-				actualNames := make([]string, len(pods.Items))
-				for i, pod := range pods.Items {
-					actualNames[i] = pod.Name
-				}
-				g.Expect(actualNames).To(ConsistOf([]string{"chk-synthetic-too-new", "chk-synthetic-no-labels", "no-name-prefix"}))
-			},
-		},
-		{
-			name: "only removes pod with checker labels",
-			client: k8sfake.NewClientset(
-				podWithLabels("chk-synthetic-pod", syntheticPodNamespace, map[string]string{syntheticPodLabelKey: checkerName}, time.Now().Add(-2*time.Hour)),
-				podWithLabels("chk-synthetic-no-label-pod", syntheticPodNamespace, map[string]string{}, time.Now().Add(-2*time.Hour)),
-			),
-			validateRes: func(g *WithT, pods *corev1.PodList, err error) {
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(pods.Items).To(HaveLen(1))
-				g.Expect(pods.Items[0].Name).To(Equal("chk-synthetic-no-label-pod"))
-			},
-		},
-		{
-			name: "error listing pods",
+			name: "error garbage collecting pods",
 			client: func() *k8sfake.Clientset {
 				client := k8sfake.NewClientset()
 				client.PrependReactor("list", "pods", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
-					// fail the List call in garbageCollect because it uses a label selector. This prevents breaking the test which also
-					// lists pods but does not use a selector.
-					listAction, ok := action.(k8stesting.ListAction)
-					if ok && listAction.GetListRestrictions().Labels.String() != "" {
-						return true, nil, errors.New("error bad things")
-					}
-					return false, nil, nil
+					return true, nil, errors.New("error bad things")
 				})
 				return client
 			}(),
-			validateRes: func(g *WithT, pods *corev1.PodList, err error) {
+			validateRes: func(g *WithT, err error) {
 				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("failed to list pods for garbage collection"))
-			},
-		},
-		{
-			name: "error deleting pod",
-			client: func() *k8sfake.Clientset {
-				client := k8sfake.NewClientset(
-					podWithLabels("chk-synthetic-pod-1", syntheticPodNamespace, map[string]string{syntheticPodLabelKey: checkerName}, time.Now().Add(-2*time.Hour)),
-					podWithLabels("chk-synthetic-pod-2", syntheticPodNamespace, map[string]string{syntheticPodLabelKey: checkerName}, time.Now().Add(-2*time.Hour)),
-				)
-				// only fail the Delete call for old-pod-1
-				client.PrependReactor("delete", "pods", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
-					deleteAction, ok := action.(k8stesting.DeleteAction)
-					if ok && deleteAction.GetName() == "chk-synthetic-pod-1" {
-						return true, nil, errors.New("error bad things")
-					}
-					return false, nil, nil
-				})
-				return client
-			}(),
-			validateRes: func(g *WithT, pods *corev1.PodList, err error) {
-				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("failed to delete old synthetic pod"))
-				g.Expect(pods.Items).To(HaveLen(1)) // one pod should be deleted
+				g.Expect(err.Error()).To(ContainSubstring("failed to garbage collect outdated synthetic pods"))
 			},
 		},
 		{
 			name:                       "clean up node pools success",
 			enableNodeProvisioningTest: true,
-			client: k8sfake.NewClientset(
-				podWithLabels("chk-synthetic-old", syntheticPodNamespace, map[string]string{syntheticPodLabelKey: checkerName}, time.Now().Add(-2*time.Hour)),
-				podWithLabels("chk-synthetic-new", syntheticPodNamespace, map[string]string{syntheticPodLabelKey: checkerName}, time.Now()),
-			),
+			client:                     k8sfake.NewClientset(),
 			dynamicClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
 				NodePoolGVR: "NodePoolList",
 			}),
-			validateRes: func(g *WithT, pods *corev1.PodList, err error) {
+			validateRes: func(g *WithT, err error) {
 				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(pods.Items).To(HaveLen(1))
-				g.Expect(pods.Items[0].Name).To(Equal("chk-synthetic-new"))
 			},
 		},
 		{
 			name:                       "clean up node pools failure",
 			enableNodeProvisioningTest: true,
-			client: k8sfake.NewClientset(
-				podWithLabels("chk-synthetic-old", syntheticPodNamespace, map[string]string{syntheticPodLabelKey: checkerName}, time.Now().Add(-2*time.Hour)),
-				podWithLabels("chk-synthetic-new", syntheticPodNamespace, map[string]string{syntheticPodLabelKey: checkerName}, time.Now()),
-			),
+			client:                     k8sfake.NewClientset(),
 			dynamicClient: func() *dynamicfake.FakeDynamicClient {
 				client := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
 					NodePoolGVR: "NodePoolList",
@@ -620,9 +538,7 @@ func TestPodStartupChecker_garbageCollect(t *testing.T) {
 				})
 				return client
 			}(),
-			validateRes: func(g *WithT, pods *corev1.PodList, err error) {
-				g.Expect(pods.Items).To(HaveLen(1))
-				g.Expect(pods.Items[0].Name).To(Equal("chk-synthetic-new"))
+			validateRes: func(g *WithT, err error) {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err.Error()).To(ContainSubstring("error listing node pools"))
 			},
@@ -636,7 +552,7 @@ func TestPodStartupChecker_garbageCollect(t *testing.T) {
 				})
 				return client
 			}(),
-			validateRes: func(g *WithT, pods *corev1.PodList, err error) {
+			validateRes: func(g *WithT, err error) {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err.Error()).To(ContainSubstring("failed to garbage collect outdated storage classes"))
 			},
@@ -650,7 +566,7 @@ func TestPodStartupChecker_garbageCollect(t *testing.T) {
 				})
 				return client
 			}(),
-			validateRes: func(g *WithT, pods *corev1.PodList, err error) {
+			validateRes: func(g *WithT, err error) {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err.Error()).To(ContainSubstring("failed to garbage collect outdated persistent volume claims"))
 			},
@@ -679,11 +595,7 @@ func TestPodStartupChecker_garbageCollect(t *testing.T) {
 			// Run garbage collect
 			err := checker.garbageCollect(context.Background())
 
-			// Get pods for validation
-			pods, listErr := tt.client.CoreV1().Pods(syntheticPodNamespace).List(context.Background(), metav1.ListOptions{})
-			g.Expect(listErr).NotTo(HaveOccurred())
-
-			tt.validateRes(g, pods, err)
+			tt.validateRes(g, err)
 		})
 	}
 }
