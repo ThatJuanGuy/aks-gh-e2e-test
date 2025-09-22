@@ -13,7 +13,7 @@ const (
 
 var (
 	// Note that podStartupCheckerName must match with the configmap in manifests/overlays/test.
-	podStartupCheckerNames = []string{"test-pod-startup"}
+	podStartupCheckerNames = []string{"testPodStartup"}
 
 	// These labels are required on nodes for the synthetic pods created by the pod startup checker to meet node affinity requirements
 	// and be scheduled. These are specified in the synthetic pod spec used by the podstartup checker.

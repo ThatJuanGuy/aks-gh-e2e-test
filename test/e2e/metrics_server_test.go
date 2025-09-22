@@ -16,7 +16,7 @@ const (
 
 var (
 	// Note that metricsServerCheckerNames must match with the configmap in manifests/overlays/test.
-	metricsServerCheckerNames = []string{"test-metrics-server"}
+	metricsServerCheckerNames = []string{"testMetricsServer"}
 )
 
 var _ = Describe("Metrics server checker", Ordered, ContinueOnFailure, func() {

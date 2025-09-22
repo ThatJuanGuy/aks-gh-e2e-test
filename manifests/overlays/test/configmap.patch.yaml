@@ -5,14 +5,14 @@
   path: /data/config.yaml
   value: |
     checkers:
-      - name: "test-internal-coredns"
+      - name: "testInternalCoredns"
         type: "dns"
         interval: "5s"
         timeout: "3s"
         dnsConfig:
           domain: "kubernetes.default.svc.cluster.local"
           queryTimeout: "1s"
-      - name: "test-external-coredns"
+      - name: "testExternalCoredns"
         type: "dns"
         interval: "5s"
         timeout: "3s"
@@ -27,7 +27,7 @@
           domain: "kubernetes.default.svc.cluster.local"
           checkLocalDNS: true
           queryTimeout: "1s"
-      - name: "test-external-localdns"
+      - name: "testExternalLocaldns"
         type: "dns"
         interval: "5s"
         timeout: "3s"
@@ -35,7 +35,7 @@
           domain: "mcr.microsoft.com"
           checkLocalDNS: true
           queryTimeout: "1s"
-      - name: "test-pod-startup"
+      - name: "testPodStartup"
         type: "podStartup"
         interval: "10s"
         timeout: "10s"
@@ -45,7 +45,7 @@
           syntheticPodStartupTimeout: "5s"
           maxSyntheticPods: 10
           tcpTimeout: "2s"
-      - name: "test-api-server"
+      - name: "testApiServer"
         type: "apiServer"
         interval: "5s"
         timeout: "5s"
@@ -55,11 +55,11 @@
           mutateTimeout: "1s"
           readTimeout: "1s"
           maxObjects: 10
-      - name: "test-metrics-server"
+      - name: "testMetricsServer"
         type: "metricsServer"
         interval: "5s"
         timeout: "5s"
-      - name: "test-azure-policy"
+      - name: "testAzurePolicy"
         type: "azurePolicy"
         interval: "10s"
         timeout: "5s"

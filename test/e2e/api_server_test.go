@@ -19,7 +19,7 @@ const (
 
 var (
 	// Note that apiServerCheckerNames must match with the configmap in manifests/overlays/test.
-	apiServerCheckerNames = []string{"test-api-server"}
+	apiServerCheckerNames = []string{"testApiServer"}
 )
 
 var _ = Describe("API server checker", Ordered, ContinueOnFailure, func() {
@@ -53,7 +53,7 @@ var _ = Describe("API server checker", Ordered, ContinueOnFailure, func() {
 		By("Creating a resource quota to limit configmaps in the object namespace to prevent creation")
 		quota := &corev1.ResourceQuota{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-api-server-quota",
+				Name:      "testApiServerQuota",
 				Namespace: apiServerObjectNamespace,
 			},
 			Spec: corev1.ResourceQuotaSpec{
