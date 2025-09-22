@@ -217,6 +217,7 @@ func (c *PodStartupChecker) garbageCollect(ctx context.Context) error {
 		errs = append(errs, fmt.Errorf("failed to garbage collect outdated synthetic pods: %w", err))
 	}
 
+	// TODO: update and refactor node provisioning test GC flow
 	if c.config.EnableNodeProvisioningTest {
 		if err := c.deleteAllKarpenterNodePools(ctx); err != nil {
 			errs = append(errs, fmt.Errorf("failed to delete old Karpenter Node Pools: %w", err))
