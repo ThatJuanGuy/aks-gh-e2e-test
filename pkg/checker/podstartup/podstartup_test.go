@@ -627,6 +627,34 @@ func TestPodStartupChecker_garbageCollect(t *testing.T) {
 				g.Expect(err.Error()).To(ContainSubstring("error listing node pools"))
 			},
 		},
+		{
+			name: "error storage class garbage collection",
+			client: func() *k8sfake.Clientset {
+				client := k8sfake.NewClientset()
+				client.PrependReactor("list", "storageclasses", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, nil, errors.New("error bad things")
+				})
+				return client
+			}(),
+			validateRes: func(g *WithT, pods *corev1.PodList, err error) {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("failed to garbage collect outdated storage classes"))
+			},
+		},
+		{
+			name: "error persistent volume claim garbage collection",
+			client: func() *k8sfake.Clientset {
+				client := k8sfake.NewClientset()
+				client.PrependReactor("list", "persistentvolumeclaims", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, nil, errors.New("error bad things")
+				})
+				return client
+			}(),
+			validateRes: func(g *WithT, pods *corev1.PodList, err error) {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("failed to garbage collect outdated persistent volume claims"))
+			},
+		},
 	}
 
 	for _, tt := range tests {
