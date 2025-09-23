@@ -4,14 +4,14 @@ import "errors"
 
 const (
 	// This is the error code of the DNSChecker's result.
-	errCodeServiceNotReady = "service_not_ready"
-	errCodePodsNotReady    = "pods_not_ready"
-	errCodeServiceTimeout  = "service_timeout"
-	errCodePodTimeout      = "pod_timeout"
-	errCodeServiceError    = "service_error"
-	errCodePodError        = "pod_error"
-	errCodeLocalDNSTimeout = "local_dns_timeout"
-	errCodeLocalDNSError   = "local_dns_error"
+	errCodeServiceNotReady = "serviceNotReady"
+	errCodePodsNotReady    = "podsNotReady"
+	errCodeServiceTimeout  = "serviceTimeout"
+	errCodePodTimeout      = "podTimeout"
+	errCodeServiceError    = "serviceError"
+	errCodePodError        = "podError"
+	errCodeLocalDNSTimeout = "localDnsTimeout"
+	errCodeLocalDNSError   = "localDnsError"
 )
 
 // This is the error list used by the DNSChecker.

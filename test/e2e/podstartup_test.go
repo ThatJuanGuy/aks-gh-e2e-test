@@ -8,7 +8,7 @@ import (
 
 const (
 	checkerTypePodStartup               = "podStartup"
-	podStartupDurationExceededErrorCode = "pod_startup_duration_exceeded"
+	podStartupDurationExceededErrorCode = "podStartupDurationExceeded"
 )
 
 var (

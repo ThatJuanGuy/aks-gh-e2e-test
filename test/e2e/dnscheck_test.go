@@ -11,9 +11,9 @@ import (
 
 const (
 	checkerTypeDNS             = "dns"
-	dnsPodsNotReadyErrorCode   = "pods_not_ready"
-	dnsServiceTimeoutErrorCode = "service_timeout"
-	localDNSTimeoutErrorCode   = "local_dns_timeout"
+	dnsPodsNotReadyErrorCode   = "podsNotReady"
+	dnsServiceTimeoutErrorCode = "serviceTimeout"
+	localDNSTimeoutErrorCode   = "localDnsTimeout"
 )
 
 var (

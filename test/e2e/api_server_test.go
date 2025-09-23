@@ -14,7 +14,7 @@ import (
 const (
 	checkerTypeAPIServer     = "apiServer"
 	apiServerObjectNamespace = "kube-system"
-	apiServerCreateErrorCode = "apiserver_create_error"
+	apiServerCreateErrorCode = "apiserverCreateError"
 )
 
 var (
