@@ -7,21 +7,21 @@ metadata:
 data:
   config.yaml: |
     checkers:
-      - name: "internalCoredns"
+      - name: "internalCoreDNS"
         type: "dns"
         interval: "10s"
         timeout: "5s"
         dnsConfig:
           domain: "kubernetes.default.svc.cluster.local"
           queryTimeout: "2s"
-      - name: "externalCoredns"
+      - name: "externalCoreDNS"
         type: "dns"
         interval: "10s"
         timeout: "5s"
         dnsConfig:
           domain: "mcr.microsoft.com"
           queryTimeout: "2s"
-      - name: "internal-localdns"
+      - name: "internalLocalDNS"
         type: "dns"
         interval: "10s"
         timeout: "5s"
@@ -29,7 +29,7 @@ data:
           domain: "kubernetes.default.svc.cluster.local"
           checkLocalDNS: true
           queryTimeout: "2s"
-      - name: "externalLocaldns"
+      - name: "externalLocalDNS"
         type: "dns"
         interval: "10s"
         timeout: "5s"

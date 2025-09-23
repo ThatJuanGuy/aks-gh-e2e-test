@@ -19,8 +19,8 @@ const (
 var (
 	// Expected DNS checkers.
 	// Note that these checkers must match with the configmap in manifests/overlays/test.
-	coreDNSCheckerNames  = []string{"testInternalCoredns", "testExternalCoredns"}
-	localDNSCheckerNames = []string{"testInternalLocaldns", "testExternalLocaldns"}
+	coreDNSCheckerNames  = []string{"testInternalCoreDNS", "testExternalCoreDNS"}
+	localDNSCheckerNames = []string{"testInternalLocaldns", "testExternalLocalDNS"}
 	dnsCheckerNames      = append(coreDNSCheckerNames, localDNSCheckerNames...)
 )
 
