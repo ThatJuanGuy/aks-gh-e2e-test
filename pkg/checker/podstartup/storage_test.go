@@ -464,15 +464,22 @@ func TestStorageClassGarbageCollection(t *testing.T) {
 func TestCheckPVCQuota(t *testing.T) {
 	testCases := []struct {
 		name          string
+		EnabledCSIs   []config.CSIType
 		k8sClient     *k8sfake.Clientset
 		expectedError string
 	}{
 		{
-			name:      "PVC quota check passed",
+			name:        "PVC quota check passed",
+			EnabledCSIs: []config.CSIType{config.CSITypeAzureFile},
+			k8sClient:   k8sfake.NewClientset(),
+		},
+		{
+			name:      "PVC quota check passed - no CSI enabled",
 			k8sClient: k8sfake.NewClientset(),
 		},
 		{
-			name: "PVC quota check failed to list PVCs",
+			name:        "PVC quota check failed to list PVCs",
+			EnabledCSIs: []config.CSIType{config.CSITypeAzureFile},
 			k8sClient: func() *k8sfake.Clientset {
 				client := k8sfake.NewClientset()
 				client.PrependReactor("list", "persistentvolumeclaims", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
@@ -483,7 +490,8 @@ func TestCheckPVCQuota(t *testing.T) {
 			expectedError: "failed to list PVCs",
 		},
 		{
-			name: "PVC quota exceeded",
+			name:        "PVC quota exceeded",
+			EnabledCSIs: []config.CSIType{config.CSITypeAzureFile},
 			k8sClient: k8sfake.NewClientset(
 				pvcWithLabels("pvc1", "test-namespace", map[string]string{"test-label": "testChecker"}, time.Now().Add(-10*time.Minute)),
 			),
@@ -499,7 +507,7 @@ func TestCheckPVCQuota(t *testing.T) {
 			checker := &PodStartupChecker{
 				name: "testChecker",
 				config: &config.PodStartupConfig{
-					EnabledCSIs:                []config.CSIType{config.CSITypeAzureFile},
+					EnabledCSIs:                tt.EnabledCSIs,
 					SyntheticPodNamespace:      "test-namespace",
 					SyntheticPodLabelKey:       "test-label",
 					SyntheticPodStartupTimeout: 3 * time.Second,
