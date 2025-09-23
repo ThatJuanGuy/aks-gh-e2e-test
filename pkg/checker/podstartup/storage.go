@@ -236,3 +236,18 @@ func (c *PodStartupChecker) storageClassGarbageCollection(ctx context.Context) e
 
 	return errors.Join(errs...)
 }
+
+func (c *PodStartupChecker) checkPVCQuota(ctx context.Context) error {
+	// List PVCs to check the current number of synthetic PVCs. Do not run the checker if the maximum number of synthetic PVCs has been reached.
+	pvcs, err := c.k8sClientset.CoreV1().PersistentVolumeClaims(c.config.SyntheticPodNamespace).List(ctx, metav1.ListOptions{
+		LabelSelector: labels.SelectorFromSet(labels.Set(c.syntheticPodLabels())).String(),
+	})
+	if err != nil {
+		return err
+	}
+	if len(c.config.EnabledCSIs) > 0 && len(pvcs.Items) >= c.config.MaxSyntheticPods*len(c.config.EnabledCSIs) {
+		return fmt.Errorf("maximum number of PVCs reached, current: %d, max allowed: %d, delete some PVCs before running the checker again",
+			len(pvcs.Items), c.config.MaxSyntheticPods*len(c.config.EnabledCSIs))
+	}
+	return nil
+}

@@ -461,6 +461,65 @@ func TestStorageClassGarbageCollection(t *testing.T) {
 	}
 }
 
+func TestCheckPVCQuota(t *testing.T) {
+	testCases := []struct {
+		name          string
+		k8sClient     *k8sfake.Clientset
+		expectedError string
+	}{
+		{
+			name:      "PVC quota check passed",
+			k8sClient: k8sfake.NewClientset(),
+		},
+		{
+			name: "PVC quota check failed to list PVCs",
+			k8sClient: func() *k8sfake.Clientset {
+				client := k8sfake.NewClientset()
+				client.PrependReactor("list", "persistentvolumeclaims", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, nil, errors.New("failed to list PVCs")
+				})
+				return client
+			}(),
+			expectedError: "failed to list PVCs",
+		},
+		{
+			name: "PVC quota exceeded",
+			k8sClient: k8sfake.NewClientset(
+				pvcWithLabels("pvc1", "test-namespace", map[string]string{"test-label": "testChecker"}, time.Now().Add(-10*time.Minute)),
+			),
+			expectedError: "maximum number of PVCs reached",
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			g := NewWithT(t)
+
+			checker := &PodStartupChecker{
+				name: "testChecker",
+				config: &config.PodStartupConfig{
+					EnabledCSIs:                []config.CSIType{config.CSITypeAzureFile},
+					SyntheticPodNamespace:      "test-namespace",
+					SyntheticPodLabelKey:       "test-label",
+					SyntheticPodStartupTimeout: 3 * time.Second,
+					MaxSyntheticPods:           1,
+				},
+				k8sClientset: tt.k8sClient,
+			}
+
+			err := checker.checkPVCQuota(context.Background())
+
+			if tt.expectedError != "" {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring(tt.expectedError))
+			} else {
+				g.Expect(err).NotTo(HaveOccurred())
+			}
+		})
+	}
+}
+
 func pvcWithLabels(name string, namespace string, labels map[string]string, creationTime time.Time) *corev1.PersistentVolumeClaim {
 	return &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{

@@ -116,6 +116,10 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 
 	timeStampStr := fmt.Sprintf("%d", time.Now().UnixNano())
 
+	if err := c.checkPVCQuota(ctx); err != nil {
+		return nil, fmt.Errorf("PVC quota check failed: %w", err)
+	}
+
 	if err := c.createCSIResources(ctx, timeStampStr); err != nil {
 		return nil, fmt.Errorf("failed to create CSI test resources: %w", err)
 	}
