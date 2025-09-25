@@ -117,7 +117,7 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 	timeStampStr := fmt.Sprintf("%d", time.Now().UnixNano())
 
 	if err := c.checkCSIResourceLimit(ctx); err != nil {
-		return nil, fmt.Errorf("PVC quota check failed: %w", err)
+		return nil, fmt.Errorf("CSI resource limit check failed: %w", err)
 	}
 
 	if err := c.createCSIResources(ctx, timeStampStr); err != nil {

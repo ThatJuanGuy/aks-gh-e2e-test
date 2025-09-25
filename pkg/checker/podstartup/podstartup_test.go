@@ -161,7 +161,7 @@ func TestPodStartupChecker_Run(t *testing.T) {
 			},
 			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
 				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("PVC quota check failed"))
+				g.Expect(err.Error()).To(ContainSubstring("CSI resource limit check failed"))
 				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(0)) // No dynamic client actions should be taken
 			},
 		},
