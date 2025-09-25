@@ -237,7 +237,7 @@ func (c *PodStartupChecker) storageClassGarbageCollection(ctx context.Context) e
 	return errors.Join(errs...)
 }
 
-func (c *PodStartupChecker) checkPVCQuota(ctx context.Context) error {
+func (c *PodStartupChecker) checkCSIResourceQuota(ctx context.Context) error {
 	if len(c.config.EnabledCSIs) == 0 {
 		return nil
 	}
@@ -253,5 +253,23 @@ func (c *PodStartupChecker) checkPVCQuota(ctx context.Context) error {
 		return fmt.Errorf("maximum number of PVCs reached, current: %d, max allowed: %d, delete some PVCs before running the checker again",
 			len(pvcs.Items), c.config.MaxSyntheticPods*len(c.config.EnabledCSIs))
 	}
+
+	for _, csiType := range c.config.EnabledCSIs {
+		if csiType == config.CSITypeAzureFile {
+			// Azure File CSI requires a StorageClass to be created, so we need to check the quota for StorageClasses as well.
+			// List StorageClasses to check the current number of synthetic StorageClasses. Do not run the checker if the maximum number of synthetic StorageClasses has been reached.
+			scs, err := c.k8sClientset.StorageV1().StorageClasses().List(ctx, metav1.ListOptions{
+				LabelSelector: labels.SelectorFromSet(labels.Set(c.syntheticPodLabels())).String(),
+			})
+			if err != nil {
+				return err
+			}
+			if len(scs.Items) >= c.config.MaxSyntheticPods {
+				return fmt.Errorf("maximum number of StorageClasses reached, current: %d, max allowed: %d, delete some StorageClasses before running the checker again",
+					len(scs.Items), c.config.MaxSyntheticPods)
+			}
+		}
+	}
+
 	return nil
 }

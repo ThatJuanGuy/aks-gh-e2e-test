@@ -497,6 +497,26 @@ func TestCheckPVCQuota(t *testing.T) {
 			),
 			expectedError: "maximum number of PVCs reached",
 		},
+		{
+			name:        "quota check failed to list storage classes",
+			EnabledCSIs: []config.CSIType{config.CSITypeAzureFile},
+			k8sClient: func() *k8sfake.Clientset {
+				client := k8sfake.NewClientset()
+				client.PrependReactor("list", "storageclasses", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, nil, errors.New("failed to list storage classes")
+				})
+				return client
+			}(),
+			expectedError: "failed to list storage classes",
+		},
+		{
+			name:        "storage class quota exceeded",
+			EnabledCSIs: []config.CSIType{config.CSITypeAzureFile},
+			k8sClient: k8sfake.NewClientset(
+				scWithLabels("sc1", map[string]string{"test-label": "testChecker"}, time.Now().Add(-10*time.Minute)),
+			),
+			expectedError: "maximum number of storage classes reached",
+		},
 	}
 
 	for _, tt := range testCases {
@@ -516,7 +536,7 @@ func TestCheckPVCQuota(t *testing.T) {
 				k8sClientset: tt.k8sClient,
 			}
 
-			err := checker.checkPVCQuota(context.Background())
+			err := checker.checkCSIResourceQuota(context.Background())
 
 			if tt.expectedError != "" {
 				g.Expect(err).To(HaveOccurred())
