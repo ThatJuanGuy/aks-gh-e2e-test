@@ -47,7 +47,7 @@ func TestMetricsServerChecker_Run(t *testing.T) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(res).ToNot(BeNil())
 				g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
-				g.Expect(res.Detail.Code).To(Equal(errCodeMetricsServerUnavailable))
+				g.Expect(res.Detail.Code).To(Equal(ErrCodeMetricsServerUnavailable))
 				g.Expect(res.Detail.Message).To(ContainSubstring("metrics server API unavailable"))
 			},
 		},
@@ -65,7 +65,7 @@ func TestMetricsServerChecker_Run(t *testing.T) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(res).ToNot(BeNil())
 				g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
-				g.Expect(res.Detail.Code).To(Equal(errCodeMetricsServerTimeout))
+				g.Expect(res.Detail.Code).To(Equal(ErrCodeMetricsServerTimeout))
 				g.Expect(res.Detail.Message).To(ContainSubstring("timed out while calling metrics server API"))
 			},
 		},

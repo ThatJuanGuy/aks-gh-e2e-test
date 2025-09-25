@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"github.com/Azure/cluster-health-monitor/pkg/checker/podstartup"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"
@@ -8,12 +9,12 @@ import (
 
 const (
 	checkerTypePodStartup               = "podStartup"
-	podStartupDurationExceededErrorCode = "podStartupDurationExceeded"
+	podStartupDurationExceededErrorCode = podstartup.ErrCodePodStartupDurationExceeded
 )
 
 var (
 	// Note that podStartupCheckerName must match with the configmap in manifests/overlays/test.
-	podStartupCheckerNames = []string{"testPodStartup"}
+	podStartupCheckerNames = []string{"TestPodStartup"}
 
 	// These labels are required on nodes for the synthetic pods created by the pod startup checker to meet node affinity requirements
 	// and be scheduled. These are specified in the synthetic pod spec used by the podstartup checker.

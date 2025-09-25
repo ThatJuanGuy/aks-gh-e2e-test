@@ -59,7 +59,7 @@ func TestDNSChecker_Run(t *testing.T) {
 			validateRes: func(g *WithT, res *types.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
-				g.Expect(res.Detail.Code).To(Equal(errCodeServiceNotReady))
+				g.Expect(res.Detail.Code).To(Equal(ErrCodeServiceNotReady))
 			},
 		},
 		{
@@ -75,7 +75,7 @@ func TestDNSChecker_Run(t *testing.T) {
 			validateRes: func(g *WithT, res *types.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
-				g.Expect(res.Detail.Code).To(Equal(errCodePodsNotReady))
+				g.Expect(res.Detail.Code).To(Equal(ErrCodePodsNotReady))
 			},
 		},
 		{
@@ -92,7 +92,7 @@ func TestDNSChecker_Run(t *testing.T) {
 			validateRes: func(g *WithT, res *types.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
-				g.Expect(res.Detail.Code).To(Equal(errCodeServiceTimeout))
+				g.Expect(res.Detail.Code).To(Equal(ErrCodeServiceTimeout))
 			},
 		},
 		{
@@ -127,7 +127,7 @@ func TestDNSChecker_Run(t *testing.T) {
 			validateRes: func(g *WithT, res *types.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
-				g.Expect(res.Detail.Code).To(Equal(errCodeLocalDNSError))
+				g.Expect(res.Detail.Code).To(Equal(ErrCodeLocalDNSError))
 			},
 		},
 		{
@@ -145,7 +145,7 @@ func TestDNSChecker_Run(t *testing.T) {
 			validateRes: func(g *WithT, res *types.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
-				g.Expect(res.Detail.Code).To(Equal(errCodeLocalDNSTimeout))
+				g.Expect(res.Detail.Code).To(Equal(ErrCodeLocalDNSTimeout))
 			},
 		},
 	}

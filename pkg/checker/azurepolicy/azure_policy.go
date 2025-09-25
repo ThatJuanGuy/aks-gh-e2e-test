@@ -141,7 +141,7 @@ func (c *AzurePolicyChecker) Run(ctx context.Context) (*types.Result, error) {
 			return types.Healthy(), nil
 		}
 	}
-	return types.Unhealthy(errCodeAzurePolicyEnforcementMissing, "no Azure Policy violations detected"), nil
+	return types.Unhealthy(ErrCodeAzurePolicyEnforcementMissing, "no Azure Policy violations detected"), nil
 }
 
 // createTestPod creates a test pod without probes to trigger Azure Policy warnings

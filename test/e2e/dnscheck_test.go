@@ -4,16 +4,18 @@ package e2e
 import (
 	"os/exec"
 
+	"github.com/Azure/cluster-health-monitor/pkg/checker/dnscheck"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"
 )
 
 const (
-	checkerTypeDNS             = "dns"
-	dnsPodsNotReadyErrorCode   = "PodsNotReady"
-	dnsServiceTimeoutErrorCode = "ServiceTimeout"
-	localDNSTimeoutErrorCode   = "LocalDNSTimeout"
+	checkerTypeDNS = "dns"
+
+	dnsPodsNotReadyErrorCode   = dnscheck.ErrCodePodsNotReady
+	dnsServiceTimeoutErrorCode = dnscheck.ErrCodeServiceError
+	localDNSTimeoutErrorCode   = dnscheck.ErrCodeLocalDNSTimeout
 )
 
 var (
