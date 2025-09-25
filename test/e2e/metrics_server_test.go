@@ -13,9 +13,6 @@ const (
 
 	metricsServerUnavailableErrorCode = metricsserver.ErrCodeMetricsServerUnavailable
 	metricsServerTimeoutErrorCode     = metricsserver.ErrCodeMetricsServerTimeout
-
-	metricsServerNamespace      = "kube-system"
-	metricsServerDeploymentName = "metrics-server"
 )
 
 var (
