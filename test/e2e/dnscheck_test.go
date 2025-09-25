@@ -15,7 +15,7 @@ const (
 	checkerTypeDNS = string(config.CheckTypeDNS)
 
 	dnsPodsNotReadyErrorCode   = dnscheck.ErrCodePodsNotReady
-	dnsServiceTimeoutErrorCode = dnscheck.ErrCodeServiceError
+	dnsServiceTimeoutErrorCode = dnscheck.ErrCodeServiceTimeout
 	localDNSTimeoutErrorCode   = dnscheck.ErrCodeLocalDNSTimeout
 )
 
