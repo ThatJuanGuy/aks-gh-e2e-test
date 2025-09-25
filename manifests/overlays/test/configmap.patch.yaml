@@ -45,7 +45,7 @@
           syntheticPodStartupTimeout: "5s"
           maxSyntheticPods: 10
           tcpTimeout: "2s"
-      - name: "TestApiServer"
+      - name: "TestAPIServer"
         type: "APIServer"
         interval: "5s"
         timeout: "5s"

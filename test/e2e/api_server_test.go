@@ -21,7 +21,7 @@ const (
 
 var (
 	// Note that apiServerCheckerNames must match with the configmap in manifests/overlays/test.
-	apiServerCheckerNames = []string{"TestApiServer"}
+	apiServerCheckerNames = []string{"TestAPIServer"}
 )
 
 var _ = Describe("API server checker", Ordered, ContinueOnFailure, func() {
