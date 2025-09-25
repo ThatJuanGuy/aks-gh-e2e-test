@@ -536,7 +536,7 @@ func TestCheckPVCQuota(t *testing.T) {
 				k8sClientset: tt.k8sClient,
 			}
 
-			err := checker.checkCSIResourceQuota(context.Background())
+			err := checker.checkCSIResourceLimit(context.Background())
 
 			if tt.expectedError != "" {
 				g.Expect(err).To(HaveOccurred())

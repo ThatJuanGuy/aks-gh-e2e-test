@@ -237,7 +237,7 @@ func (c *PodStartupChecker) storageClassGarbageCollection(ctx context.Context) e
 	return errors.Join(errs...)
 }
 
-func (c *PodStartupChecker) checkCSIResourceQuota(ctx context.Context) error {
+func (c *PodStartupChecker) checkCSIResourceLimit(ctx context.Context) error {
 	if len(c.config.EnabledCSIs) == 0 {
 		return nil
 	}
@@ -265,7 +265,7 @@ func (c *PodStartupChecker) checkCSIResourceQuota(ctx context.Context) error {
 				return err
 			}
 			if len(scs.Items) >= c.config.MaxSyntheticPods {
-				return fmt.Errorf("maximum number of StorageClasses reached, current: %d, max allowed: %d, delete some StorageClasses before running the checker again",
+				return fmt.Errorf("maximum number of storage classes reached, current: %d, max allowed: %d, delete some storage classes before running the checker again",
 					len(scs.Items), c.config.MaxSyntheticPods)
 			}
 		}
