@@ -14,12 +14,12 @@ import (
 const (
 	checkerTypeAPIServer     = "apiServer"
 	apiServerObjectNamespace = "kube-system"
-	apiServerCreateErrorCode = "apiserverCreateError"
+	apiServerCreateErrorCode = "ApiServerCreateError"
 )
 
 var (
 	// Note that apiServerCheckerNames must match with the configmap in manifests/overlays/test.
-	apiServerCheckerNames = []string{"testApiServer"}
+	apiServerCheckerNames = []string{"TestApiServer"}
 )
 
 var _ = Describe("API server checker", Ordered, ContinueOnFailure, func() {

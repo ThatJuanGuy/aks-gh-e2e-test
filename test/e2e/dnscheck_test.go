@@ -11,16 +11,16 @@ import (
 
 const (
 	checkerTypeDNS             = "dns"
-	dnsPodsNotReadyErrorCode   = "podsNotReady"
-	dnsServiceTimeoutErrorCode = "serviceTimeout"
-	localDNSTimeoutErrorCode   = "localDnsTimeout"
+	dnsPodsNotReadyErrorCode   = "PodsNotReady"
+	dnsServiceTimeoutErrorCode = "ServiceTimeout"
+	localDNSTimeoutErrorCode   = "LocalDNSTimeout"
 )
 
 var (
 	// Expected DNS checkers.
 	// Note that these checkers must match with the configmap in manifests/overlays/test.
-	coreDNSCheckerNames  = []string{"testInternalCoreDNS", "testExternalCoreDNS"}
-	localDNSCheckerNames = []string{"testInternalLocalDNS", "testExternalLocalDNS"}
+	coreDNSCheckerNames  = []string{"TestInternalCoreDNS", "TestExternalCoreDNS"}
+	localDNSCheckerNames = []string{"TestInternalLocalDNS", "TestExternalLocalDNS"}
 	dnsCheckerNames      = append(coreDNSCheckerNames, localDNSCheckerNames...)
 )
 

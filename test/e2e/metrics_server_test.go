@@ -8,8 +8,8 @@ import (
 
 const (
 	checkerTypeMetricsServer          = "metricsServer"
-	metricsServerUnavailableErrorCode = "metricsServerUnavailable"
-	metricsServerTimeoutErrorCode     = "metricsServerTimeout"
+	metricsServerUnavailableErrorCode = "MetricsServerUnavailable"
+	metricsServerTimeoutErrorCode     = "MetricsServerTimeout"
 	metricsServerNamespace            = "kube-system"
 	metricsServerDeploymentName       = "metrics-server"
 )
