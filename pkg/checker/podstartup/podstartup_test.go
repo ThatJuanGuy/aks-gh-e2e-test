@@ -86,6 +86,7 @@ func TestPodStartupChecker_Run(t *testing.T) {
 		podIP                  string
 		startupDelay           time.Duration
 		preExistingPods        []string
+		preExistingPVCs        []string
 		hasDeleteError         bool
 		dialer                 Dialer
 		enableNodeProvisioning bool
@@ -145,6 +146,22 @@ func TestPodStartupChecker_Run(t *testing.T) {
 			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err.Error()).To(ContainSubstring("maximum number of synthetic pods reached"))
+				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(0)) // No dynamic client actions should be taken
+			},
+		},
+		{
+			name: "error - max persistent volume claims reached",
+			mutators: []scenarioMutator{
+				func(s *testScenario) {
+					s.enabledCSITests = []config.CSIType{config.CSITypeAzureFile}
+					for i := 0; i < maxSyntheticPods; i++ {
+						s.preExistingPVCs = append(s.preExistingPVCs, fmt.Sprintf("pvc%d", i))
+					}
+				},
+			},
+			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("CSI resource limit check failed"))
 				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(0)) // No dynamic client actions should be taken
 			},
 		},
@@ -421,6 +438,11 @@ func TestPodStartupChecker_Run(t *testing.T) {
 			for _, podName := range scenario.preExistingPods {
 				pod := podWithLabels(podName, scenario.namespace, scenario.labels, podCreationTimestamp)
 				client.CoreV1().Pods(scenario.namespace).Create(context.Background(), pod, metav1.CreateOptions{}) //nolint:errcheck
+			}
+
+			for _, pvcName := range scenario.preExistingPVCs {
+				pvc := pvcWithLabels(pvcName, scenario.namespace, scenario.labels, podCreationTimestamp)
+				client.CoreV1().PersistentVolumeClaims(scenario.namespace).Create(context.Background(), pvc, metav1.CreateOptions{}) //nolint:errcheck
 			}
 
 			// Create the main test pod
