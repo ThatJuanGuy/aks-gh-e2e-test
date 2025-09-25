@@ -1,17 +1,21 @@
 package e2e
 
 import (
+	"github.com/Azure/cluster-health-monitor/pkg/checker/metricsserver"
+	"github.com/Azure/cluster-health-monitor/pkg/config"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"
 )
 
 const (
-	checkerTypeMetricsServer          = "metricsServer"
-	metricsServerUnavailableErrorCode = "MetricsServerUnavailable"
-	metricsServerTimeoutErrorCode     = "MetricsServerTimeout"
-	metricsServerNamespace            = "kube-system"
-	metricsServerDeploymentName       = "metrics-server"
+	checkerTypeMetricsServer = string(config.CheckTypeMetricsServer)
+
+	metricsServerUnavailableErrorCode = metricsserver.ErrCodeMetricsServerUnavailable
+	metricsServerTimeoutErrorCode     = metricsserver.ErrCodeMetricsServerTimeout
+
+	metricsServerNamespace      = "kube-system"
+	metricsServerDeploymentName = "metrics-server"
 )
 
 var (

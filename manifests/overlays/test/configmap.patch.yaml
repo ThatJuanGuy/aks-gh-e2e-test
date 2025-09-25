@@ -6,21 +6,21 @@
   value: |
     checkers:
       - name: "TestInternalCoreDNS"
-        type: "dns"
+        type: "DNS"
         interval: "5s"
         timeout: "3s"
         dnsConfig:
           domain: "kubernetes.default.svc.cluster.local"
           queryTimeout: "1s"
       - name: "TestExternalCoreDNS"
-        type: "dns"
+        type: "DNS"
         interval: "5s"
         timeout: "3s"
         dnsConfig:
           domain: "mcr.microsoft.com"
           queryTimeout: "1s"
       - name: "TestInternalLocalDNS"
-        type: "dns"
+        type: "DNS"
         interval: "5s"
         timeout: "3s"
         dnsConfig:
@@ -28,7 +28,7 @@
           checkLocalDNS: true
           queryTimeout: "1s"
       - name: "TestExternalLocalDNS"
-        type: "dns"
+        type: "DNS"
         interval: "5s"
         timeout: "3s"
         dnsConfig:
@@ -36,7 +36,7 @@
           checkLocalDNS: true
           queryTimeout: "1s"
       - name: "TestPodStartup"
-        type: "podStartup"
+        type: "PodStartup"
         interval: "10s"
         timeout: "10s"
         podStartupConfig:
@@ -46,7 +46,7 @@
           maxSyntheticPods: 10
           tcpTimeout: "2s"
       - name: "TestApiServer"
-        type: "apiServer"
+        type: "APIServer"
         interval: "5s"
         timeout: "5s"
         apiServerConfig:
@@ -56,10 +56,10 @@
           readTimeout: "1s"
           maxObjects: 10
       - name: "TestMetricsServer"
-        type: "metricsServer"
+        type: "MetricsServer"
         interval: "5s"
         timeout: "5s"
       - name: "TestAzurePolicy"
-        type: "azurePolicy"
+        type: "AzurePolicy"
         interval: "10s"
         timeout: "5s"

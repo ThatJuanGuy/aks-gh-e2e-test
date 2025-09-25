@@ -3,6 +3,8 @@ package e2e
 import (
 	"context"
 
+	"github.com/Azure/cluster-health-monitor/pkg/checker/apiserver"
+	"github.com/Azure/cluster-health-monitor/pkg/config"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"
@@ -12,9 +14,9 @@ import (
 )
 
 const (
-	checkerTypeAPIServer     = "apiServer"
+	checkerTypeAPIServer     = string(config.CheckTypeAPIServer)
 	apiServerObjectNamespace = "kube-system"
-	apiServerCreateErrorCode = "ApiServerCreateError"
+	apiServerCreateErrorCode = apiserver.ErrCodeAPIServerCreateError
 )
 
 var (

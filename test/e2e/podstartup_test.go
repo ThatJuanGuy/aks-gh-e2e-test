@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	checkerTypePodStartup               = "podStartup"
+	checkerTypePodStartup               = "PodStartup"
 	podStartupDurationExceededErrorCode = podstartup.ErrCodePodStartupDurationExceeded
 )
 

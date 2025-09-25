@@ -5,11 +5,11 @@ type Status string
 
 const (
 	// StatusHealthy indicates the checker passed.
-	StatusHealthy Status = "healthy"
+	StatusHealthy Status = "Healthy"
 	// StatusUnhealthy indicates the checker failed.
-	StatusUnhealthy Status = "unhealthy"
+	StatusUnhealthy Status = "Unhealthy"
 	// StatusSkipped indicates the test was skipped by the checker.
-	StatusSkipped Status = "skipped"
+	StatusSkipped Status = "Skipped"
 )
 
 // Result represents the result of a health check.

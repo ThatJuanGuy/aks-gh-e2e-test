@@ -8,21 +8,21 @@ data:
   config.yaml: |
     checkers:
       - name: "InternalCoreDNS"
-        type: "dns"
+        type: "DNS"
         interval: "10s"
         timeout: "5s"
         dnsConfig:
           domain: "kubernetes.default.svc.cluster.local"
           queryTimeout: "2s"
       - name: "ExternalCoreDNS"
-        type: "dns"
+        type: "DNS"
         interval: "10s"
         timeout: "5s"
         dnsConfig:
           domain: "mcr.microsoft.com"
           queryTimeout: "2s"
       - name: "InternalLocalDNS"
-        type: "dns"
+        type: "DNS"
         interval: "10s"
         timeout: "5s"
         dnsConfig:
@@ -30,7 +30,7 @@ data:
           checkLocalDNS: true
           queryTimeout: "2s"
       - name: "ExternalLocalDNS"
-        type: "dns"
+        type: "DNS"
         interval: "10s"
         timeout: "5s"
         dnsConfig:
@@ -38,7 +38,7 @@ data:
           checkLocalDNS: true
           queryTimeout: "2s"
       - name: "PodStartup"
-        type: "podStartup"
+        type: "PodStartup"
         interval: "1m"
         timeout: "30s"
         podStartupConfig:
@@ -47,8 +47,8 @@ data:
           syntheticPodStartupTimeout: "5s"
           maxSyntheticPods: 10
           tcpTimeout: "2s"
-      - name: "ApiServer"
-        type: "apiServer"
+      - name: "APIServer"
+        type: "APIServer"
         interval: "30s"
         timeout: "5s"
         apiServerConfig:
@@ -58,10 +58,10 @@ data:
           readTimeout: "1s"
           maxObjects: 10
       - name: "MetricsServer"
-        type: "metricsServer"
+        type: "MetricsServer"
         interval: "30s"
         timeout: "10s"
       - name: "AzurePolicy"
-        type: "azurePolicy"
+        type: "AzurePolicy"
         interval: "1m"
         timeout: "10s"

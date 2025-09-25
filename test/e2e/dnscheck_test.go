@@ -5,13 +5,14 @@ import (
 	"os/exec"
 
 	"github.com/Azure/cluster-health-monitor/pkg/checker/dnscheck"
+	"github.com/Azure/cluster-health-monitor/pkg/config"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"
 )
 
 const (
-	checkerTypeDNS = "dns"
+	checkerTypeDNS = string(config.CheckTypeDNS)
 
 	dnsPodsNotReadyErrorCode   = dnscheck.ErrCodePodsNotReady
 	dnsServiceTimeoutErrorCode = dnscheck.ErrCodeServiceError
