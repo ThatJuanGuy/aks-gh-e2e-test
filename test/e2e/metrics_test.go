@@ -2,16 +2,16 @@
 package e2e
 
 import (
-	"github.com/Azure/cluster-health-monitor/pkg/types"
+	"github.com/Azure/cluster-health-monitor/pkg/metrics"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"
 )
 
 const (
-	metricsHealthyStatus    = string(types.StatusHealthy)
+	metricsHealthyStatus    = metrics.HealthyStatus
 	metricsHealthyErrorCode = metricsHealthyStatus
-	metricsUnhealthyStatus  = string(types.StatusUnhealthy)
+	metricsUnhealthyStatus  = metrics.UnhealthyStatus
 )
 
 var _ = Describe("Metrics endpoint", func() {
