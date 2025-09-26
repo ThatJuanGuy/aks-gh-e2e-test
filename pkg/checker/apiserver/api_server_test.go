@@ -56,7 +56,7 @@ func TestAPIServerChecker_Run(t *testing.T) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
 				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
-				g.Expect(result.Detail.Code).To(Equal(errCodeAPIServerCreateError))
+				g.Expect(result.Detail.Code).To(Equal(ErrCodeAPIServerCreateError))
 			},
 		},
 		{
@@ -72,7 +72,7 @@ func TestAPIServerChecker_Run(t *testing.T) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
 				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
-				g.Expect(result.Detail.Code).To(Equal(errCodeAPIServerCreateTimeout))
+				g.Expect(result.Detail.Code).To(Equal(ErrCodeAPIServerCreateTimeout))
 			},
 		},
 		{
@@ -88,7 +88,7 @@ func TestAPIServerChecker_Run(t *testing.T) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
 				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
-				g.Expect(result.Detail.Code).To(Equal(errCodeAPIServerGetError))
+				g.Expect(result.Detail.Code).To(Equal(ErrCodeAPIServerGetError))
 			},
 		},
 		{
@@ -104,7 +104,7 @@ func TestAPIServerChecker_Run(t *testing.T) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
 				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
-				g.Expect(result.Detail.Code).To(Equal(errCodeAPIServerGetTimeout))
+				g.Expect(result.Detail.Code).To(Equal(ErrCodeAPIServerGetTimeout))
 			},
 		},
 		{
@@ -120,7 +120,7 @@ func TestAPIServerChecker_Run(t *testing.T) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
 				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
-				g.Expect(result.Detail.Code).To(Equal(errCodeAPIServerDeleteError))
+				g.Expect(result.Detail.Code).To(Equal(ErrCodeAPIServerDeleteError))
 			},
 		},
 		{
@@ -136,7 +136,7 @@ func TestAPIServerChecker_Run(t *testing.T) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
 				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
-				g.Expect(result.Detail.Code).To(Equal(errCodeAPIServerDeleteTimeout))
+				g.Expect(result.Detail.Code).To(Equal(ErrCodeAPIServerDeleteTimeout))
 			},
 		},
 		{

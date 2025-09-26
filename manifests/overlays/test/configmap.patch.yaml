@@ -5,38 +5,38 @@
   path: /data/config.yaml
   value: |
     checkers:
-      - name: "test-internal-coredns"
-        type: "dns"
+      - name: "TestInternalCoreDNS"
+        type: "DNS"
         interval: "5s"
         timeout: "3s"
         dnsConfig:
           domain: "kubernetes.default.svc.cluster.local"
           queryTimeout: "1s"
-      - name: "test-external-coredns"
-        type: "dns"
+      - name: "TestExternalCoreDNS"
+        type: "DNS"
         interval: "5s"
         timeout: "3s"
         dnsConfig:
           domain: "mcr.microsoft.com"
           queryTimeout: "1s"
-      - name: "test-internal-localdns"
-        type: "dns"
+      - name: "TestInternalLocalDNS"
+        type: "DNS"
         interval: "5s"
         timeout: "3s"
         dnsConfig:
           domain: "kubernetes.default.svc.cluster.local"
           checkLocalDNS: true
           queryTimeout: "1s"
-      - name: "test-external-localdns"
-        type: "dns"
+      - name: "TestExternalLocalDNS"
+        type: "DNS"
         interval: "5s"
         timeout: "3s"
         dnsConfig:
           domain: "mcr.microsoft.com"
           checkLocalDNS: true
           queryTimeout: "1s"
-      - name: "test-pod-startup"
-        type: "podStartup"
+      - name: "TestPodStartup"
+        type: "PodStartup"
         interval: "10s"
         timeout: "10s"
         podStartupConfig:
@@ -45,8 +45,8 @@
           syntheticPodStartupTimeout: "5s"
           maxSyntheticPods: 10
           tcpTimeout: "2s"
-      - name: "test-api-server"
-        type: "apiServer"
+      - name: "TestAPIServer"
+        type: "APIServer"
         interval: "5s"
         timeout: "5s"
         apiServerConfig:
@@ -55,11 +55,11 @@
           mutateTimeout: "1s"
           readTimeout: "1s"
           maxObjects: 10
-      - name: "test-metrics-server"
-        type: "metricsServer"
+      - name: "TestMetricsServer"
+        type: "MetricsServer"
         interval: "5s"
         timeout: "5s"
-      - name: "test-azure-policy"
-        type: "azurePolicy"
+      - name: "TestAzurePolicy"
+        type: "AzurePolicy"
         interval: "10s"
         timeout: "5s"

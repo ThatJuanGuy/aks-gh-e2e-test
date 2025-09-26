@@ -161,9 +161,9 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 	synthPod, err := c.k8sClientset.CoreV1().Pods(c.config.SyntheticPodNamespace).Create(ctx, c.generateSyntheticPod(timeStampStr), metav1.CreateOptions{})
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return types.Unhealthy(errCodePodCreationTimeout, "timed out creating synthetic pod"), nil
+			return types.Unhealthy(ErrCodePodCreationTimeout, "timed out creating synthetic pod"), nil
 		}
-		return types.Unhealthy(errCodePodCreationError, fmt.Sprintf("error creating synthetic pod: %s", err)), nil
+		return types.Unhealthy(ErrCodePodCreationError, fmt.Sprintf("error creating synthetic pod: %s", err)), nil
 	}
 	defer func() {
 		err := c.k8sClientset.CoreV1().Pods(c.config.SyntheticPodNamespace).Delete(ctx, synthPod.Name, metav1.DeleteOptions{})
@@ -182,7 +182,7 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 	podCreationToContainerRunningDuration, err := c.pollPodCreationToContainerRunningDuration(ctx, synthPod.Name)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return types.Unhealthy(errCodePodStartupDurationExceeded, "pod has no running container"), nil
+			return types.Unhealthy(ErrCodePodStartupDurationExceeded, "pod has no running container"), nil
 		}
 		return nil, fmt.Errorf("pod has no running container: %w", err)
 	}
@@ -194,7 +194,7 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 	// Calculate the pod startup duration. Round to the seconds place because that is the unit of the least precise measurement.
 	podStartupDuration := (podCreationToContainerRunningDuration - imagePullDuration).Round(time.Second)
 	if podStartupDuration >= c.config.SyntheticPodStartupTimeout {
-		return types.Unhealthy(errCodePodStartupDurationExceeded, "pod exceeded the maximum healthy startup duration"), nil
+		return types.Unhealthy(ErrCodePodStartupDurationExceeded, "pod exceeded the maximum healthy startup duration"), nil
 	}
 
 	// perform pod communication check - get pod IP and create TCP connection
@@ -206,9 +206,9 @@ func (c *PodStartupChecker) Run(ctx context.Context) (*types.Result, error) {
 	err = c.createTCPConnection(ctx, podIP)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return types.Unhealthy(errCodeRequestTimeout, "TCP request to synthetic pod timed out"), nil
+			return types.Unhealthy(ErrCodeRequestTimeout, "TCP request to synthetic pod timed out"), nil
 		}
-		return types.Unhealthy(errCodeRequestFailed, fmt.Sprintf("TCP request to synthetic pod failed: %s", err)), nil
+		return types.Unhealthy(ErrCodeRequestFailed, fmt.Sprintf("TCP request to synthetic pod failed: %s", err)), nil
 	}
 
 	return types.Healthy(), nil

@@ -7,11 +7,11 @@ import (
 type CheckerType string
 
 const (
-	CheckTypeDNS           CheckerType = "dns"
-	CheckTypePodStartup    CheckerType = "podStartup"
-	CheckTypeAPIServer     CheckerType = "apiServer"
-	CheckTypeMetricsServer CheckerType = "metricsServer"
-	CheckTypeAzurePolicy   CheckerType = "azurePolicy"
+	CheckTypeDNS           CheckerType = "DNS"
+	CheckTypePodStartup    CheckerType = "PodStartup"
+	CheckTypeAPIServer     CheckerType = "APIServer"
+	CheckTypeMetricsServer CheckerType = "MetricsServer"
+	CheckTypeAzurePolicy   CheckerType = "AzurePolicy"
 )
 
 // Config represents the configuration for the health checkers.

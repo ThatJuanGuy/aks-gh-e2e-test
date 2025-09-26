@@ -1,22 +1,23 @@
 package e2e
 
 import (
+	"github.com/Azure/cluster-health-monitor/pkg/checker/metricsserver"
+	"github.com/Azure/cluster-health-monitor/pkg/config"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"
 )
 
 const (
-	checkerTypeMetricsServer          = "metricsServer"
-	metricsServerUnavailableErrorCode = "metrics_server_unavailable"
-	metricsServerTimeoutErrorCode     = "metrics_server_timeout"
-	metricsServerNamespace            = "kube-system"
-	metricsServerDeploymentName       = "metrics-server"
+	checkerTypeMetricsServer = string(config.CheckTypeMetricsServer)
+
+	metricsServerUnavailableErrorCode = metricsserver.ErrCodeMetricsServerUnavailable
+	metricsServerTimeoutErrorCode     = metricsserver.ErrCodeMetricsServerTimeout
 )
 
 var (
 	// Note that metricsServerCheckerNames must match with the configmap in manifests/overlays/test.
-	metricsServerCheckerNames = []string{"test-metrics-server"}
+	metricsServerCheckerNames = []string{"TestMetricsServer"}
 )
 
 var _ = Describe("Metrics server checker", Ordered, ContinueOnFailure, func() {

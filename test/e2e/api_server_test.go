@@ -3,6 +3,8 @@ package e2e
 import (
 	"context"
 
+	"github.com/Azure/cluster-health-monitor/pkg/checker/apiserver"
+	"github.com/Azure/cluster-health-monitor/pkg/config"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"
@@ -12,14 +14,14 @@ import (
 )
 
 const (
-	checkerTypeAPIServer     = "apiServer"
+	checkerTypeAPIServer     = string(config.CheckTypeAPIServer)
 	apiServerObjectNamespace = "kube-system"
-	apiServerCreateErrorCode = "apiserver_create_error"
+	apiServerCreateErrorCode = apiserver.ErrCodeAPIServerCreateError
 )
 
 var (
 	// Note that apiServerCheckerNames must match with the configmap in manifests/overlays/test.
-	apiServerCheckerNames = []string{"test-api-server"}
+	apiServerCheckerNames = []string{"TestAPIServer"}
 )
 
 var _ = Describe("API server checker", Ordered, ContinueOnFailure, func() {

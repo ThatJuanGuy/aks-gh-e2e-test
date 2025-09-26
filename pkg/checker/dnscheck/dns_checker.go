@@ -90,22 +90,22 @@ func (c DNSChecker) checkCoreDNS(ctx context.Context) (*types.Result, error) {
 	// Check CoreDNS service.
 	svcIP, err := getCoreDNSSvcIP(ctx, c.kubeClient)
 	if errors.Is(err, errServiceNotReady) {
-		return types.Unhealthy(errCodeServiceNotReady, "CoreDNS service is not ready"), nil
+		return types.Unhealthy(ErrCodeServiceNotReady, "CoreDNS service is not ready"), nil
 	}
 	if err != nil {
 		return nil, err
 	}
 	if _, err := c.resolver.lookupHost(ctx, svcIP, c.config.Domain, c.config.QueryTimeout); err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return types.Unhealthy(errCodeServiceTimeout, "CoreDNS service query timed out"), nil
+			return types.Unhealthy(ErrCodeServiceTimeout, "CoreDNS service query timed out"), nil
 		}
-		return types.Unhealthy(errCodeServiceError, fmt.Sprintf("CoreDNS service query error: %s", err)), nil
+		return types.Unhealthy(ErrCodeServiceError, fmt.Sprintf("CoreDNS service query error: %s", err)), nil
 	}
 
 	// Check CoreDNS pods.
 	podIPs, err := getCoreDNSPodIPs(ctx, c.kubeClient)
 	if errors.Is(err, errPodsNotReady) {
-		return types.Unhealthy(errCodePodsNotReady, "CoreDNS Pods are not ready"), nil
+		return types.Unhealthy(ErrCodePodsNotReady, "CoreDNS Pods are not ready"), nil
 	}
 	if err != nil {
 		return nil, err
@@ -114,9 +114,9 @@ func (c DNSChecker) checkCoreDNS(ctx context.Context) (*types.Result, error) {
 	for _, ip := range podIPs {
 		if _, err := c.resolver.lookupHost(ctx, ip, c.config.Domain, c.config.QueryTimeout); err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
-				return types.Unhealthy(errCodePodTimeout, "CoreDNS pod query timed out"), nil
+				return types.Unhealthy(ErrCodePodTimeout, "CoreDNS pod query timed out"), nil
 			}
-			return types.Unhealthy(errCodePodError, fmt.Sprintf("CoreDNS pod query error: %s", err)), nil
+			return types.Unhealthy(ErrCodePodError, fmt.Sprintf("CoreDNS pod query error: %s", err)), nil
 		}
 	}
 
@@ -128,9 +128,9 @@ func (c DNSChecker) checkCoreDNS(ctx context.Context) (*types.Result, error) {
 func (c DNSChecker) checkLocalDNS(ctx context.Context) (*types.Result, error) {
 	if _, err := c.resolver.lookupHost(ctx, localDNSIP, c.config.Domain, c.config.QueryTimeout); err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return types.Unhealthy(errCodeLocalDNSTimeout, "LocalDNS query timed out"), nil
+			return types.Unhealthy(ErrCodeLocalDNSTimeout, "LocalDNS query timed out"), nil
 		}
-		return types.Unhealthy(errCodeLocalDNSError, fmt.Sprintf("LocalDNS query error: %s", err)), nil
+		return types.Unhealthy(ErrCodeLocalDNSError, fmt.Sprintf("LocalDNS query error: %s", err)), nil
 	}
 
 	return types.Healthy(), nil

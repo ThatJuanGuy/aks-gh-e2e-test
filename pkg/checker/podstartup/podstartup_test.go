@@ -129,7 +129,7 @@ func TestPodStartupChecker_Run(t *testing.T) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
 				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
-				g.Expect(result.Detail.Code).To(Equal(errCodePodStartupDurationExceeded))
+				g.Expect(result.Detail.Code).To(Equal(ErrCodePodStartupDurationExceeded))
 				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(0)) // No dynamic client actions should be taken
 			},
 		},
@@ -185,7 +185,7 @@ func TestPodStartupChecker_Run(t *testing.T) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
 				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
-				g.Expect(result.Detail.Code).To(Equal(errCodeRequestFailed))
+				g.Expect(result.Detail.Code).To(Equal(ErrCodeRequestFailed))
 				g.Expect(result.Detail.Message).To(ContainSubstring("TCP request to synthetic pod failed"))
 				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(0)) // No dynamic client actions should be taken
 			},

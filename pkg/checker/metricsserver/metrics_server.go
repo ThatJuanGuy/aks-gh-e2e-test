@@ -71,9 +71,9 @@ func (c *MetricsServerChecker) Run(ctx context.Context) (*types.Result, error) {
 	err := c.checkMetricsServerAPI(ctx)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return types.Unhealthy(errCodeMetricsServerTimeout, "timed out while calling metrics server API"), nil
+			return types.Unhealthy(ErrCodeMetricsServerTimeout, "timed out while calling metrics server API"), nil
 		}
-		return types.Unhealthy(errCodeMetricsServerUnavailable, fmt.Sprintf("metrics server API unavailable: %v", err)), nil
+		return types.Unhealthy(ErrCodeMetricsServerUnavailable, fmt.Sprintf("metrics server API unavailable: %v", err)), nil
 	}
 
 	return types.Healthy(), nil

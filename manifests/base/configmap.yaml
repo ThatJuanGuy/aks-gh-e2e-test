@@ -7,38 +7,38 @@ metadata:
 data:
   config.yaml: |
     checkers:
-      - name: "internal-coredns"
-        type: "dns"
+      - name: "InternalCoreDNS"
+        type: "DNS"
         interval: "10s"
         timeout: "5s"
         dnsConfig:
           domain: "kubernetes.default.svc.cluster.local"
           queryTimeout: "2s"
-      - name: "external-coredns"
-        type: "dns"
+      - name: "ExternalCoreDNS"
+        type: "DNS"
         interval: "10s"
         timeout: "5s"
         dnsConfig:
           domain: "mcr.microsoft.com"
           queryTimeout: "2s"
-      - name: "internal-localdns"
-        type: "dns"
+      - name: "InternalLocalDNS"
+        type: "DNS"
         interval: "10s"
         timeout: "5s"
         dnsConfig:
           domain: "kubernetes.default.svc.cluster.local"
           checkLocalDNS: true
           queryTimeout: "2s"
-      - name: "external-localdns"
-        type: "dns"
+      - name: "ExternalLocalDNS"
+        type: "DNS"
         interval: "10s"
         timeout: "5s"
         dnsConfig:
           domain: "mcr.microsoft.com"
           checkLocalDNS: true
           queryTimeout: "2s"
-      - name: "pod-startup"
-        type: "podStartup"
+      - name: "PodStartup"
+        type: "PodStartup"
         interval: "1m"
         timeout: "30s"
         podStartupConfig:
@@ -47,8 +47,8 @@ data:
           syntheticPodStartupTimeout: "5s"
           maxSyntheticPods: 10
           tcpTimeout: "2s"
-      - name: "api-server"
-        type: "apiServer"
+      - name: "APIServer"
+        type: "APIServer"
         interval: "30s"
         timeout: "5s"
         apiServerConfig:
@@ -57,11 +57,11 @@ data:
           mutateTimeout: "1s"
           readTimeout: "1s"
           maxObjects: 10
-      - name: "metrics-server"
-        type: "metricsServer"
+      - name: "MetricsServer"
+        type: "MetricsServer"
         interval: "30s"
         timeout: "10s"
-      - name: "azure-policy"
-        type: "azurePolicy"
+      - name: "AzurePolicy"
+        type: "AzurePolicy"
         interval: "1m"
         timeout: "10s"

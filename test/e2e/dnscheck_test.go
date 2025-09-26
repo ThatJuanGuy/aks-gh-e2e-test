@@ -4,23 +4,26 @@ package e2e
 import (
 	"os/exec"
 
+	"github.com/Azure/cluster-health-monitor/pkg/checker/dnscheck"
+	"github.com/Azure/cluster-health-monitor/pkg/config"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"
 )
 
 const (
-	checkerTypeDNS             = "dns"
-	dnsPodsNotReadyErrorCode   = "pods_not_ready"
-	dnsServiceTimeoutErrorCode = "service_timeout"
-	localDNSTimeoutErrorCode   = "local_dns_timeout"
+	checkerTypeDNS = string(config.CheckTypeDNS)
+
+	dnsPodsNotReadyErrorCode   = dnscheck.ErrCodePodsNotReady
+	dnsServiceTimeoutErrorCode = dnscheck.ErrCodeServiceTimeout
+	localDNSTimeoutErrorCode   = dnscheck.ErrCodeLocalDNSTimeout
 )
 
 var (
 	// Expected DNS checkers.
 	// Note that these checkers must match with the configmap in manifests/overlays/test.
-	coreDNSCheckerNames  = []string{"test-internal-coredns", "test-external-coredns"}
-	localDNSCheckerNames = []string{"test-internal-localdns", "test-external-localdns"}
+	coreDNSCheckerNames  = []string{"TestInternalCoreDNS", "TestExternalCoreDNS"}
+	localDNSCheckerNames = []string{"TestInternalLocalDNS", "TestExternalLocalDNS"}
 	dnsCheckerNames      = append(coreDNSCheckerNames, localDNSCheckerNames...)
 )
 
