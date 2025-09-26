@@ -76,7 +76,7 @@ func (c DNSChecker) Type() config.CheckerType {
 
 func (c DNSChecker) Run(ctx context.Context) {
 	result, err := c.check(ctx)
-	checker.DefaultCheckerResultRecording(c, result, err)
+	checker.DefaultRecordResult(c, result, err)
 }
 
 // check executes the DNS check.

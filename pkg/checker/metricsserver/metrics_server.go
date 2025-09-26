@@ -67,7 +67,7 @@ func (c *MetricsServerChecker) Type() config.CheckerType {
 
 func (c *MetricsServerChecker) Run(ctx context.Context) {
 	result, err := c.check(ctx)
-	checker.DefaultCheckerResultRecording(c, result, err)
+	checker.DefaultRecordResult(c, result, err)
 }
 
 // check executes the metrics server check.

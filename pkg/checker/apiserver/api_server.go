@@ -58,7 +58,7 @@ func (c APIServerChecker) Type() config.CheckerType {
 
 func (c APIServerChecker) Run(ctx context.Context) {
 	result, err := c.check(ctx)
-	checker.DefaultCheckerResultRecording(c, result, err)
+	checker.DefaultRecordResult(c, result, err)
 }
 
 // check executes the API server check.

@@ -105,7 +105,7 @@ func (c *PodStartupChecker) Type() config.CheckerType {
 
 func (c *PodStartupChecker) Run(ctx context.Context) {
 	result, err := c.check(ctx)
-	checker.DefaultCheckerResultRecording(c, result, err)
+	checker.DefaultRecordResult(c, result, err)
 }
 
 // Run executes the pod startup checker logic. It creates synthetic pods to measure the startup time. The startup time is defined as the
