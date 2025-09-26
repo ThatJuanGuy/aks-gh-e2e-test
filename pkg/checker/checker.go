@@ -44,10 +44,10 @@ func Build(cfg *config.CheckerConfig, kubeClient kubernetes.Interface) (Checker,
 	return builder(cfg, kubeClient)
 }
 
-// DefaultCheckerResultRecording increments the result counter for a specific checker run.
+// DefaultRecordResult increments the result counter for a specific checker run.
 // If err is not nil, it records a run error (unknown status).
 // If result is not nil, it records the status from the result.
-func DefaultCheckerResultRecording(checker Checker, result *types.Result, err error) {
+func DefaultRecordResult(checker Checker, result *types.Result, err error) {
 	checkerType := string(checker.Type())
 	checkerName := checker.Name()
 	// If there's an error, record as unknown.
