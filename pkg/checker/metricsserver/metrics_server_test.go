@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/cluster-health-monitor/pkg/types"
+	"github.com/Azure/cluster-health-monitor/pkg/checker"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
@@ -20,17 +20,17 @@ func TestMetricsServerChecker_check(t *testing.T) {
 	testCases := []struct {
 		name        string
 		client      *metricsfake.Clientset
-		validateRes func(g *WithT, res *types.Result, err error)
+		validateRes func(g *WithT, res *checker.Result, err error)
 	}{
 		{
 			name: "healthy result - metrics server API is available",
 			client: func() *metricsfake.Clientset {
 				return metricsfake.NewSimpleClientset()
 			}(),
-			validateRes: func(g *WithT, res *types.Result, err error) {
+			validateRes: func(g *WithT, res *checker.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(res).ToNot(BeNil())
-				g.Expect(res.Status).To(Equal(types.StatusHealthy))
+				g.Expect(res.Status).To(Equal(checker.StatusHealthy))
 			},
 		},
 		{
@@ -43,10 +43,10 @@ func TestMetricsServerChecker_check(t *testing.T) {
 				})
 				return client
 			}(),
-			validateRes: func(g *WithT, res *types.Result, err error) {
+			validateRes: func(g *WithT, res *checker.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(res).ToNot(BeNil())
-				g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
+				g.Expect(res.Status).To(Equal(checker.StatusUnhealthy))
 				g.Expect(res.Detail.Code).To(Equal(ErrCodeMetricsServerUnavailable))
 				g.Expect(res.Detail.Message).To(ContainSubstring("metrics server API unavailable"))
 			},
@@ -61,10 +61,10 @@ func TestMetricsServerChecker_check(t *testing.T) {
 				})
 				return client
 			}(),
-			validateRes: func(g *WithT, res *types.Result, err error) {
+			validateRes: func(g *WithT, res *checker.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(res).ToNot(BeNil())
-				g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
+				g.Expect(res.Status).To(Equal(checker.StatusUnhealthy))
 				g.Expect(res.Detail.Code).To(Equal(ErrCodeMetricsServerTimeout))
 				g.Expect(res.Detail.Message).To(ContainSubstring("timed out while calling metrics server API"))
 			},

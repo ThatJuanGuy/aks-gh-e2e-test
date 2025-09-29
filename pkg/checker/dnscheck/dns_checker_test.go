@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/cluster-health-monitor/pkg/checker"
 	"github.com/Azure/cluster-health-monitor/pkg/config"
-	"github.com/Azure/cluster-health-monitor/pkg/types"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
@@ -30,7 +30,7 @@ func TestDNSChecker_check(t *testing.T) {
 		client        *k8sfake.Clientset
 		mockResolver  resolver
 		checkLocalDNS bool
-		validateRes   func(g *WithT, res *types.Result, err error)
+		validateRes   func(g *WithT, res *checker.Result, err error)
 	}{
 		{
 			name: "CoreDNS Healthy",
@@ -43,9 +43,9 @@ func TestDNSChecker_check(t *testing.T) {
 					return []string{"1.2.3.4"}, nil
 				},
 			},
-			validateRes: func(g *WithT, res *types.Result, err error) {
+			validateRes: func(g *WithT, res *checker.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(res.Status).To(Equal(types.StatusHealthy))
+				g.Expect(res.Status).To(Equal(checker.StatusHealthy))
 			},
 		},
 		{
@@ -56,9 +56,9 @@ func TestDNSChecker_check(t *testing.T) {
 					return []string{"1.2.3.4"}, nil
 				},
 			},
-			validateRes: func(g *WithT, res *types.Result, err error) {
+			validateRes: func(g *WithT, res *checker.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
+				g.Expect(res.Status).To(Equal(checker.StatusUnhealthy))
 				g.Expect(res.Detail.Code).To(Equal(ErrCodeServiceNotReady))
 			},
 		},
@@ -72,9 +72,9 @@ func TestDNSChecker_check(t *testing.T) {
 					return []string{"1.2.3.4"}, nil
 				},
 			},
-			validateRes: func(g *WithT, res *types.Result, err error) {
+			validateRes: func(g *WithT, res *checker.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
+				g.Expect(res.Status).To(Equal(checker.StatusUnhealthy))
 				g.Expect(res.Detail.Code).To(Equal(ErrCodePodsNotReady))
 			},
 		},
@@ -89,9 +89,9 @@ func TestDNSChecker_check(t *testing.T) {
 					return nil, context.DeadlineExceeded
 				},
 			},
-			validateRes: func(g *WithT, res *types.Result, err error) {
+			validateRes: func(g *WithT, res *checker.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
+				g.Expect(res.Status).To(Equal(checker.StatusUnhealthy))
 				g.Expect(res.Detail.Code).To(Equal(ErrCodeServiceTimeout))
 			},
 		},
@@ -107,9 +107,9 @@ func TestDNSChecker_check(t *testing.T) {
 				},
 			},
 			checkLocalDNS: true,
-			validateRes: func(g *WithT, res *types.Result, err error) {
+			validateRes: func(g *WithT, res *checker.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(res.Status).To(Equal(types.StatusHealthy))
+				g.Expect(res.Status).To(Equal(checker.StatusHealthy))
 			},
 		},
 		{
@@ -124,9 +124,9 @@ func TestDNSChecker_check(t *testing.T) {
 				},
 			},
 			checkLocalDNS: true,
-			validateRes: func(g *WithT, res *types.Result, err error) {
+			validateRes: func(g *WithT, res *checker.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
+				g.Expect(res.Status).To(Equal(checker.StatusUnhealthy))
 				g.Expect(res.Detail.Code).To(Equal(ErrCodeLocalDNSError))
 			},
 		},
@@ -142,9 +142,9 @@ func TestDNSChecker_check(t *testing.T) {
 				},
 			},
 			checkLocalDNS: true,
-			validateRes: func(g *WithT, res *types.Result, err error) {
+			validateRes: func(g *WithT, res *checker.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(res.Status).To(Equal(types.StatusUnhealthy))
+				g.Expect(res.Status).To(Equal(checker.StatusUnhealthy))
 				g.Expect(res.Detail.Code).To(Equal(ErrCodeLocalDNSTimeout))
 			},
 		},

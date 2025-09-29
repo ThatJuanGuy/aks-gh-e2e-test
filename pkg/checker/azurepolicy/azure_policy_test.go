@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/cluster-health-monitor/pkg/types"
+	"github.com/Azure/cluster-health-monitor/pkg/checker"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -45,7 +45,7 @@ func TestAzurePolicyChecker_check(t *testing.T) {
 	tests := []struct {
 		name           string
 		setupMocks     func() (*mockClientFactory, *k8sfake.Clientset, *mockWarningCapture)
-		validateResult func(g *WithT, result *types.Result, err error)
+		validateResult func(g *WithT, result *checker.Result, err error)
 	}{
 		{
 			name: "healthy result - Azure Policy violation detected in error message",
@@ -63,10 +63,10 @@ func TestAzurePolicyChecker_check(t *testing.T) {
 				factory := &mockClientFactory{client: client, warningCapture: warningCapture}
 				return factory, client, warningCapture
 			},
-			validateResult: func(g *WithT, result *types.Result, err error) {
+			validateResult: func(g *WithT, result *checker.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
-				g.Expect(result.Status).To(Equal(types.StatusHealthy))
+				g.Expect(result.Status).To(Equal(checker.StatusHealthy))
 			},
 		},
 		{
@@ -82,10 +82,10 @@ func TestAzurePolicyChecker_check(t *testing.T) {
 				factory := &mockClientFactory{client: client, warningCapture: warningCapture}
 				return factory, client, warningCapture
 			},
-			validateResult: func(g *WithT, result *types.Result, err error) {
+			validateResult: func(g *WithT, result *checker.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
-				g.Expect(result.Status).To(Equal(types.StatusHealthy))
+				g.Expect(result.Status).To(Equal(checker.StatusHealthy))
 			},
 		},
 		{
@@ -99,10 +99,10 @@ func TestAzurePolicyChecker_check(t *testing.T) {
 				factory := &mockClientFactory{client: client, warningCapture: warningCapture}
 				return factory, client, warningCapture
 			},
-			validateResult: func(g *WithT, result *types.Result, err error) {
+			validateResult: func(g *WithT, result *checker.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
-				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
+				g.Expect(result.Status).To(Equal(checker.StatusUnhealthy))
 				g.Expect(result.Detail.Code).To(Equal(ErrCodeAzurePolicyEnforcementMissing))
 			},
 		},
@@ -117,10 +117,10 @@ func TestAzurePolicyChecker_check(t *testing.T) {
 				factory := &mockClientFactory{client: client, warningCapture: warningCapture}
 				return factory, client, warningCapture
 			},
-			validateResult: func(g *WithT, result *types.Result, err error) {
+			validateResult: func(g *WithT, result *checker.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
-				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
+				g.Expect(result.Status).To(Equal(checker.StatusUnhealthy))
 				g.Expect(result.Detail.Code).To(Equal(ErrCodeAzurePolicyEnforcementMissing))
 			},
 		},
@@ -135,7 +135,7 @@ func TestAzurePolicyChecker_check(t *testing.T) {
 				factory := &mockClientFactory{client: client, warningCapture: warningCapture}
 				return factory, client, warningCapture
 			},
-			validateResult: func(g *WithT, result *types.Result, err error) {
+			validateResult: func(g *WithT, result *checker.Result, err error) {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err.Error()).To(ContainSubstring("dry run request to create pod timed out"))
 				g.Expect(result).To(BeNil())
@@ -147,7 +147,7 @@ func TestAzurePolicyChecker_check(t *testing.T) {
 				factory := &mockClientFactory{err: errors.New("failed to create client")}
 				return factory, nil, nil
 			},
-			validateResult: func(g *WithT, result *types.Result, err error) {
+			validateResult: func(g *WithT, result *checker.Result, err error) {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err.Error()).To(ContainSubstring("failed to create Kubernetes client"))
 				g.Expect(result).To(BeNil())

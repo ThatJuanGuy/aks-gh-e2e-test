@@ -6,7 +6,6 @@ import (
 
 	"github.com/Azure/cluster-health-monitor/pkg/config"
 	"github.com/Azure/cluster-health-monitor/pkg/metrics"
-	"github.com/Azure/cluster-health-monitor/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 )
@@ -47,7 +46,7 @@ func Build(cfg *config.CheckerConfig, kubeClient kubernetes.Interface) (Checker,
 // RecordResult increments the result counter for a specific checker run.
 // If err is not nil, it records a run error (unknown status).
 // If result is not nil, it records the status from the result.
-func RecordResult(checker Checker, result *types.Result, err error) {
+func RecordResult(checker Checker, result *Result, err error) {
 	checkerType := string(checker.Type())
 	checkerName := checker.Name()
 	// If there's an error, record as unknown.
@@ -62,10 +61,10 @@ func RecordResult(checker Checker, result *types.Result, err error) {
 	var status string
 	var errorCode string
 	switch result.Status {
-	case types.StatusHealthy:
+	case StatusHealthy:
 		status = metrics.HealthyStatus
 		errorCode = metrics.HealthyCode
-	case types.StatusUnhealthy:
+	case StatusUnhealthy:
 		status = metrics.UnhealthyStatus
 		errorCode = result.Detail.Code
 	}

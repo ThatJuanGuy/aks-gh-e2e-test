@@ -15,7 +15,6 @@ import (
 
 	"github.com/Azure/cluster-health-monitor/pkg/checker"
 	"github.com/Azure/cluster-health-monitor/pkg/config"
-	"github.com/Azure/cluster-health-monitor/pkg/types"
 )
 
 // MetricsServerChecker implements the Checker interface for metrics server checks.
@@ -72,16 +71,16 @@ func (c *MetricsServerChecker) Run(ctx context.Context) {
 
 // check executes the metrics server check.
 // It attempts to call the metrics server API to verify it's available and responding.
-func (c *MetricsServerChecker) check(ctx context.Context) (*types.Result, error) {
+func (c *MetricsServerChecker) check(ctx context.Context) (*checker.Result, error) {
 	err := c.checkMetricsServerAPI(ctx)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return types.Unhealthy(ErrCodeMetricsServerTimeout, "timed out while calling metrics server API"), nil
+			return checker.Unhealthy(ErrCodeMetricsServerTimeout, "timed out while calling metrics server API"), nil
 		}
-		return types.Unhealthy(ErrCodeMetricsServerUnavailable, fmt.Sprintf("metrics server API unavailable: %v", err)), nil
+		return checker.Unhealthy(ErrCodeMetricsServerUnavailable, fmt.Sprintf("metrics server API unavailable: %v", err)), nil
 	}
 
-	return types.Healthy(), nil
+	return checker.Healthy(), nil
 }
 
 func (c *MetricsServerChecker) checkMetricsServerAPI(ctx context.Context) error {

@@ -22,7 +22,6 @@ import (
 
 	"github.com/Azure/cluster-health-monitor/pkg/checker"
 	"github.com/Azure/cluster-health-monitor/pkg/config"
-	"github.com/Azure/cluster-health-monitor/pkg/types"
 )
 
 // Dialer is an interface for making network connections
@@ -112,7 +111,7 @@ func (c *PodStartupChecker) Run(ctx context.Context) {
 // duration between the pod creation and the container running, minus the image pull duration (including waiting). If it is within the
 // allowed limit, the checker is considered healthy. Otherwise, it is considered unhealthy. Before each run, the checker also attempts to
 // garbage collect any leftover synthetic pods from previous runs that may not have been previously deleted due to errors or other issues.
-func (c *PodStartupChecker) check(ctx context.Context) (*types.Result, error) {
+func (c *PodStartupChecker) check(ctx context.Context) (*checker.Result, error) {
 	// Garbage collect any leftover synthetic pods previously created by this checker.
 	if err := c.garbageCollect(ctx); err != nil {
 		// Logging instead of returning an error here to avoid failing the checker run.
@@ -154,7 +153,7 @@ func (c *PodStartupChecker) check(ctx context.Context) (*types.Result, error) {
 			return nil, fmt.Errorf("failed to check Karpenter NodePool CRD presence: %w", err)
 		}
 		if !karpenterNodePoolCRDPresent {
-			return types.Skipped("Karpenter NodePool CRD was not found, pod startup test was skipped"), nil
+			return checker.Skipped("Karpenter NodePool CRD was not found, pod startup test was skipped"), nil
 		}
 		// create a NodePool first, then create synthetic pods on a new node from the node pool.
 		if err := c.createKarpenterNodePool(ctx, c.karpenterNodePool(nodePoolName, timeStampStr)); err != nil {
@@ -166,9 +165,9 @@ func (c *PodStartupChecker) check(ctx context.Context) (*types.Result, error) {
 	synthPod, err := c.k8sClientset.CoreV1().Pods(c.config.SyntheticPodNamespace).Create(ctx, c.generateSyntheticPod(timeStampStr), metav1.CreateOptions{})
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return types.Unhealthy(ErrCodePodCreationTimeout, "timed out creating synthetic pod"), nil
+			return checker.Unhealthy(ErrCodePodCreationTimeout, "timed out creating synthetic pod"), nil
 		}
-		return types.Unhealthy(ErrCodePodCreationError, fmt.Sprintf("error creating synthetic pod: %s", err)), nil
+		return checker.Unhealthy(ErrCodePodCreationError, fmt.Sprintf("error creating synthetic pod: %s", err)), nil
 	}
 	defer func() {
 		err := c.k8sClientset.CoreV1().Pods(c.config.SyntheticPodNamespace).Delete(ctx, synthPod.Name, metav1.DeleteOptions{})
@@ -187,7 +186,7 @@ func (c *PodStartupChecker) check(ctx context.Context) (*types.Result, error) {
 	podCreationToContainerRunningDuration, err := c.pollPodCreationToContainerRunningDuration(ctx, synthPod.Name)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return types.Unhealthy(ErrCodePodStartupDurationExceeded, "pod has no running container"), nil
+			return checker.Unhealthy(ErrCodePodStartupDurationExceeded, "pod has no running container"), nil
 		}
 		return nil, fmt.Errorf("pod has no running container: %w", err)
 	}
@@ -199,7 +198,7 @@ func (c *PodStartupChecker) check(ctx context.Context) (*types.Result, error) {
 	// Calculate the pod startup duration. Round to the seconds place because that is the unit of the least precise measurement.
 	podStartupDuration := (podCreationToContainerRunningDuration - imagePullDuration).Round(time.Second)
 	if podStartupDuration >= c.config.SyntheticPodStartupTimeout {
-		return types.Unhealthy(ErrCodePodStartupDurationExceeded, "pod exceeded the maximum healthy startup duration"), nil
+		return checker.Unhealthy(ErrCodePodStartupDurationExceeded, "pod exceeded the maximum healthy startup duration"), nil
 	}
 
 	// perform pod communication check - get pod IP and create TCP connection
@@ -211,12 +210,12 @@ func (c *PodStartupChecker) check(ctx context.Context) (*types.Result, error) {
 	err = c.createTCPConnection(ctx, podIP)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return types.Unhealthy(ErrCodeRequestTimeout, "TCP request to synthetic pod timed out"), nil
+			return checker.Unhealthy(ErrCodeRequestTimeout, "TCP request to synthetic pod timed out"), nil
 		}
-		return types.Unhealthy(ErrCodeRequestFailed, fmt.Sprintf("TCP request to synthetic pod failed: %s", err)), nil
+		return checker.Unhealthy(ErrCodeRequestFailed, fmt.Sprintf("TCP request to synthetic pod failed: %s", err)), nil
 	}
 
-	return types.Healthy(), nil
+	return checker.Healthy(), nil
 }
 
 // garbageCollect deletes all pods created by the checker that are older than the checker's timeout.
