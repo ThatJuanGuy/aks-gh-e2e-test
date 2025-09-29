@@ -110,7 +110,7 @@ func (c *AzurePolicyChecker) Type() config.CheckerType {
 
 func (c *AzurePolicyChecker) Run(ctx context.Context) {
 	result, err := c.check(ctx)
-	checker.DefaultRecordResult(c, result, err)
+	checker.RecordResult(c, result, err)
 }
 
 // check executes the Azure Policy check by doing a dry run creation of a test pod that violates default AKS Deployment Safeguards policies.
