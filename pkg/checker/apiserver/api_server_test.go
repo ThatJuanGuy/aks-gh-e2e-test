@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/cluster-health-monitor/pkg/checker"
 	"github.com/Azure/cluster-health-monitor/pkg/config"
-	"github.com/Azure/cluster-health-monitor/pkg/types"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -30,17 +30,17 @@ func TestAPIServerChecker_check(t *testing.T) {
 	tests := []struct {
 		name           string
 		client         *k8sfake.Clientset
-		validateResult func(g *WithT, result *types.Result, err error)
+		validateResult func(g *WithT, result *checker.Result, err error)
 	}{
 		{
 			name: "healthy result - all operations succeed",
 			client: func() *k8sfake.Clientset {
 				return k8sfake.NewSimpleClientset()
 			}(),
-			validateResult: func(g *WithT, result *types.Result, err error) {
+			validateResult: func(g *WithT, result *checker.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
-				g.Expect(result.Status).To(Equal(types.StatusHealthy))
+				g.Expect(result.Status).To(Equal(checker.StatusHealthy))
 			},
 		},
 		{
@@ -52,10 +52,10 @@ func TestAPIServerChecker_check(t *testing.T) {
 				})
 				return client
 			}(),
-			validateResult: func(g *WithT, result *types.Result, err error) {
+			validateResult: func(g *WithT, result *checker.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
-				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
+				g.Expect(result.Status).To(Equal(checker.StatusUnhealthy))
 				g.Expect(result.Detail.Code).To(Equal(ErrCodeAPIServerCreateError))
 			},
 		},
@@ -68,10 +68,10 @@ func TestAPIServerChecker_check(t *testing.T) {
 				})
 				return client
 			}(),
-			validateResult: func(g *WithT, result *types.Result, err error) {
+			validateResult: func(g *WithT, result *checker.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
-				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
+				g.Expect(result.Status).To(Equal(checker.StatusUnhealthy))
 				g.Expect(result.Detail.Code).To(Equal(ErrCodeAPIServerCreateTimeout))
 			},
 		},
@@ -84,10 +84,10 @@ func TestAPIServerChecker_check(t *testing.T) {
 				})
 				return client
 			}(),
-			validateResult: func(g *WithT, result *types.Result, err error) {
+			validateResult: func(g *WithT, result *checker.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
-				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
+				g.Expect(result.Status).To(Equal(checker.StatusUnhealthy))
 				g.Expect(result.Detail.Code).To(Equal(ErrCodeAPIServerGetError))
 			},
 		},
@@ -100,10 +100,10 @@ func TestAPIServerChecker_check(t *testing.T) {
 				})
 				return client
 			}(),
-			validateResult: func(g *WithT, result *types.Result, err error) {
+			validateResult: func(g *WithT, result *checker.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
-				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
+				g.Expect(result.Status).To(Equal(checker.StatusUnhealthy))
 				g.Expect(result.Detail.Code).To(Equal(ErrCodeAPIServerGetTimeout))
 			},
 		},
@@ -116,10 +116,10 @@ func TestAPIServerChecker_check(t *testing.T) {
 				})
 				return client
 			}(),
-			validateResult: func(g *WithT, result *types.Result, err error) {
+			validateResult: func(g *WithT, result *checker.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
-				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
+				g.Expect(result.Status).To(Equal(checker.StatusUnhealthy))
 				g.Expect(result.Detail.Code).To(Equal(ErrCodeAPIServerDeleteError))
 			},
 		},
@@ -132,10 +132,10 @@ func TestAPIServerChecker_check(t *testing.T) {
 				})
 				return client
 			}(),
-			validateResult: func(g *WithT, result *types.Result, err error) {
+			validateResult: func(g *WithT, result *checker.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
-				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
+				g.Expect(result.Status).To(Equal(checker.StatusUnhealthy))
 				g.Expect(result.Detail.Code).To(Equal(ErrCodeAPIServerDeleteTimeout))
 			},
 		},
@@ -155,7 +155,7 @@ func TestAPIServerChecker_check(t *testing.T) {
 				})
 				return client
 			}(),
-			validateResult: func(g *WithT, result *types.Result, err error) {
+			validateResult: func(g *WithT, result *checker.Result, err error) {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err.Error()).To(ContainSubstring("maximum number of ConfigMaps reached"))
 			},

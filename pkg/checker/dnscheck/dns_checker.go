@@ -15,7 +15,6 @@ import (
 
 	"github.com/Azure/cluster-health-monitor/pkg/checker"
 	"github.com/Azure/cluster-health-monitor/pkg/config"
-	"github.com/Azure/cluster-health-monitor/pkg/types"
 )
 
 func Register() {
@@ -81,7 +80,7 @@ func (c DNSChecker) Run(ctx context.Context) {
 
 // check executes the DNS check.
 // It will check either CoreDNS or LocalDNS for the configured domain.
-func (c DNSChecker) check(ctx context.Context) (*types.Result, error) {
+func (c DNSChecker) check(ctx context.Context) (*checker.Result, error) {
 	if c.config.CheckLocalDNS {
 		return c.checkLocalDNS(ctx)
 	} else {
@@ -91,26 +90,26 @@ func (c DNSChecker) check(ctx context.Context) (*types.Result, error) {
 
 // checkCoreDNS queries CoreDNS service and pods.
 // If all queries succeed, the check is considered healthy.
-func (c DNSChecker) checkCoreDNS(ctx context.Context) (*types.Result, error) {
+func (c DNSChecker) checkCoreDNS(ctx context.Context) (*checker.Result, error) {
 	// Check CoreDNS service.
 	svcIP, err := getCoreDNSSvcIP(ctx, c.kubeClient)
 	if errors.Is(err, errServiceNotReady) {
-		return types.Unhealthy(ErrCodeServiceNotReady, "CoreDNS service is not ready"), nil
+		return checker.Unhealthy(ErrCodeServiceNotReady, "CoreDNS service is not ready"), nil
 	}
 	if err != nil {
 		return nil, err
 	}
 	if _, err := c.resolver.lookupHost(ctx, svcIP, c.config.Domain, c.config.QueryTimeout); err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return types.Unhealthy(ErrCodeServiceTimeout, "CoreDNS service query timed out"), nil
+			return checker.Unhealthy(ErrCodeServiceTimeout, "CoreDNS service query timed out"), nil
 		}
-		return types.Unhealthy(ErrCodeServiceError, fmt.Sprintf("CoreDNS service query error: %s", err)), nil
+		return checker.Unhealthy(ErrCodeServiceError, fmt.Sprintf("CoreDNS service query error: %s", err)), nil
 	}
 
 	// Check CoreDNS pods.
 	podIPs, err := getCoreDNSPodIPs(ctx, c.kubeClient)
 	if errors.Is(err, errPodsNotReady) {
-		return types.Unhealthy(ErrCodePodsNotReady, "CoreDNS Pods are not ready"), nil
+		return checker.Unhealthy(ErrCodePodsNotReady, "CoreDNS Pods are not ready"), nil
 	}
 	if err != nil {
 		return nil, err
@@ -119,26 +118,26 @@ func (c DNSChecker) checkCoreDNS(ctx context.Context) (*types.Result, error) {
 	for _, ip := range podIPs {
 		if _, err := c.resolver.lookupHost(ctx, ip, c.config.Domain, c.config.QueryTimeout); err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
-				return types.Unhealthy(ErrCodePodTimeout, "CoreDNS pod query timed out"), nil
+				return checker.Unhealthy(ErrCodePodTimeout, "CoreDNS pod query timed out"), nil
 			}
-			return types.Unhealthy(ErrCodePodError, fmt.Sprintf("CoreDNS pod query error: %s", err)), nil
+			return checker.Unhealthy(ErrCodePodError, fmt.Sprintf("CoreDNS pod query error: %s", err)), nil
 		}
 	}
 
-	return types.Healthy(), nil
+	return checker.Healthy(), nil
 }
 
 // checkLocalDNS queries the LocalDNS server.
 // If the query succeeds, the check is considered healthy.
-func (c DNSChecker) checkLocalDNS(ctx context.Context) (*types.Result, error) {
+func (c DNSChecker) checkLocalDNS(ctx context.Context) (*checker.Result, error) {
 	if _, err := c.resolver.lookupHost(ctx, localDNSIP, c.config.Domain, c.config.QueryTimeout); err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return types.Unhealthy(ErrCodeLocalDNSTimeout, "LocalDNS query timed out"), nil
+			return checker.Unhealthy(ErrCodeLocalDNSTimeout, "LocalDNS query timed out"), nil
 		}
-		return types.Unhealthy(ErrCodeLocalDNSError, fmt.Sprintf("LocalDNS query error: %s", err)), nil
+		return checker.Unhealthy(ErrCodeLocalDNSError, fmt.Sprintf("LocalDNS query error: %s", err)), nil
 	}
 
-	return types.Healthy(), nil
+	return checker.Healthy(), nil
 }
 
 // getCoreDNSSvcIP returns the ClusterIP of the CoreDNS service in the cluster as a DNSTarget.

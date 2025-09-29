@@ -16,7 +16,6 @@ import (
 
 	"github.com/Azure/cluster-health-monitor/pkg/checker"
 	"github.com/Azure/cluster-health-monitor/pkg/config"
-	"github.com/Azure/cluster-health-monitor/pkg/types"
 )
 
 // WarningCapture provides access to captured warning headers
@@ -119,7 +118,7 @@ func (c *AzurePolicyChecker) Run(ctx context.Context) {
 // are mainly expected to be present when the policy enforcement is set to "Audit". The errors are mainly expected to be present when the
 // policy enforcement is set to "Deny". That said, if a policy has recently had its enforcement mode changed, it is possible to receive
 // both an error and warning headers in the response.
-func (c *AzurePolicyChecker) check(ctx context.Context) (*types.Result, error) {
+func (c *AzurePolicyChecker) check(ctx context.Context) (*checker.Result, error) {
 	// Create client with warning capture
 	client, warningCapture, err := c.clientFactory.CreateClientWithWarningCapture(c.restConfig)
 	if err != nil {
@@ -137,16 +136,16 @@ func (c *AzurePolicyChecker) check(ctx context.Context) (*types.Result, error) {
 			return nil, fmt.Errorf("dry run request to create pod timed out: %w", err)
 		}
 		if c.hasAzurePolicyViolation(err.Error()) {
-			return types.Healthy(), nil
+			return checker.Healthy(), nil
 		}
 	}
 
 	for _, warning := range warningCapture.GetWarnings() {
 		if c.hasAzurePolicyViolation(warning) {
-			return types.Healthy(), nil
+			return checker.Healthy(), nil
 		}
 	}
-	return types.Unhealthy(ErrCodeAzurePolicyEnforcementMissing, "no Azure Policy violations detected"), nil
+	return checker.Unhealthy(ErrCodeAzurePolicyEnforcementMissing, "no Azure Policy violations detected"), nil
 }
 
 // createTestPod creates a test pod without probes to trigger Azure Policy warnings

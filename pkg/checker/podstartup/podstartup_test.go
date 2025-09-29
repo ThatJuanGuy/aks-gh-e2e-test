@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/cluster-health-monitor/pkg/checker"
 	"github.com/Azure/cluster-health-monitor/pkg/config"
-	"github.com/Azure/cluster-health-monitor/pkg/types"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -108,15 +108,15 @@ func TestPodStartupChecker_check(t *testing.T) {
 	tests := []struct {
 		name           string
 		mutators       []scenarioMutator
-		validateResult func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient)
+		validateResult func(g *WithT, result *checker.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient)
 	}{
 		{
 			name:     "healthy result - no pre-existing synthetic pods",
 			mutators: nil, // Use default scenario
-			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
+			validateResult: func(g *WithT, result *checker.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
-				g.Expect(result.Status).To(Equal(types.StatusHealthy))
+				g.Expect(result.Status).To(Equal(checker.StatusHealthy))
 				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(0)) // No dynamic client actions should be taken
 			},
 		},
@@ -125,10 +125,10 @@ func TestPodStartupChecker_check(t *testing.T) {
 			mutators: []scenarioMutator{
 				func(s *testScenario) { s.startupDelay = 10 * time.Second },
 			},
-			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
+			validateResult: func(g *WithT, result *checker.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
-				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
+				g.Expect(result.Status).To(Equal(checker.StatusUnhealthy))
 				g.Expect(result.Detail.Code).To(Equal(ErrCodePodStartupDurationExceeded))
 				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(0)) // No dynamic client actions should be taken
 			},
@@ -143,7 +143,7 @@ func TestPodStartupChecker_check(t *testing.T) {
 					s.hasDeleteError = true
 				},
 			},
-			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
+			validateResult: func(g *WithT, result *checker.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err.Error()).To(ContainSubstring("maximum number of synthetic pods reached"))
 				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(0)) // No dynamic client actions should be taken
@@ -159,7 +159,7 @@ func TestPodStartupChecker_check(t *testing.T) {
 					}
 				},
 			},
-			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
+			validateResult: func(g *WithT, result *checker.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err.Error()).To(ContainSubstring("CSI resource limit check failed"))
 				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(0)) // No dynamic client actions should be taken
@@ -170,7 +170,7 @@ func TestPodStartupChecker_check(t *testing.T) {
 			mutators: []scenarioMutator{
 				func(s *testScenario) { s.podIP = "" },
 			},
-			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
+			validateResult: func(g *WithT, result *checker.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err.Error()).To(ContainSubstring("failed to get synthetic pod IP"))
 				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(0)) // No dynamic client actions should be taken
@@ -181,10 +181,10 @@ func TestPodStartupChecker_check(t *testing.T) {
 			mutators: []scenarioMutator{
 				func(s *testScenario) { s.dialer = failingDialer("error") },
 			},
-			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
+			validateResult: func(g *WithT, result *checker.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
-				g.Expect(result.Status).To(Equal(types.StatusUnhealthy))
+				g.Expect(result.Status).To(Equal(checker.StatusUnhealthy))
 				g.Expect(result.Detail.Code).To(Equal(ErrCodeRequestFailed))
 				g.Expect(result.Detail.Message).To(ContainSubstring("TCP request to synthetic pod failed"))
 				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(0)) // No dynamic client actions should be taken
@@ -213,10 +213,10 @@ func TestPodStartupChecker_check(t *testing.T) {
 				},
 			},
 
-			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
+			validateResult: func(g *WithT, result *checker.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
-				g.Expect(result.Status).To(Equal(types.StatusHealthy))
+				g.Expect(result.Status).To(Equal(checker.StatusHealthy))
 
 				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(4))
 				g.Expect(fakeDynamicClient.Actions()[0].GetResource()).To(Equal(NodePoolGVR))
@@ -252,10 +252,10 @@ func TestPodStartupChecker_check(t *testing.T) {
 				},
 			},
 
-			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
+			validateResult: func(g *WithT, result *checker.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
-				g.Expect(result.Status).To(Equal(types.StatusHealthy))
+				g.Expect(result.Status).To(Equal(checker.StatusHealthy))
 
 				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(4))
 				g.Expect(fakeDynamicClient.Actions()[0].GetResource()).To(Equal(NodePoolGVR))
@@ -309,10 +309,10 @@ func TestPodStartupChecker_check(t *testing.T) {
 				},
 			},
 
-			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
+			validateResult: func(g *WithT, result *checker.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
-				g.Expect(result.Status).To(Equal(types.StatusHealthy))
+				g.Expect(result.Status).To(Equal(checker.StatusHealthy))
 
 				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(5))
 				g.Expect(fakeDynamicClient.Actions()[0].GetResource()).To(Equal(NodePoolGVR))
@@ -341,10 +341,10 @@ func TestPodStartupChecker_check(t *testing.T) {
 					})
 				},
 			},
-			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
+			validateResult: func(g *WithT, result *checker.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(result).ToNot(BeNil())
-				g.Expect(result.Status).To(Equal(types.StatusSkipped))
+				g.Expect(result.Status).To(Equal(checker.StatusSkipped))
 
 				g.Expect(fakeDynamicClient.Actions()).To(HaveLen(2))
 				g.Expect(fakeDynamicClient.Actions()[0].GetResource()).To(Equal(NodePoolGVR))
@@ -378,7 +378,7 @@ func TestPodStartupChecker_check(t *testing.T) {
 					})
 				},
 			},
-			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
+			validateResult: func(g *WithT, result *checker.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err.Error()).To(ContainSubstring("unexpected error occurred while creating node pool"))
 
@@ -399,7 +399,7 @@ func TestPodStartupChecker_check(t *testing.T) {
 					s.hasCSICreateError = true
 				},
 			},
-			validateResult: func(g *WithT, result *types.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
+			validateResult: func(g *WithT, result *checker.Result, err error, fakeDynamicClient *dynamicfake.FakeDynamicClient) {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err.Error()).To(ContainSubstring("failed to create CSI test resources"))
 			},

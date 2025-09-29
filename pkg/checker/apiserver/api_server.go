@@ -17,7 +17,6 @@ import (
 
 	"github.com/Azure/cluster-health-monitor/pkg/checker"
 	"github.com/Azure/cluster-health-monitor/pkg/config"
-	"github.com/Azure/cluster-health-monitor/pkg/types"
 )
 
 // APIServerChecker implements the Checker interface for API server checks.
@@ -64,7 +63,7 @@ func (c APIServerChecker) Run(ctx context.Context) {
 // check executes the API server check.
 // It creates an empty ConfigMap, gets it, and then deletes it.
 // If all operations succeed, the check is considered healthy.
-func (c APIServerChecker) check(ctx context.Context) (*types.Result, error) {
+func (c APIServerChecker) check(ctx context.Context) (*checker.Result, error) {
 	// Garbage collect any leftover ConfigMaps previously created by this checker.
 	if err := c.garbageCollect(ctx); err != nil {
 		// Logging instead of returning an error to avoid failing the checker run.
@@ -90,9 +89,9 @@ func (c APIServerChecker) check(ctx context.Context) (*types.Result, error) {
 	createdConfigMap, err := c.kubeClient.CoreV1().ConfigMaps(c.config.Namespace).Create(createCtx, c.generateConfigMap(), metav1.CreateOptions{})
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return types.Unhealthy(ErrCodeAPIServerCreateTimeout, "timed out while creating ConfigMap"), nil
+			return checker.Unhealthy(ErrCodeAPIServerCreateTimeout, "timed out while creating ConfigMap"), nil
 		}
-		return types.Unhealthy(ErrCodeAPIServerCreateError, fmt.Sprintf("failed to create ConfigMap: %v", err)), nil
+		return checker.Unhealthy(ErrCodeAPIServerCreateError, fmt.Sprintf("failed to create ConfigMap: %v", err)), nil
 	}
 	// Defer deletion of the created ConfigMap in case of failure later in the function.
 	defer func() {
@@ -109,9 +108,9 @@ func (c APIServerChecker) check(ctx context.Context) (*types.Result, error) {
 	_, err = c.kubeClient.CoreV1().ConfigMaps(c.config.Namespace).Get(getCtx, createdConfigMap.Name, metav1.GetOptions{})
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return types.Unhealthy(ErrCodeAPIServerGetTimeout, "timed out while getting ConfigMap"), nil
+			return checker.Unhealthy(ErrCodeAPIServerGetTimeout, "timed out while getting ConfigMap"), nil
 		}
-		return types.Unhealthy(ErrCodeAPIServerGetError, fmt.Sprintf("failed to get ConfigMap: %v", err)), nil
+		return checker.Unhealthy(ErrCodeAPIServerGetError, fmt.Sprintf("failed to get ConfigMap: %v", err)), nil
 	}
 
 	// Delete ConfigMap.
@@ -120,12 +119,12 @@ func (c APIServerChecker) check(ctx context.Context) (*types.Result, error) {
 	err = c.kubeClient.CoreV1().ConfigMaps(c.config.Namespace).Delete(deleteCtx, createdConfigMap.Name, metav1.DeleteOptions{})
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return types.Unhealthy(ErrCodeAPIServerDeleteTimeout, "timed out while deleting ConfigMap"), nil
+			return checker.Unhealthy(ErrCodeAPIServerDeleteTimeout, "timed out while deleting ConfigMap"), nil
 		}
-		return types.Unhealthy(ErrCodeAPIServerDeleteError, fmt.Sprintf("failed to delete ConfigMap: %v", err)), nil
+		return checker.Unhealthy(ErrCodeAPIServerDeleteError, fmt.Sprintf("failed to delete ConfigMap: %v", err)), nil
 	}
 
-	return types.Healthy(), nil
+	return checker.Healthy(), nil
 }
 
 // configMapLabels returns the labels to be applied to ConfigMaps created specifically by this checker.
