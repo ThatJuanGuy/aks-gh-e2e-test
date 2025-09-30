@@ -51,7 +51,6 @@ func RecordResult(checker Checker, result *Result, err error, labels ...string) 
 	checkerName := checker.Name()
 	// If there's an error, record as unknown.
 	if err != nil {
-
 		metrics.CheckerResultCounter.WithLabelValues(append(labels, checkerType, checkerName, metrics.UnknownStatus, metrics.UnknownCode)...).Inc()
 		klog.V(3).InfoS("Recorded checker result", "name", checkerName, "type", checkerType, "status", metrics.UnknownStatus, "labels", labels)
 		klog.ErrorS(err, "Failed checker run", "name", checkerName, "type", checkerType)
