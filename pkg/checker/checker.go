@@ -73,7 +73,7 @@ func RecordResult(checker Checker, result *Result, err error) {
 	klog.V(3).InfoS("Recorded checker result", "name", checkerName, "type", checkerType, "status", status, "errorCode", errorCode, "message", result.Detail.Message)
 }
 
-// RecordResult increments the result counter for a specific checker run.
+// RecordCoreDNSPodResult increments the result counter for a specific core DNS pod check.
 // If err is not nil, it records a run error (unknown status).
 // If result is not nil, it records the status from the result.
 func RecordCoreDNSPodResult(checker Checker, podName string, result *Result, err error) {
