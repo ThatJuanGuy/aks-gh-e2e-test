@@ -46,13 +46,13 @@ func Build(cfg *config.CheckerConfig, kubeClient kubernetes.Interface) (Checker,
 // RecordResult increments the result counter for a specific checker run.
 // If err is not nil, it records a run error (unknown status).
 // If result is not nil, it records the status from the result.
-func RecordResult(checker Checker, result *Result, err error, labels ...string) {
+func RecordResult(checker Checker, result *Result, err error) {
 	checkerType := string(checker.Type())
 	checkerName := checker.Name()
 	// If there's an error, record as unknown.
 	if err != nil {
-		metrics.CheckerResultCounter.WithLabelValues(append(labels, checkerType, checkerName, metrics.UnknownStatus, metrics.UnknownCode)...).Inc()
-		klog.V(3).InfoS("Recorded checker result", "name", checkerName, "type", checkerType, "status", metrics.UnknownStatus, "labels", labels)
+		metrics.CheckerResultCounter.WithLabelValues(checkerType, checkerName, metrics.UnknownStatus, metrics.UnknownCode).Inc()
+		klog.V(3).InfoS("Recorded checker result", "name", checkerName, "type", checkerType, "status", metrics.UnknownStatus)
 		klog.ErrorS(err, "Failed checker run", "name", checkerName, "type", checkerType)
 		return
 	}
@@ -69,6 +69,36 @@ func RecordResult(checker Checker, result *Result, err error, labels ...string) 
 		errorCode = result.Detail.Code
 	}
 
-	metrics.CheckerResultCounter.WithLabelValues(append(labels, checkerType, checkerName, status, errorCode)...).Inc()
-	klog.V(3).InfoS("Recorded checker result", "name", checkerName, "type", checkerType, "status", status, "errorCode", errorCode, "message", result.Detail.Message, "labels", labels)
+	metrics.CheckerResultCounter.WithLabelValues(checkerType, checkerName, status, errorCode).Inc()
+	klog.V(3).InfoS("Recorded checker result", "name", checkerName, "type", checkerType, "status", status, "errorCode", errorCode, "message", result.Detail.Message)
+}
+
+// RecordResult increments the result counter for a specific checker run.
+// If err is not nil, it records a run error (unknown status).
+// If result is not nil, it records the status from the result.
+func RecordCoreDNSPodResult(checker Checker, podName string, result *Result, err error) {
+	checkerType := string(checker.Type())
+	checkerName := checker.Name()
+	// If there's an error, record as unknown.
+	if err != nil {
+		metrics.CoreDNSPodResultCounter.WithLabelValues(checkerType, checkerName, podName, metrics.UnknownStatus, metrics.UnknownCode).Inc()
+		klog.V(3).InfoS("Recorded checker result", "name", checkerName, "type", checkerType, "podName", podName, "status", metrics.UnknownStatus)
+		klog.ErrorS(err, "Failed checker run", "name", checkerName, "type", checkerType, "podName", podName)
+		return
+	}
+
+	// Record based on result status.
+	var status string
+	var errorCode string
+	switch result.Status {
+	case StatusHealthy:
+		status = metrics.HealthyStatus
+		errorCode = metrics.HealthyCode
+	case StatusUnhealthy:
+		status = metrics.UnhealthyStatus
+		errorCode = result.Detail.Code
+	}
+
+	metrics.CoreDNSPodResultCounter.WithLabelValues(checkerType, checkerName, podName, status, errorCode).Inc()
+	klog.V(3).InfoS("Recorded checker result", "name", checkerName, "type", checkerType, "podName", podName, "status", status, "errorCode", errorCode, "message", result.Detail.Message)
 }
