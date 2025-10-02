@@ -67,14 +67,14 @@ type DNSConfig struct {
 	QueryTimeout time.Duration `yaml:"queryTimeout"`
 	// Required.
 	// DNS check mode: core DNS, per-pod core DNS, or local DNS.
-	CheckType DNSCheckType `yaml:"checkType,omitempty"`
+	Target DNSCheckTarget `yaml:"target,omitempty"`
 }
-type DNSCheckType string
+type DNSCheckTarget string
 
 const (
-	DNSCheckTypeCoreDNS       DNSCheckType = "coreDNS"
-	DNSCheckTypeCoreDNSPerPod DNSCheckType = "coreDNSPerPod"
-	DNSCheckTypeLocalDNS      DNSCheckType = "localDNS"
+	DNSCheckTargetCoreDNS       DNSCheckTarget = "CoreDNS"
+	DNSCheckTargetCoreDNSPerPod DNSCheckTarget = "CoreDNSPerPod"
+	DNSCheckTargetLocalDNS      DNSCheckTarget = "LocalDNS"
 )
 
 type PodStartupConfig struct {

@@ -29,7 +29,7 @@ func TestDNSChecker_check(t *testing.T) {
 		name         string
 		client       *k8sfake.Clientset
 		mockResolver resolver
-		checkType    config.DNSCheckType
+		target       config.DNSCheckTarget
 		validateRes  func(g *WithT, res *checker.Result, err error)
 	}{
 		{
@@ -38,7 +38,7 @@ func TestDNSChecker_check(t *testing.T) {
 				makeCoreDNSService("10.0.0.10"),
 				makeCoreDNSEndpointSlice([]string{"10.0.0.11", "10.0.0.12"}),
 			),
-			checkType: config.DNSCheckTypeCoreDNS,
+			target: config.DNSCheckTargetCoreDNS,
 			mockResolver: &fakeResolver{
 				lookupHostFunc: func(ctx context.Context, ip, domain string, queryTimeout time.Duration) ([]string, error) {
 					return []string{"1.2.3.4"}, nil
@@ -50,9 +50,9 @@ func TestDNSChecker_check(t *testing.T) {
 			},
 		},
 		{
-			name:      "CoreDNS Service Not Ready",
-			client:    k8sfake.NewClientset(), // No service.
-			checkType: config.DNSCheckTypeCoreDNS,
+			name:   "CoreDNS Service Not Ready",
+			client: k8sfake.NewClientset(), // No service.
+			target: config.DNSCheckTargetCoreDNS,
 			mockResolver: &fakeResolver{
 				lookupHostFunc: func(ctx context.Context, ip, domain string, queryTimeout time.Duration) ([]string, error) {
 					return []string{"1.2.3.4"}, nil
@@ -69,7 +69,7 @@ func TestDNSChecker_check(t *testing.T) {
 			client: k8sfake.NewClientset(
 				makeCoreDNSService("10.0.0.10"),
 			),
-			checkType: config.DNSCheckTypeCoreDNS,
+			target: config.DNSCheckTargetCoreDNS,
 			mockResolver: &fakeResolver{
 				lookupHostFunc: func(ctx context.Context, ip, domain string, queryTimeout time.Duration) ([]string, error) {
 					return []string{"1.2.3.4"}, nil
@@ -87,7 +87,7 @@ func TestDNSChecker_check(t *testing.T) {
 				makeCoreDNSService("10.0.0.10"),
 				makeCoreDNSEndpointSlice([]string{"10.0.0.11"}),
 			),
-			checkType: config.DNSCheckTypeCoreDNS,
+			target: config.DNSCheckTargetCoreDNS,
 			mockResolver: &fakeResolver{
 				lookupHostFunc: func(ctx context.Context, ip, domain string, queryTimeout time.Duration) ([]string, error) {
 					return nil, context.DeadlineExceeded
@@ -110,7 +110,7 @@ func TestDNSChecker_check(t *testing.T) {
 					return []string{"1.2.3.4"}, nil
 				},
 			},
-			checkType: config.DNSCheckTypeLocalDNS,
+			target: config.DNSCheckTargetLocalDNS,
 			validateRes: func(g *WithT, res *checker.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(res.Status).To(Equal(checker.StatusHealthy))
@@ -127,7 +127,7 @@ func TestDNSChecker_check(t *testing.T) {
 					return nil, fmt.Errorf("local dns error")
 				},
 			},
-			checkType: config.DNSCheckTypeLocalDNS,
+			target: config.DNSCheckTargetLocalDNS,
 			validateRes: func(g *WithT, res *checker.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(res.Status).To(Equal(checker.StatusUnhealthy))
@@ -145,7 +145,7 @@ func TestDNSChecker_check(t *testing.T) {
 					return nil, context.DeadlineExceeded
 				},
 			},
-			checkType: config.DNSCheckTypeLocalDNS,
+			target: config.DNSCheckTargetLocalDNS,
 			validateRes: func(g *WithT, res *checker.Result, err error) {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(res.Status).To(Equal(checker.StatusUnhealthy))
@@ -163,7 +163,7 @@ func TestDNSChecker_check(t *testing.T) {
 				name: "dns-test",
 				config: &config.DNSConfig{
 					Domain:       "example.com",
-					CheckType:    tc.checkType,
+					Target:       tc.target,
 					QueryTimeout: 2 * time.Second,
 				},
 				kubeClient: tc.client,
@@ -193,7 +193,7 @@ func TestDNSChecker_QueryTimeoutUsedByResolver(t *testing.T) {
 		config: &config.DNSConfig{
 			Domain:       "example.com",
 			QueryTimeout: 5 * time.Second,
-			CheckType:    config.DNSCheckTypeCoreDNS,
+			Target:       config.DNSCheckTargetCoreDNS,
 		},
 		kubeClient: k8sfake.NewClientset(makeCoreDNSService("10.0.0.10"), makeCoreDNSEndpointSlice([]string{"10.0.0.11"})),
 		resolver:   mockResolver,

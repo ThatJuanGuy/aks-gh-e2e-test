@@ -10,7 +10,7 @@
         interval: "5s"
         timeout: "3s"
         dnsConfig:
-          checkType: "coreDNS"
+          target: "CoreDNS"
           domain: "kubernetes.default.svc.cluster.local"
           queryTimeout: "1s"
       - name: "TestExternalCoreDNS"
@@ -18,7 +18,7 @@
         interval: "5s"
         timeout: "3s"
         dnsConfig:
-          checkType: "coreDNS"
+          target: "CoreDNS"
           domain: "mcr.microsoft.com"
           queryTimeout: "1s"
       - name: "TestInternalLocalDNS"
@@ -27,7 +27,7 @@
         timeout: "3s"
         dnsConfig:
           domain: "kubernetes.default.svc.cluster.local"
-          checkType: "localDNS"
+          target: "LocalDNS"
           queryTimeout: "1s"
       - name: "TestExternalLocalDNS"
         type: "DNS"
@@ -35,7 +35,7 @@
         timeout: "3s"
         dnsConfig:
           domain: "mcr.microsoft.com"
-          checkType: "localDNS"
+          target: "LocalDNS"
           queryTimeout: "1s"
       - name: "TestPodStartup"
         type: "PodStartup"

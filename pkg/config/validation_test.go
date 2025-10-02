@@ -16,7 +16,7 @@ func TestConfigValidate_Valid(t *testing.T) {
 				Type:      CheckTypeDNS,
 				Interval:  10 * time.Second,
 				Timeout:   5 * time.Second,
-				DNSConfig: &DNSConfig{Domain: "example.com", QueryTimeout: 2 * time.Second, CheckType: DNSCheckTypeCoreDNS},
+				DNSConfig: &DNSConfig{Domain: "example.com", QueryTimeout: 2 * time.Second, Target: DNSCheckTargetCoreDNS},
 			},
 			{
 				Name:     "podStartup1",
@@ -415,25 +415,25 @@ func TestDNSConfig_Validate(t *testing.T) {
 			},
 		},
 		{
-			name: "DNS config check type is missing",
+			name: "DNS config target is missing",
 			mutateConfig: func(cfg *CheckerConfig) *CheckerConfig {
-				cfg.DNSConfig.CheckType = ""
+				cfg.DNSConfig.Target = ""
 				return cfg
 			},
 			validateRes: func(g *WithT, err error) {
 				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("checkType is required for DNSChecker"))
+				g.Expect(err.Error()).To(ContainSubstring("target is required for DNSChecker"))
 			},
 		},
 		{
-			name: "DNS config check type is invalid",
+			name: "DNS config target is invalid",
 			mutateConfig: func(cfg *CheckerConfig) *CheckerConfig {
-				cfg.DNSConfig.CheckType = "invalidType"
+				cfg.DNSConfig.Target = "invalidTarget"
 				return cfg
 			},
 			validateRes: func(g *WithT, err error) {
 				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring("checkType invalidType is not valid for DNSChecker"))
+				g.Expect(err.Error()).To(ContainSubstring("target invalidTarget is not valid for DNSChecker"))
 			},
 		},
 	}
@@ -451,7 +451,7 @@ func TestDNSConfig_Validate(t *testing.T) {
 				DNSConfig: &DNSConfig{
 					Domain:       "example.com",
 					QueryTimeout: 2 * time.Second,
-					CheckType:    DNSCheckTypeCoreDNS,
+					Target:       DNSCheckTargetCoreDNS,
 				},
 			}
 

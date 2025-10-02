@@ -40,8 +40,8 @@ type DNSChecker struct {
 // If the DNSType is LocalDNS, it checks if LocalDNS IP is enabled before creating the checker.
 func BuildDNSChecker(checkerConfig *config.CheckerConfig, kubeClient kubernetes.Interface) (checker.Checker, error) {
 	// If this is a LocalDNS checker, check if LocalDNS IP is enabled.
-	switch checkerConfig.DNSConfig.CheckType {
-	case config.DNSCheckTypeLocalDNS:
+	switch checkerConfig.DNSConfig.Target {
+	case config.DNSCheckTargetLocalDNS:
 		enabled, err := isLocalDNSEnabled()
 		if err != nil {
 			klog.ErrorS(err, "Failed to check LocalDNS IP")
@@ -82,16 +82,16 @@ func (c DNSChecker) Run(ctx context.Context) {
 // check executes the DNS check.
 // It will check either CoreDNS or LocalDNS for the configured domain.
 func (c DNSChecker) check(ctx context.Context) (*checker.Result, error) {
-	switch c.config.CheckType {
-	case config.DNSCheckTypeCoreDNS:
+	switch c.config.Target {
+	case config.DNSCheckTargetCoreDNS:
 		return c.checkCoreDNS(ctx)
-	case config.DNSCheckTypeLocalDNS:
+	case config.DNSCheckTargetLocalDNS:
 		return c.checkLocalDNS(ctx)
-	case config.DNSCheckTypeCoreDNSPerPod:
+	case config.DNSCheckTargetCoreDNSPerPod:
 		//TODO: implement per-pod CoreDNS check
 		return checker.Healthy(), nil
 	default:
-		return nil, fmt.Errorf("unknown DNS check type: %s", c.config.CheckType)
+		return nil, fmt.Errorf("unknown DNS check target: %s", c.config.Target)
 	}
 }
 
