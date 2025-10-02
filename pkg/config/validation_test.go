@@ -414,6 +414,28 @@ func TestDNSConfig_Validate(t *testing.T) {
 				g.Expect(err.Error()).To(ContainSubstring("checker timeout must be greater than DNS query timeout"))
 			},
 		},
+		{
+			name: "DNS config check type is missing",
+			mutateConfig: func(cfg *CheckerConfig) *CheckerConfig {
+				cfg.DNSConfig.CheckType = ""
+				return cfg
+			},
+			validateRes: func(g *WithT, err error) {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("checkType is required for DNSChecker"))
+			},
+		},
+		{
+			name: "DNS config check type is invalid",
+			mutateConfig: func(cfg *CheckerConfig) *CheckerConfig {
+				cfg.DNSConfig.CheckType = "invalidType"
+				return cfg
+			},
+			validateRes: func(g *WithT, err error) {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(ContainSubstring("checkType invalidType is not valid for DNSChecker"))
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -429,6 +451,7 @@ func TestDNSConfig_Validate(t *testing.T) {
 				DNSConfig: &DNSConfig{
 					Domain:       "example.com",
 					QueryTimeout: 2 * time.Second,
+					CheckType:    DNSCheckTypeCoreDNS,
 				},
 			}
 
