@@ -7,6 +7,8 @@ jobs:
   get_ref: 
     name: "Get ref"
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       checkout_ref: ${{ steps.checkout_ref.outputs.CHECKOUT_REF }}
       status_ref: ${{ steps.status_ref.outputs.STATUS_REF }}
