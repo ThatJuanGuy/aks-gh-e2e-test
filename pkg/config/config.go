@@ -61,16 +61,21 @@ type DNSConfig struct {
 	// Required.
 	// The domain to check, used to determine the DNS records to query.
 	Domain string `yaml:"domain"`
-	// Optional.
-	// Whether to check LocalDNS instead of CoreDNS.
-	// If not specified or set to false, CoreDNS will be checked.
-	// If set to true, LocalDNS will be checked. Note that LocalDNS checks require LocalDNS to be enabled.
-	CheckLocalDNS bool `yaml:"checkLocalDNS,omitempty"`
 	// Required.
 	// The timeout for DNS queries. The string format see https://pkg.go.dev/time#ParseDuration
 	// It must be greater than 0.
 	QueryTimeout time.Duration `yaml:"queryTimeout"`
+	// Required.
+	// DNS check mode: core DNS, per-pod core DNS, or local DNS.
+	CheckType DNSCheckType `yaml:"checkType,omitempty"`
 }
+type DNSCheckType string
+
+const (
+	DNSCheckTypeCoreDNS       DNSCheckType = "coreDNS"
+	DNSCheckTypeCoreDNSPerPod DNSCheckType = "coreDNSPerPod"
+	DNSCheckTypeLocalDNS      DNSCheckType = "localDNS"
+)
 
 type PodStartupConfig struct {
 	// Required.

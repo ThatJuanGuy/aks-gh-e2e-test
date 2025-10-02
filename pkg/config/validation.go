@@ -85,6 +85,14 @@ func (c *DNSConfig) validate(checkerConfigTimeout time.Duration) error {
 	if c.QueryTimeout <= 0 {
 		errs = append(errs, fmt.Errorf("queryTimeout must be greater than 0"))
 	}
+	switch c.CheckType {
+	case DNSCheckTypeCoreDNS, DNSCheckTypeLocalDNS, DNSCheckTypeCoreDNSPerPod:
+		// Valid check types for DNSChecker.
+	case "":
+		errs = append(errs, fmt.Errorf("checkType is required for DNSChecker"))
+	default:
+		errs = append(errs, fmt.Errorf("checkType %s is not valid for DNSChecker", c.CheckType))
+	}
 
 	if checkerConfigTimeout <= c.QueryTimeout {
 		errs = append(errs, fmt.Errorf("checker timeout must be greater than DNS query timeout: checker timeout='%s', DNS query timeout='%s'",
