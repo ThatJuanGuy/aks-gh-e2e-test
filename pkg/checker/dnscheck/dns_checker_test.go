@@ -193,6 +193,7 @@ func TestDNSChecker_QueryTimeoutUsedByResolver(t *testing.T) {
 		config: &config.DNSConfig{
 			Domain:       "example.com",
 			QueryTimeout: 5 * time.Second,
+			CheckType:    config.DNSCheckTypeCoreDNS,
 		},
 		kubeClient: k8sfake.NewClientset(makeCoreDNSService("10.0.0.10"), makeCoreDNSEndpointSlice([]string{"10.0.0.11"})),
 		resolver:   mockResolver,
