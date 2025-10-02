@@ -16,7 +16,7 @@ func TestConfigValidate_Valid(t *testing.T) {
 				Type:      CheckTypeDNS,
 				Interval:  10 * time.Second,
 				Timeout:   5 * time.Second,
-				DNSConfig: &DNSConfig{Domain: "example.com", QueryTimeout: 2 * time.Second},
+				DNSConfig: &DNSConfig{Domain: "example.com", QueryTimeout: 2 * time.Second, CheckType: DNSCheckTypeCoreDNS},
 			},
 			{
 				Name:     "podStartup1",
