@@ -38,23 +38,37 @@ type DNSChecker struct {
 
 // BuildDNSChecker creates a new DNSChecker instance.
 // If the DNSType is LocalDNS, it checks if LocalDNS IP is enabled before creating the checker.
-func BuildDNSChecker(config *config.CheckerConfig, kubeClient kubernetes.Interface) (checker.Checker, error) {
+func BuildDNSChecker(checkerConfig *config.CheckerConfig, kubeClient kubernetes.Interface) (checker.Checker, error) {
 	// If this is a LocalDNS checker, check if LocalDNS IP is enabled.
-	if config.DNSConfig.CheckLocalDNS {
+	switch checkerConfig.DNSConfig.CheckType {
+	case config.DNSCheckTypeLocalDNS:
 		enabled, err := isLocalDNSEnabled()
 		if err != nil {
 			klog.ErrorS(err, "Failed to check LocalDNS IP")
 			return nil, fmt.Errorf("failed to create LocalDNS checker: %w", err)
 		}
 		if !enabled {
-			klog.InfoS("LocalDNS is not enabled", "name", config.Name)
+			klog.InfoS("LocalDNS is not enabled", "name", checkerConfig.Name)
 			return nil, checker.ErrSkipChecker
+		}
+	default:
+		// TODO: remove this block after deprecating CheckLocalDNS field.
+		if checkerConfig.DNSConfig.CheckLocalDNS {
+			enabled, err := isLocalDNSEnabled()
+			if err != nil {
+				klog.ErrorS(err, "Failed to check LocalDNS IP")
+				return nil, fmt.Errorf("failed to create LocalDNS checker: %w", err)
+			}
+			if !enabled {
+				klog.InfoS("LocalDNS is not enabled", "name", checkerConfig.Name)
+				return nil, checker.ErrSkipChecker
+			}
 		}
 	}
 
 	chk := &DNSChecker{
-		name:       config.Name,
-		config:     config.DNSConfig,
+		name:       checkerConfig.Name,
+		config:     checkerConfig.DNSConfig,
 		kubeClient: kubeClient,
 		resolver:   &defaultResolver{},
 	}
@@ -81,10 +95,21 @@ func (c DNSChecker) Run(ctx context.Context) {
 // check executes the DNS check.
 // It will check either CoreDNS or LocalDNS for the configured domain.
 func (c DNSChecker) check(ctx context.Context) (*checker.Result, error) {
-	if c.config.CheckLocalDNS {
-		return c.checkLocalDNS(ctx)
-	} else {
+	switch c.config.CheckType {
+	case config.DNSCheckTypeCoreDNS:
 		return c.checkCoreDNS(ctx)
+	case config.DNSCheckTypeLocalDNS:
+		return c.checkLocalDNS(ctx)
+	case config.DNSCheckTypeCoreDNSPerPod:
+		//TODO: implement per-pod CoreDNS check
+		return checker.Healthy(), nil
+	default:
+		// TODO: remove this block after deprecating CheckLocalDNS field.
+		if c.config.CheckLocalDNS {
+			return c.checkLocalDNS(ctx)
+		} else {
+			return c.checkCoreDNS(ctx)
+		}
 	}
 }
 
