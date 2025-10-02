@@ -61,12 +61,6 @@ type DNSConfig struct {
 	// Required.
 	// The domain to check, used to determine the DNS records to query.
 	Domain string `yaml:"domain"`
-	// Optional.
-	// This field will be deprecated and replaced with CheckType.
-	// Whether to check LocalDNS instead of CoreDNS.
-	// If not specified or set to false, CoreDNS will be checked.
-	// If set to true, LocalDNS will be checked. Note that LocalDNS checks require LocalDNS to be enabled.
-	CheckLocalDNS bool `yaml:"checkLocalDNS,omitempty"`
 	// Required.
 	// The timeout for DNS queries. The string format see https://pkg.go.dev/time#ParseDuration
 	// It must be greater than 0.

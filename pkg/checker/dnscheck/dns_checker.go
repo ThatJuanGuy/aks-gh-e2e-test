@@ -51,19 +51,6 @@ func BuildDNSChecker(checkerConfig *config.CheckerConfig, kubeClient kubernetes.
 			klog.InfoS("LocalDNS is not enabled", "name", checkerConfig.Name)
 			return nil, checker.ErrSkipChecker
 		}
-	default:
-		// TODO: remove this block after deprecating CheckLocalDNS field.
-		if checkerConfig.DNSConfig.CheckLocalDNS {
-			enabled, err := isLocalDNSEnabled()
-			if err != nil {
-				klog.ErrorS(err, "Failed to check LocalDNS IP")
-				return nil, fmt.Errorf("failed to create LocalDNS checker: %w", err)
-			}
-			if !enabled {
-				klog.InfoS("LocalDNS is not enabled", "name", checkerConfig.Name)
-				return nil, checker.ErrSkipChecker
-			}
-		}
 	}
 
 	chk := &DNSChecker{
@@ -104,12 +91,7 @@ func (c DNSChecker) check(ctx context.Context) (*checker.Result, error) {
 		//TODO: implement per-pod CoreDNS check
 		return checker.Healthy(), nil
 	default:
-		// TODO: remove this block after deprecating CheckLocalDNS field.
-		if c.config.CheckLocalDNS {
-			return c.checkLocalDNS(ctx)
-		} else {
-			return c.checkCoreDNS(ctx)
-		}
+		return nil, fmt.Errorf("unknown DNS check type: %s", c.config.CheckType)
 	}
 }
 
