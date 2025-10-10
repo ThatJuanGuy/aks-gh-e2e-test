@@ -14,7 +14,7 @@ import (
 	kyaml "sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
-func TestConfigFileFormat(t *testing.T) {
+func Test_ValidateConfigFile(t *testing.T) {
 	g := NewWithT(t)
 	data, err := os.ReadFile("base/configmap.yaml")
 	g.Expect(err).ToNot(HaveOccurred())
@@ -32,7 +32,7 @@ func TestConfigFileFormat(t *testing.T) {
 	g.Expect(cfg).ToNot(BeNil())
 }
 
-func TestConfigPatchFileFormat(t *testing.T) {
+func Test_ValidateConfigPatchFile(t *testing.T) {
 	g := NewWithT(t)
 	data, err := os.ReadFile("overlays/test/configmap.patch.yaml")
 	g.Expect(err).ToNot(HaveOccurred())
@@ -54,7 +54,7 @@ func TestConfigPatchFileFormat(t *testing.T) {
 	g.Expect(cfg).ToNot(BeNil())
 }
 
-func TestAllFilesYamlFormat(t *testing.T) {
+func Test_ValidateYamlFormat_AllFiles(t *testing.T) {
 	g := NewWithT(t)
 	// list all yaml files in the directory
 	paths, err := findYamlPaths(".")
