@@ -13,11 +13,11 @@ func ParseFromFile(path string) (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file %q: %w", path, err)
 	}
-	return parseFromYAML(data)
+	return ParseFromYAML(data)
 }
 
 // parseFromYAML parses the configuration from a YAML.
-func parseFromYAML(cfgData []byte) (*Config, error) {
+func ParseFromYAML(cfgData []byte) (*Config, error) {
 	var cfg Config
 	if err := yaml.Unmarshal(cfgData, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal yaml: %w", err)
