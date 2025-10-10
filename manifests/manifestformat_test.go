@@ -14,7 +14,7 @@ import (
 	kyaml "sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
-func Test_ValidateConfigFile(t *testing.T) {
+func Test_ValidateConfigMapFile(t *testing.T) {
 	g := NewWithT(t)
 	data, err := os.ReadFile("base/configmap.yaml")
 	g.Expect(err).ToNot(HaveOccurred())
@@ -32,7 +32,7 @@ func Test_ValidateConfigFile(t *testing.T) {
 	g.Expect(cfg).ToNot(BeNil())
 }
 
-func Test_ValidateConfigPatchFile(t *testing.T) {
+func Test_ValidateConfigMapPatchFile(t *testing.T) {
 	g := NewWithT(t)
 	data, err := os.ReadFile("overlays/test/configmap.patch.yaml")
 	g.Expect(err).ToNot(HaveOccurred())
