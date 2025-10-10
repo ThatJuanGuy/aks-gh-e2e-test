@@ -19,7 +19,7 @@ checkers:
       queryTimeout: 2s
       target: CoreDNS
 `)
-	cfg, err := parseFromYAML(yamlData)
+	cfg, err := ParseFromYAML(yamlData)
 	g.Expect(err).ToNot(HaveOccurred())
 	g.Expect(cfg.Checkers).To(HaveLen(1))
 	g.Expect(cfg.Checkers[0].Name).To(Equal("dns1"))
@@ -28,14 +28,14 @@ checkers:
 func TestParseFromYAML_InvalidYAML(t *testing.T) {
 	g := NewWithT(t)
 	badYAML := []byte(`checkers: [name: dns1, type: dns`)
-	_, err := parseFromYAML(badYAML)
+	_, err := ParseFromYAML(badYAML)
 	g.Expect(err).To(HaveOccurred())
 }
 
 func TestParseFromYAML_InvalidConfig(t *testing.T) {
 	g := NewWithT(t)
 	yamlData := []byte(`checkers: []`)
-	_, err := parseFromYAML(yamlData)
+	_, err := ParseFromYAML(yamlData)
 	g.Expect(err).To(HaveOccurred())
 }
 
