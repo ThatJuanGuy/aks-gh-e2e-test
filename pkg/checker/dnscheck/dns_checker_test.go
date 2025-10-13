@@ -279,6 +279,7 @@ func TestDNSChecker_checkCoreDNSPerPod(t *testing.T) {
 			name: "CoreDNS Pods Hostname Missing",
 			client: k8sfake.NewClientset(
 				makeCoreDNSEndpointSlice([]string{"10.0.0.11"}),
+				makeCoreDNSEndpointSliceWithTargetref([]string{"10.0.0.12"}),
 			),
 			mockResolver: &fakeResolver{
 				lookupHostFunc: func(ctx context.Context, ip, domain string, queryTimeout time.Duration) ([]string, error) {
@@ -286,9 +287,11 @@ func TestDNSChecker_checkCoreDNSPerPod(t *testing.T) {
 				},
 			},
 			validateRes: func(g *WithT, res []*checker.Result, err error) {
-				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(Equal("found CoreDNS endpoint missing pod name in targetRef"))
-				g.Expect(res).To(HaveLen(0))
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(res).To(HaveLen(2))
+				g.Expect(res[0].Status).To(Equal(checker.StatusUnhealthy))
+				g.Expect(res[0].Detail.Code).To(Equal(ErrCodePodNameMissing))
+				g.Expect(res[1].Status).To(Equal(checker.StatusHealthy))
 			},
 		},
 	}
@@ -402,6 +405,7 @@ func makeCoreDNSEndpointSliceWithTargetref(ips []string) *discoveryv1.EndpointSl
 			Labels: map[string]string{
 				discoveryv1.LabelServiceName: coreDNSServiceName,
 			},
+			Name: "coredns-ips-with-targetref",
 		},
 		Endpoints: endpoints,
 	}

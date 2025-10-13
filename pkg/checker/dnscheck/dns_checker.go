@@ -160,7 +160,8 @@ func (c DNSChecker) checkCoreDNSPods(ctx context.Context) ([]*checker.Result, er
 	for _, endpoint := range endpoints {
 		isPodHealthy := true
 		if endpoint.TargetRef == nil || len(endpoint.TargetRef.Name) == 0 {
-			return nil, fmt.Errorf("found CoreDNS endpoint missing pod name in targetRef")
+			results = append(results, checker.Unhealthy(ErrCodePodNameMissing, "CoreDNS pod name missing in endpoint's targetRef"))
+			continue
 		}
 		podname := endpoint.TargetRef.Name
 		for _, ip := range endpoint.Addresses {
