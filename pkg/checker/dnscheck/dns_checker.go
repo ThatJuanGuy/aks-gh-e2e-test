@@ -209,7 +209,7 @@ func getCoreDNSEndpoints(ctx context.Context, kubeClient kubernetes.Interface) (
 		return nil, fmt.Errorf("failed to get CoreDNS pod IPs: %w", err)
 	}
 
-	var pods []discoveryv1.Endpoint
+	var endpoints []discoveryv1.Endpoint
 	for _, endpointSlice := range endpointSliceList.Items {
 		for _, ep := range endpointSlice.Endpoints {
 			// According to Kubernetes docs: "A nil value should be interpreted as 'true'".
@@ -217,15 +217,15 @@ func getCoreDNSEndpoints(ctx context.Context, kubeClient kubernetes.Interface) (
 				continue
 			}
 
-			pods = append(pods, ep)
+			endpoints = append(endpoints, ep)
 		}
 	}
 
-	if len(pods) == 0 {
+	if len(endpoints) == 0 {
 		return nil, errPodsNotReady
 	}
 
-	return pods, nil
+	return endpoints, nil
 }
 
 // isLocalDNSEnabled reads /etc/resolv.conf and checks if the localDNSIP exists.
