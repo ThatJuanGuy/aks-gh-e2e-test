@@ -149,9 +149,8 @@ func (c DNSChecker) checkLocalDNS(ctx context.Context) (*checker.Result, error) 
 	return checker.Healthy(), nil
 }
 
-// checkCoreDNS queries CoreDNS pods and return a result for each of the pods.
+// checkCoreDNSPods queries CoreDNS pods and return a result for each of the pods.
 func (c DNSChecker) checkCoreDNSPods(ctx context.Context) ([]*checker.Result, error) {
-	// Check CoreDNS pods.
 	endpoints, err := getCoreDNSEndpoints(ctx, c.kubeClient)
 	if err != nil {
 		return nil, err
@@ -167,7 +166,11 @@ func (c DNSChecker) checkCoreDNSPods(ctx context.Context) ([]*checker.Result, er
 		for _, ip := range endpoint.Addresses {
 			if _, err := c.resolver.lookupHost(ctx, ip, c.config.Domain, c.config.QueryTimeout); err != nil {
 				isPodHealthy = false
-				results = append(results, checker.Unhealthy(ErrCodePodError, fmt.Sprintf("CoreDNS pod query error: %s", err)).WithPod(podname))
+				if errors.Is(err, context.DeadlineExceeded) {
+					results = append(results, checker.Unhealthy(ErrCodePodTimeout, "CoreDNS pod query timed out").WithPod(podname))
+				} else {
+					results = append(results, checker.Unhealthy(ErrCodePodError, fmt.Sprintf("CoreDNS pod query error: %s", err)).WithPod(podname))
+				}
 				break
 			}
 		}

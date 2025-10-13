@@ -2,6 +2,7 @@ package dnscheck
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -248,6 +249,23 @@ func TestDNSChecker_checkCoreDNSPerPod(t *testing.T) {
 			mockResolver: &fakeResolver{
 				lookupHostFunc: func(ctx context.Context, ip, domain string, queryTimeout time.Duration) ([]string, error) {
 					return nil, context.DeadlineExceeded
+				},
+			},
+			validateRes: func(g *WithT, res []*checker.Result, err error) {
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(res).To(HaveLen(1))
+				g.Expect(res[0].Status).To(Equal(checker.StatusUnhealthy))
+				g.Expect(res[0].Detail.Code).To(Equal(ErrCodePodTimeout))
+			},
+		},
+		{
+			name: "CoreDNS Pod Query Error",
+			client: k8sfake.NewClientset(
+				makeCoreDNSEndpointSliceWithTargetref([]string{"10.0.0.11"}),
+			),
+			mockResolver: &fakeResolver{
+				lookupHostFunc: func(ctx context.Context, ip, domain string, queryTimeout time.Duration) ([]string, error) {
+					return nil, errors.New("some query error")
 				},
 			},
 			validateRes: func(g *WithT, res []*checker.Result, err error) {
