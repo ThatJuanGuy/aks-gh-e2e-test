@@ -114,7 +114,7 @@ func (c DNSChecker) checkCoreDNS(ctx context.Context) (*checker.Result, error) {
 	}
 
 	// Check CoreDNS pods.
-	podIPs, err := getCoreDNSPodIPs(ctx, c.kubeClient)
+	dnsEndpoints, err := getCoreDNSEndpoints(ctx, c.kubeClient)
 	if errors.Is(err, errPodsNotReady) {
 		return checker.Unhealthy(ErrCodePodsNotReady, "CoreDNS Pods are not ready"), nil
 	}
@@ -122,12 +122,14 @@ func (c DNSChecker) checkCoreDNS(ctx context.Context) (*checker.Result, error) {
 		return nil, err
 	}
 
-	for _, ip := range podIPs {
-		if _, err := c.resolver.lookupHost(ctx, ip, c.config.Domain, c.config.QueryTimeout); err != nil {
-			if errors.Is(err, context.DeadlineExceeded) {
-				return checker.Unhealthy(ErrCodePodTimeout, "CoreDNS pod query timed out"), nil
+	for _, dnsEndpoint := range dnsEndpoints {
+		for _, ip := range dnsEndpoint.Addresses {
+			if _, err := c.resolver.lookupHost(ctx, ip, c.config.Domain, c.config.QueryTimeout); err != nil {
+				if errors.Is(err, context.DeadlineExceeded) {
+					return checker.Unhealthy(ErrCodePodTimeout, "CoreDNS pod query timed out"), nil
+				}
+				return checker.Unhealthy(ErrCodePodError, fmt.Sprintf("CoreDNS pod query error: %s", err)), nil
 			}
-			return checker.Unhealthy(ErrCodePodError, fmt.Sprintf("CoreDNS pod query error: %s", err)), nil
 		}
 	}
 
@@ -145,6 +147,36 @@ func (c DNSChecker) checkLocalDNS(ctx context.Context) (*checker.Result, error) 
 	}
 
 	return checker.Healthy(), nil
+}
+
+// checkCoreDNS queries CoreDNS pods and return a result for each of the pods.
+func (c DNSChecker) checkCoreDNSPods(ctx context.Context) ([]*checker.Result, error) {
+	// Check CoreDNS pods.
+	endpoints, err := getCoreDNSEndpoints(ctx, c.kubeClient)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []*checker.Result
+	for _, endpoint := range endpoints {
+		isPodHealthy := true
+		if endpoint.TargetRef == nil || len(endpoint.TargetRef.Name) == 0 {
+			return nil, fmt.Errorf("found CoreDNS endpoint missing pod name in targetRef")
+		}
+		podname := endpoint.TargetRef.Name
+		for _, ip := range endpoint.Addresses {
+			if _, err := c.resolver.lookupHost(ctx, ip, c.config.Domain, c.config.QueryTimeout); err != nil {
+				isPodHealthy = false
+				results = append(results, checker.Unhealthy(ErrCodePodError, fmt.Sprintf("CoreDNS pod query error: %s", err)).WithPod(podname))
+				break
+			}
+		}
+		if isPodHealthy {
+			results = append(results, checker.Healthy().WithPod(podname))
+		}
+	}
+
+	return results, nil
 }
 
 // getCoreDNSSvcIP returns the ClusterIP of the CoreDNS service in the cluster as a DNSTarget.
@@ -165,8 +197,8 @@ func getCoreDNSSvcIP(ctx context.Context, kubeClient kubernetes.Interface) (stri
 	return svc.Spec.ClusterIP, nil
 }
 
-// getCoreDNSPodIPs returns the IPs of all CoreDNS pods in the cluster as DNSTargets.
-func getCoreDNSPodIPs(ctx context.Context, kubeClient kubernetes.Interface) ([]string, error) {
+// getCoreDNSEndpoints returns all CoreDNS pod endpoints in the cluster.
+func getCoreDNSEndpoints(ctx context.Context, kubeClient kubernetes.Interface) ([]discoveryv1.Endpoint, error) {
 	endpointSliceList, err := kubeClient.DiscoveryV1().EndpointSlices(coreDNSNamespace).List(ctx, metav1.ListOptions{
 		LabelSelector: discoveryv1.LabelServiceName + "=" + coreDNSServiceName,
 	})
@@ -177,7 +209,7 @@ func getCoreDNSPodIPs(ctx context.Context, kubeClient kubernetes.Interface) ([]s
 		return nil, fmt.Errorf("failed to get CoreDNS pod IPs: %w", err)
 	}
 
-	var podIPs []string
+	var pods []discoveryv1.Endpoint
 	for _, endpointSlice := range endpointSliceList.Items {
 		for _, ep := range endpointSlice.Endpoints {
 			// According to Kubernetes docs: "A nil value should be interpreted as 'true'".
@@ -185,15 +217,15 @@ func getCoreDNSPodIPs(ctx context.Context, kubeClient kubernetes.Interface) ([]s
 				continue
 			}
 
-			podIPs = append(podIPs, ep.Addresses...)
+			pods = append(pods, ep)
 		}
 	}
 
-	if len(podIPs) == 0 {
+	if len(pods) == 0 {
 		return nil, errPodsNotReady
 	}
 
-	return podIPs, nil
+	return pods, nil
 }
 
 // isLocalDNSEnabled reads /etc/resolv.conf and checks if the localDNSIP exists.
