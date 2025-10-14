@@ -153,7 +153,6 @@ func (c DNSChecker) checkCoreDNSPerPod(ctx context.Context) {
 	}
 
 	for _, endpoint := range endpoints {
-		isPodHealthy := true
 		if endpoint.TargetRef == nil || len(endpoint.TargetRef.Name) == 0 {
 			// TODO: record error with a separate metric
 			if endpoint.NodeName != nil {
@@ -163,22 +162,29 @@ func (c DNSChecker) checkCoreDNSPerPod(ctx context.Context) {
 			}
 			continue
 		}
+
+		// Query CoreDNS endpoint.
 		podname := endpoint.TargetRef.Name
-		for _, ip := range endpoint.Addresses {
-			if _, err := c.resolver.lookupHost(ctx, ip, c.config.Domain, c.config.QueryTimeout); err != nil {
-				isPodHealthy = false
-				if errors.Is(err, context.DeadlineExceeded) {
-					checker.RecordCoreDNSPodResult(c, podname, checker.Unhealthy(ErrCodePodTimeout, "CoreDNS pod query timed out"), nil)
-				} else {
-					checker.RecordCoreDNSPodResult(c, podname, nil, err)
-				}
-				break
+		err := c.queryEndpoint(ctx, endpoint)
+		if err != nil {
+			if errors.Is(err, context.DeadlineExceeded) {
+				checker.RecordCoreDNSPodResult(c, podname, checker.Unhealthy(ErrCodePodTimeout, "CoreDNS pod query timed out"), nil)
+			} else {
+				checker.RecordCoreDNSPodResult(c, podname, nil, err)
 			}
-		}
-		if isPodHealthy {
+		} else {
 			checker.RecordCoreDNSPodResult(c, podname, checker.Healthy(), nil)
 		}
 	}
+}
+
+func (c DNSChecker) queryEndpoint(ctx context.Context, endpoint discoveryv1.Endpoint) error {
+	for _, ip := range endpoint.Addresses {
+		if _, err := c.resolver.lookupHost(ctx, ip, c.config.Domain, c.config.QueryTimeout); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // getCoreDNSSvcIP returns the ClusterIP of the CoreDNS service in the cluster as a DNSTarget.
