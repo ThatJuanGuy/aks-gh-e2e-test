@@ -279,7 +279,7 @@ func TestDNSChecker_checkCoreDNSPerPod(t *testing.T) {
 			}
 			// No return value to validate; just ensure no panic occurs.
 			// The actual results are recorded via metrics and tested with E2E tests.
-			chk.checkCoreDNSPods(context.Background())
+			chk.checkCoreDNSPerPod(context.Background())
 		})
 	}
 }

@@ -85,7 +85,7 @@ func (c DNSChecker) Run(ctx context.Context) {
 		checker.RecordResult(c, result, err)
 		return
 	case config.DNSCheckTargetCoreDNSPerPod:
-		c.checkCoreDNSPods(ctx)
+		c.checkCoreDNSPerPod(ctx)
 	}
 }
 
@@ -144,7 +144,7 @@ func (c DNSChecker) checkLocalDNS(ctx context.Context) (*checker.Result, error) 
 }
 
 // checkCoreDNSPods queries CoreDNS pods and return a result for each of the pods.
-func (c DNSChecker) checkCoreDNSPods(ctx context.Context) {
+func (c DNSChecker) checkCoreDNSPerPod(ctx context.Context) {
 	endpoints, err := getCoreDNSEndpoints(ctx, c.kubeClient)
 	if err != nil {
 		// TODO: record error with a separate metric
