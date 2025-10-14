@@ -8,7 +8,6 @@ const (
 	ErrCodePodsNotReady    = "PodsNotReady"
 	ErrCodeServiceTimeout  = "ServiceTimeout"
 	ErrCodePodTimeout      = "PodTimeout"
-	ErrCodePodNameMissing  = "PodNameMissing"
 	ErrCodeServiceError    = "ServiceError"
 	ErrCodePodError        = "PodError"
 	ErrCodeLocalDNSTimeout = "LocalDNSTimeout"
