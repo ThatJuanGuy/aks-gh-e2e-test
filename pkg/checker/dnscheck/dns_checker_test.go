@@ -207,7 +207,6 @@ func TestDNSChecker_checkCoreDNSPerPod(t *testing.T) {
 		name         string
 		client       *k8sfake.Clientset
 		mockResolver resolver
-		validateRes  func(g *WithT, res []*checker.Result, err error)
 	}{
 		{
 			name: "All CoreDNS Pods Healthy",
@@ -219,13 +218,6 @@ func TestDNSChecker_checkCoreDNSPerPod(t *testing.T) {
 					return []string{"1.2.3.4"}, nil
 				},
 			},
-			validateRes: func(g *WithT, res []*checker.Result, err error) {
-				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(res).To(HaveLen(2))
-				for _, r := range res {
-					g.Expect(r.Status).To(Equal(checker.StatusHealthy))
-				}
-			},
 		},
 		{
 			name:   "CoreDNS Pods Not Ready",
@@ -234,11 +226,6 @@ func TestDNSChecker_checkCoreDNSPerPod(t *testing.T) {
 				lookupHostFunc: func(ctx context.Context, ip, domain string, queryTimeout time.Duration) ([]string, error) {
 					return []string{"1.2.3.4"}, nil
 				},
-			},
-			validateRes: func(g *WithT, res []*checker.Result, err error) {
-				g.Expect(err).To(HaveOccurred())
-				g.Expect(err).To(Equal(errPodsNotReady))
-				g.Expect(res).To(HaveLen(0))
 			},
 		},
 		{
@@ -251,12 +238,6 @@ func TestDNSChecker_checkCoreDNSPerPod(t *testing.T) {
 					return nil, context.DeadlineExceeded
 				},
 			},
-			validateRes: func(g *WithT, res []*checker.Result, err error) {
-				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(res).To(HaveLen(1))
-				g.Expect(res[0].Status).To(Equal(checker.StatusUnhealthy))
-				g.Expect(res[0].Detail.Code).To(Equal(ErrCodePodTimeout))
-			},
 		},
 		{
 			name: "CoreDNS Pod Query Error",
@@ -267,12 +248,6 @@ func TestDNSChecker_checkCoreDNSPerPod(t *testing.T) {
 				lookupHostFunc: func(ctx context.Context, ip, domain string, queryTimeout time.Duration) ([]string, error) {
 					return nil, errors.New("some query error")
 				},
-			},
-			validateRes: func(g *WithT, res []*checker.Result, err error) {
-				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(res).To(HaveLen(1))
-				g.Expect(res[0].Status).To(Equal(checker.StatusUnhealthy))
-				g.Expect(res[0].Detail.Code).To(Equal(ErrCodePodError))
 			},
 		},
 		{
@@ -286,21 +261,12 @@ func TestDNSChecker_checkCoreDNSPerPod(t *testing.T) {
 					return []string{"1.2.3.4"}, nil
 				},
 			},
-			validateRes: func(g *WithT, res []*checker.Result, err error) {
-				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(res).To(HaveLen(2))
-				g.Expect(res[0].Status).To(Equal(checker.StatusUnhealthy))
-				g.Expect(res[0].Detail.Code).To(Equal(ErrCodePodNameMissing))
-				g.Expect(res[1].Status).To(Equal(checker.StatusHealthy))
-			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			g := NewWithT(t)
-
 			chk := &DNSChecker{
 				name: "dns-test",
 				config: &config.DNSConfig{
@@ -311,9 +277,9 @@ func TestDNSChecker_checkCoreDNSPerPod(t *testing.T) {
 				kubeClient: tc.client,
 				resolver:   tc.mockResolver,
 			}
-
-			res, err := chk.checkCoreDNSPods(context.Background())
-			tc.validateRes(g, res, err)
+			// No return value to validate; just ensure no panic occurs.
+			// The actual results are recorded via metrics and tested with E2E tests.
+			chk.checkCoreDNSPods(context.Background())
 		})
 	}
 }

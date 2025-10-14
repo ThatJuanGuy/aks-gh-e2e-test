@@ -75,23 +75,17 @@ func (c DNSChecker) Type() config.CheckerType {
 }
 
 func (c DNSChecker) Run(ctx context.Context) {
-	result, err := c.check(ctx)
-	checker.RecordResult(c, result, err)
-}
-
-// check executes the DNS check.
-// It will check either CoreDNS or LocalDNS for the configured domain.
-func (c DNSChecker) check(ctx context.Context) (*checker.Result, error) {
 	switch c.config.Target {
 	case config.DNSCheckTargetCoreDNS:
-		return c.checkCoreDNS(ctx)
+		result, err := c.checkCoreDNS(ctx)
+		checker.RecordResult(c, result, err)
+		return
 	case config.DNSCheckTargetLocalDNS:
-		return c.checkLocalDNS(ctx)
+		result, err := c.checkLocalDNS(ctx)
+		checker.RecordResult(c, result, err)
+		return
 	case config.DNSCheckTargetCoreDNSPerPod:
-		//TODO: implement per-pod CoreDNS check
-		return checker.Healthy(), nil
-	default:
-		return nil, fmt.Errorf("unknown DNS check target: %s", c.config.Target)
+		c.checkCoreDNSPods(ctx)
 	}
 }
 
@@ -150,17 +144,23 @@ func (c DNSChecker) checkLocalDNS(ctx context.Context) (*checker.Result, error) 
 }
 
 // checkCoreDNSPods queries CoreDNS pods and return a result for each of the pods.
-func (c DNSChecker) checkCoreDNSPods(ctx context.Context) ([]*checker.Result, error) {
+func (c DNSChecker) checkCoreDNSPods(ctx context.Context) {
 	endpoints, err := getCoreDNSEndpoints(ctx, c.kubeClient)
 	if err != nil {
-		return nil, err
+		// TODO: record error with a separate metric
+		klog.Errorf("Failed to get CoreDNS endpoints: %s", err)
+		return
 	}
 
-	var results []*checker.Result
 	for _, endpoint := range endpoints {
 		isPodHealthy := true
 		if endpoint.TargetRef == nil || len(endpoint.TargetRef.Name) == 0 {
-			results = append(results, checker.Unhealthy(ErrCodePodNameMissing, "CoreDNS pod name missing in endpoint's targetRef"))
+			// TODO: record error with a separate metric
+			if endpoint.NodeName != nil {
+				klog.Errorf("CoreDNS pod name missing in endpoint's targetRef on node %s", *endpoint.NodeName)
+			} else {
+				klog.Error("CoreDNS pod name missing in endpoint's targetRef")
+			}
 			continue
 		}
 		podname := endpoint.TargetRef.Name
@@ -168,19 +168,17 @@ func (c DNSChecker) checkCoreDNSPods(ctx context.Context) ([]*checker.Result, er
 			if _, err := c.resolver.lookupHost(ctx, ip, c.config.Domain, c.config.QueryTimeout); err != nil {
 				isPodHealthy = false
 				if errors.Is(err, context.DeadlineExceeded) {
-					results = append(results, checker.Unhealthy(ErrCodePodTimeout, "CoreDNS pod query timed out").WithPod(podname))
+					checker.RecordCoreDNSPodResult(c, podname, checker.Unhealthy(ErrCodePodTimeout, "CoreDNS pod query timed out"), nil)
 				} else {
-					results = append(results, checker.Unhealthy(ErrCodePodError, fmt.Sprintf("CoreDNS pod query error: %s", err)).WithPod(podname))
+					checker.RecordCoreDNSPodResult(c, podname, nil, err)
 				}
 				break
 			}
 		}
 		if isPodHealthy {
-			results = append(results, checker.Healthy().WithPod(podname))
+			checker.RecordCoreDNSPodResult(c, podname, checker.Healthy(), nil)
 		}
 	}
-
-	return results, nil
 }
 
 // getCoreDNSSvcIP returns the ClusterIP of the CoreDNS service in the cluster as a DNSTarget.
