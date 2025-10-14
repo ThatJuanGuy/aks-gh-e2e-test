@@ -296,7 +296,7 @@ func verifyCheckerResultMetrics(localPort int, expectedChkNames []string, expect
 	return verifyCheckerResultMetricsHelper(checkerResultMetricName, localPort, expectedChkNames, expectedType, expectedStatus, expectedErrorCode)
 }
 
-// verifyCheckerResultMetrics checks if all the checker result metrics match the expected type, status, and error code.
+// verifyCheckerResultMetricsHelper checks if all the checker result metrics match the expected type, status, and error code.
 // It returns true if all checker names match the criteria, false otherwise.
 func verifyCheckerResultMetricsHelper(metricName string, localPort int, expectedChkNames []string, expectedType, expectedStatus, expectedErrorCode string) (bool, map[string]struct{}) {
 	metricsData, err := getMetrics(localPort)
