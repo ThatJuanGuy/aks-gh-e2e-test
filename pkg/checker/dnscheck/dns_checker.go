@@ -143,7 +143,7 @@ func (c DNSChecker) checkLocalDNS(ctx context.Context) (*checker.Result, error) 
 	return checker.Healthy(), nil
 }
 
-// checkCoreDNSPods queries CoreDNS pods and return a result for each of the pods.
+// checkCoreDNSPods queries CoreDNS pods and records a result for each of the pods.
 func (c DNSChecker) checkCoreDNSPerPod(ctx context.Context) {
 	endpoints, err := getCoreDNSEndpoints(ctx, c.kubeClient)
 	if err != nil {
