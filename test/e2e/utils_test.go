@@ -26,18 +26,18 @@ import (
 const (
 	// Kubernetes resource names.
 	// Note that these names must match with the applied manifests/overlays/test.
-	namespace            = "kube-system"
-	deploymentName       = "cluster-health-monitor"
-	checkerConfigMapName = "cluster-health-monitor-config"
+	namespace      = "kube-system"
+	deploymentName = "cluster-health-monitor"
 
 	remoteMetricsPort = 9800  // remoteMetricsPort is the fixed port used by the service in the container.
 	baseLocalPort     = 10000 // baseLocalPort is the base local port for dynamic allocation.
 
-	checkerResultMetricName = "cluster_health_monitor_checker_result_total"
-	metricsCheckerTypeLabel = "checker_type"
-	metricsCheckerNameLabel = "checker_name"
-	metricsStatusLabel      = "status"
-	metricsErrorCodeLabel   = "error_code"
+	checkerResultMetricName    = "cluster_health_monitor_checker_result_total"
+	coreDNSPodResultMetricName = "cluster_health_monitor_coredns_pod_result_total"
+	metricsCheckerTypeLabel    = "checker_type"
+	metricsCheckerNameLabel    = "checker_name"
+	metricsStatusLabel         = "status"
+	metricsErrorCodeLabel      = "error_code"
 )
 
 // safeSessionKill is shorthand to kill the provided gexec.Session if it is not nil.
@@ -288,17 +288,26 @@ func isMockLocalDNSAvailable(clientset *kubernetes.Clientset) bool {
 		bindLocalDNS.Status.NumberAvailable == bindLocalDNS.Status.DesiredNumberScheduled
 }
 
-// verifyCheckerResultMetrics checks if all the checker result metrics match the expected type, status, and error code.
-// It returns true if all checker names match the criteria, false otherwise.
+func verifyCoreDNSPodCheckerResultMetrics(localPort int, expectedChkNames []string, expectedType, expectedStatus, expectedErrorCode string) (bool, map[string]struct{}) {
+	return verifyCheckerResultMetricsHelper(coreDNSPodResultMetricName, localPort, expectedChkNames, expectedType, expectedStatus, expectedErrorCode, []string{"pod_name"})
+}
+
 func verifyCheckerResultMetrics(localPort int, expectedChkNames []string, expectedType, expectedStatus, expectedErrorCode string) (bool, map[string]struct{}) {
+	return verifyCheckerResultMetricsHelper(checkerResultMetricName, localPort, expectedChkNames, expectedType, expectedStatus, expectedErrorCode, nil)
+}
+
+// verifyCheckerResultMetricsHelper checks if all the checker result metrics match the expected type, status, and error code.
+// It returns true if all checker names match the criteria, false otherwise.
+func verifyCheckerResultMetricsHelper(metricName string, localPort int, expectedChkNames []string, expectedType, expectedStatus, expectedErrorCode string, expectedLabels []string) (bool, map[string]struct{}) {
 	metricsData, err := getMetrics(localPort)
 	if err != nil {
 		GinkgoWriter.Printf("Failed to get metrics: %v\n", err)
 		return false, nil
 	}
 
-	metricFamily, found := metricsData[checkerResultMetricName]
+	metricFamily, found := metricsData[metricName]
 	if !found {
+		GinkgoWriter.Printf("%s not found\n", metricName)
 		return false, nil
 	}
 
@@ -312,7 +321,8 @@ func verifyCheckerResultMetrics(localPort int, expectedChkNames []string, expect
 
 		if labels[metricsCheckerTypeLabel] == expectedType &&
 			labels[metricsStatusLabel] == expectedStatus &&
-			labels[metricsErrorCodeLabel] == expectedErrorCode {
+			labels[metricsErrorCodeLabel] == expectedErrorCode &&
+			containExpectedLabels(labels, expectedLabels) {
 			foundCheckers[labels[metricsCheckerNameLabel]] = struct{}{}
 		}
 	}
@@ -330,6 +340,15 @@ func verifyCheckerResultMetrics(localPort int, expectedChkNames []string, expect
 	}
 
 	return true, foundCheckers
+}
+
+func containExpectedLabels(labels map[string]string, expectedLabels []string) bool {
+	for _, label := range expectedLabels {
+		if _, found := labels[label]; !found {
+			return false
+		}
+	}
+	return true
 }
 
 // removeLabelsFromAllNodes removes the given labels from all nodes in the cluster.
