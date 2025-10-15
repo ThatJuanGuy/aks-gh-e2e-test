@@ -289,16 +289,16 @@ func isMockLocalDNSAvailable(clientset *kubernetes.Clientset) bool {
 }
 
 func verifyCoreDNSPodCheckerResultMetrics(localPort int, expectedChkNames []string, expectedType, expectedStatus, expectedErrorCode string) (bool, map[string]struct{}) {
-	return verifyCheckerResultMetricsHelper(coreDNSPodResultMetricName, localPort, expectedChkNames, expectedType, expectedStatus, expectedErrorCode)
+	return verifyCheckerResultMetricsHelper(coreDNSPodResultMetricName, localPort, expectedChkNames, expectedType, expectedStatus, expectedErrorCode, []string{"pod_name"})
 }
 
 func verifyCheckerResultMetrics(localPort int, expectedChkNames []string, expectedType, expectedStatus, expectedErrorCode string) (bool, map[string]struct{}) {
-	return verifyCheckerResultMetricsHelper(checkerResultMetricName, localPort, expectedChkNames, expectedType, expectedStatus, expectedErrorCode)
+	return verifyCheckerResultMetricsHelper(checkerResultMetricName, localPort, expectedChkNames, expectedType, expectedStatus, expectedErrorCode, nil)
 }
 
 // verifyCheckerResultMetricsHelper checks if all the checker result metrics match the expected type, status, and error code.
 // It returns true if all checker names match the criteria, false otherwise.
-func verifyCheckerResultMetricsHelper(metricName string, localPort int, expectedChkNames []string, expectedType, expectedStatus, expectedErrorCode string) (bool, map[string]struct{}) {
+func verifyCheckerResultMetricsHelper(metricName string, localPort int, expectedChkNames []string, expectedType, expectedStatus, expectedErrorCode string, expectedLabels []string) (bool, map[string]struct{}) {
 	metricsData, err := getMetrics(localPort)
 	if err != nil {
 		GinkgoWriter.Printf("Failed to get metrics: %v\n", err)
@@ -321,7 +321,8 @@ func verifyCheckerResultMetricsHelper(metricName string, localPort int, expected
 
 		if labels[metricsCheckerTypeLabel] == expectedType &&
 			labels[metricsStatusLabel] == expectedStatus &&
-			labels[metricsErrorCodeLabel] == expectedErrorCode {
+			labels[metricsErrorCodeLabel] == expectedErrorCode &&
+			containExpectedLabels(labels, expectedLabels) {
 			foundCheckers[labels[metricsCheckerNameLabel]] = struct{}{}
 		}
 	}
@@ -339,6 +340,15 @@ func verifyCheckerResultMetricsHelper(metricName string, localPort int, expected
 	}
 
 	return true, foundCheckers
+}
+
+func containExpectedLabels(labels map[string]string, expectedLabels []string) bool {
+	for _, label := range expectedLabels {
+		if _, found := labels[label]; !found {
+			return false
+		}
+	}
+	return true
 }
 
 // removeLabelsFromAllNodes removes the given labels from all nodes in the cluster.
