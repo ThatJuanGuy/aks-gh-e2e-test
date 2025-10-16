@@ -1,11 +1,10 @@
-# Based on https://github.com/Azure/aks-app-routing-operator/blob/main/.github/workflows/test.yaml
 name: aks_e2e
 on:
   repository_dispatch:
     types: [ok-to-test-command]
 
 jobs:
-  get_ref: 
+  get_ref: # Based on https://github.com/Azure/aks-app-routing-operator/blob/main/.github/workflows/test.yaml
     name: "Get ref"
     runs-on: ubuntu-latest
     permissions:
@@ -38,3 +37,222 @@ jobs:
           echo "latest ref doesn't match what was ok-to-test'd"
           exit 1
          fi
+
+  validate_region:
+    name: "Validate Region"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      region: ${{ steps.set_region.outputs.REGION }}
+    steps:
+      # validate and set the region parameter
+      - id: set_region
+        env:
+          REGION_ARG: ${{ github.event.client_payload.slash_command.args.named.region }}
+        run: |
+          REGION="${REGION_ARG:-canadacentral}"
+          
+          # Validate region contains only alphanumeric characters
+          if [[ ! $REGION =~ ^[a-zA-Z0-9]+$ ]]; then
+            echo "Error: Region contains invalid characters. Only alphanumeric characters are allowed."
+            exit 1
+          fi
+          
+          echo "Using region: $REGION"
+          echo "REGION=$REGION" >> $GITHUB_OUTPUT
+
+  validate_sku:
+    name: "Validate SKU"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      sku: ${{ steps.set_sku.outputs.SKU }}
+    steps:
+      # validate and set the sku parameter
+      - id: set_sku
+        env:
+          SKU_ARG: ${{ github.event.client_payload.slash_command.args.named.sku }}
+        run: |
+          SKU="${SKU_ARG:-automatic}"
+          
+          # Validate SKU is one of the allowed values
+          case "$SKU" in
+            automatic|base)
+              echo "Using SKU: $SKU"
+              ;;
+            *)
+              echo "Error: Invalid SKU provided. Allowed values: automatic, base"
+              exit 1
+              ;;
+          esac
+          
+          echo "SKU=$SKU" >> $GITHUB_OUTPUT
+
+  provision_azure:
+    name: "Provision Azure"
+    runs-on: ubuntu-latest
+    needs: [get_ref, validate_region, validate_sku]
+    permissions:
+      id-token: write
+      contents: read
+      actions: read
+    env:
+      AZURE_CORE_OUTPUT: none
+      SUBSCRIPTION_ID: ${{ secrets.SUBSCRIPTION_ID }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          ref: ${{ needs.get_ref.outputs.checkout_ref }}
+
+      - name: Azure Login
+        uses: azure/login@6c251865b4e6290e7b78be643ea2d005bc51f69a # v2.1.1
+        with:
+          client-id: ${{ secrets.CLIENT_ID }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          subscription-id: ${{ secrets.SUBSCRIPTION_ID }}
+      
+      - name: Create Resource Group
+        uses: Azure/CLI@9f7ce6f37c31b777ec6c6b6d1dfe7db79f497956 # v2.2.0
+        with:
+          azcliversion: latest
+          inlineScript: |
+            az group create \
+              --name "chme2e${{ github.run_id }}" \
+              --location "${{ needs.validate_region.outputs.region }}" \
+              --subscription "$SUBSCRIPTION_ID"
+      
+      - name: Create Azure Container Registry
+        uses: Azure/CLI@9f7ce6f37c31b777ec6c6b6d1dfe7db79f497956 # v2.2.0
+        with:
+          azcliversion: latest
+          inlineScript: |
+            az acr create \
+              --name "chme2e${{ github.run_id }}" \
+              --resource-group "chme2e${{ github.run_id }}" \
+              --location "${{ needs.validate_region.outputs.region }}" \
+              --sku "Standard" \
+              --subscription "$SUBSCRIPTION_ID"
+            
+            # Enable anonymous pull access
+            az acr update \
+              --name "chme2e${{ github.run_id }}" \
+              --anonymous-pull-enabled true
+
+      - name: Build and Push Image to ACR
+        uses: Azure/CLI@9f7ce6f37c31b777ec6c6b6d1dfe7db79f497956 # v2.2.0
+        with:
+          azcliversion: latest
+          inlineScript: |
+            # Build and push image to ACR
+            az acr build \
+              --registry "chme2e${{ github.run_id }}" \
+              --image "cluster-health-monitor:${{ github.sha }}" \
+              --file "docker/cluster-health-monitor.Dockerfile" \
+              .
+      
+      - name: Create AKS Cluster
+        uses: Azure/CLI@9f7ce6f37c31b777ec6c6b6d1dfe7db79f497956 # v2.2.0
+        with:
+          azcliversion: latest
+          inlineScript: |
+            az aks create \
+              --name "chme2e${{ github.run_id }}" \
+              --resource-group "chme2e${{ github.run_id }}" \
+              --location "${{ needs.validate_region.outputs.region }}" \
+              --subscription "$SUBSCRIPTION_ID" \
+              --sku "${{ needs.validate_sku.outputs.sku }}" \
+              --no-ssh-key
+
+  deploy_kubernetes_resources:
+    name: "Deploy Kubernetes Resources"
+    runs-on: ubuntu-latest
+    needs: [get_ref, provision_azure]
+    permissions:
+      id-token: write
+      contents: read
+      actions: read
+    env:
+      AZURE_CORE_OUTPUT: none
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          ref: ${{ needs.get_ref.outputs.checkout_ref }}
+
+      - name: Set up Kubectl
+        uses: azure/setup-kubectl@776406bce94f63e41d621b960d78ee25c8b76ede # v4.0.1
+      
+      - name: Set up kubelogin
+        uses: azure/use-kubelogin@76597ae0fcbaace21b05e13a2cbf8daee2c6e820 # v1.2
+        with:
+          kubelogin-version: 'v0.2.10'
+      
+      - name: Azure Login
+        uses: azure/login@6c251865b4e6290e7b78be643ea2d005bc51f69a # v2.1.1
+        with:
+          client-id: ${{ secrets.CLIENT_ID }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          subscription-id: ${{ secrets.SUBSCRIPTION_ID }}
+      
+      - name: Set AKS Context
+        uses: azure/aks-set-context@c7eb093e5a5d47caa333f64974d5fd1cd4bf069d # v4.0.3
+        with:
+          cluster-name: "chme2e${{ github.run_id }}"
+          resource-group: "chme2e${{ github.run_id }}"
+
+      - name: Convert kubeconfig to use Azure CLI
+        run: kubelogin convert-kubeconfig -l azurecli
+      
+      - name: Generate Kubernetes manifests
+        run: |
+          # Generate raw manifests from kustomize with image substitution
+          # The following Azure/k8s-deploy action does not support substituting full image urls, only tags.
+          cd manifests/overlays/test
+          kubectl kustomize . | sed "s|image:.*cluster-health-monitor.*|image: chme2e${{ github.run_id }}.azurecr.io/cluster-health-monitor:${{ github.sha }}|g" > /tmp/k8s-manifests.yaml
+          
+          # Verify the generated manifest with substituted image
+          echo "Generated manifest with substituted image:"
+          cat /tmp/k8s-manifests.yaml
+      
+      - name: Deploy to AKS
+        uses: Azure/k8s-deploy@6f7c489cecd8da05646259d9fa3daae92e095c7b # v5.0.4
+        with:
+          action: deploy
+          manifests: |
+            /tmp/k8s-manifests.yaml
+          force: true
+          pull-images: false
+
+  cleanup:
+    name: "Cleanup Resources"
+    runs-on: ubuntu-latest
+    needs: [deploy_kubernetes_resources]
+    if: always()
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AZURE_CORE_OUTPUT: none
+      SUBSCRIPTION_ID: ${{ secrets.SUBSCRIPTION_ID }}
+    steps:
+      - name: Azure Login
+        uses: azure/login@6c251865b4e6290e7b78be643ea2d005bc51f69a # v2.1.1
+        with:
+          client-id: ${{ secrets.CLIENT_ID }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          subscription-id: ${{ secrets.SUBSCRIPTION_ID }}
+      
+      - name: Cleanup Resources
+        uses: Azure/CLI@9f7ce6f37c31b777ec6c6b6d1dfe7db79f497956 # v2.2.0
+        with:
+          azcliversion: latest
+          inlineScript: |
+            # Delete resource group and all resources
+            az group delete \
+              --name "chme2e${{ github.run_id }}" \
+              --subscription "$SUBSCRIPTION_ID" \
+              --yes \
+              --no-wait
